@@ -1,8 +1,23 @@
 - included_paths:
-    - "**/*"
+    - "**/*.proto"
   disabled_rules:
-    - "core::0191::proto-package"
+    # Since we don't care about resource annotations, we don't care about
+    # resource-annotation-presence.
+    - "core::0131::request-name-reference"
+    - "core::0135::request-name-reference"
+    # We should be able to make X_id fields required for CreateX RPCs.
+    - "core::0133::request-required-fields"
+    # Resource annotations are not required for our use case.
     - "core::0123::resource-annotation"
+    # Field behavior defaults to OPTIONAL, so we don't want to require it.
+    # Required fields MUST be explicitly marked as such though.
+    - "core::0203::field-behavior-required"
+    # The proto package does not strictly match, but modeled in a way that makes
+    # sense for this monorepo. We prepend "peridot." and don't include the "proto"
+    # directory.
+    - "core::0191::proto-package"
+    # We don't follow the parent/child pattern for our services.
+    - "core::0133::method-signature"
+    - "core::0133::http-uri-parent"
     - "core::0132::request-parent-required"
     - "core::0133::request-parent-required"
-    - "core::0131::request-name-reference"
