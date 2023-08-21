@@ -31,9 +31,38 @@ const (
 	EnvVarFrontendOIDCClientSecret  EnvVar = "FRONTEND_OIDC_CLIENT_SECRET"
 	EnvVarFrontendRequiredOIDCGroup EnvVar = "FRONTEND_REQUIRED_OIDC_GROUP"
 	EnvVarFrontendAdminOIDCGroup    EnvVar = "FRONTEND_ADMIN_OIDC_GROUP"
+	EnvVarTemporalNamespace         EnvVar = "TEMPORAL_NAMESPACE"
+	EnvVarTemporalAddress           EnvVar = "TEMPORAL_ADDRESS"
 )
 
-var defaultCliFlags = []cli.Flag{
+var defaultCliFlagsDatabaseOnly = []cli.Flag{
+	&cli.StringFlag{
+		Name:    "database-url",
+		Aliases: []string{"d"},
+		Usage:   "database url",
+		EnvVars: []string{string(EnvVarDatabaseURL)},
+		Value:   "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
+	},
+}
+
+var defaultCliFlagsTemporal = append(defaultCliFlagsDatabaseOnly, []cli.Flag{
+	&cli.StringFlag{
+		Name:    "temporal-namespace",
+		Aliases: []string{"n"},
+		Usage:   "temporal namespace",
+		EnvVars: []string{string(EnvVarTemporalNamespace)},
+		Value:   "default",
+	},
+	&cli.StringFlag{
+		Name:    "temporal-address",
+		Aliases: []string{"a"},
+		Usage:   "temporal address",
+		EnvVars: []string{string(EnvVarTemporalAddress)},
+		Value:   "localhost:7233",
+	},
+}...)
+
+var defaultCliFlags = append(defaultCliFlagsDatabaseOnly, []cli.Flag{
 	&cli.IntFlag{
 		Name:    "grpc-port",
 		Aliases: []string{"p"},
@@ -48,14 +77,7 @@ var defaultCliFlags = []cli.Flag{
 		EnvVars: []string{string(EnvVarGatewayPort)},
 		Value:   8081,
 	},
-	&cli.StringFlag{
-		Name:    "database-url",
-		Aliases: []string{"d"},
-		Usage:   "database url",
-		EnvVars: []string{string(EnvVarDatabaseURL)},
-		Value:   "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
-	},
-}
+}...)
 
 var defaultFrontendNoAuthCliFlags = []cli.Flag{
 	&cli.IntFlag{
@@ -102,6 +124,16 @@ var defaultFrontendAdminCliFlags = append(defaultFrontendCliFlags, []cli.Flag{
 // WithDefaultCliFlags adds the default cli flags to the app.
 func WithDefaultCliFlags(flags ...cli.Flag) []cli.Flag {
 	return append(defaultCliFlags, flags...)
+}
+
+// WithDefaultCliFlagsTemporal adds the default cli flags to the app.
+func WithDefaultCliFlagsTemporal(flags ...cli.Flag) []cli.Flag {
+	return append(defaultCliFlagsTemporal, flags...)
+}
+
+// WithDefaultCliFlagsDatabaseOnly adds the default cli flags to the app.
+func WithDefaultCliFlagsDatabaseOnly(flags ...cli.Flag) []cli.Flag {
+	return append(defaultCliFlagsDatabaseOnly, flags...)
 }
 
 // WithDefaultFrontendNoAuthCliFlags adds the default frontend cli flags to the app.
