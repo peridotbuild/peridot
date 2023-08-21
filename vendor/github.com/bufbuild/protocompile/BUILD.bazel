@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "protocompile",
+    srcs = [
+        "compiler.go",
+        "doc.go",
+        "resolver.go",
+        "std_imports.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/bufbuild/protocompile",
+    importpath = "github.com/bufbuild/protocompile",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/bufbuild/protocompile/ast",
+        "//vendor/github.com/bufbuild/protocompile/linker",
+        "//vendor/github.com/bufbuild/protocompile/options",
+        "//vendor/github.com/bufbuild/protocompile/parser",
+        "//vendor/github.com/bufbuild/protocompile/reporter",
+        "//vendor/github.com/bufbuild/protocompile/sourceinfo",
+        "//vendor/golang.org/x/sync/semaphore",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//reflect/protoreflect",
+        "@org_golang_google_protobuf//reflect/protoregistry",
+        "@org_golang_google_protobuf//types/descriptorpb",
+        "@org_golang_google_protobuf//types/known/anypb",
+        "@org_golang_google_protobuf//types/known/apipb",
+        "@org_golang_google_protobuf//types/known/durationpb",
+        "@org_golang_google_protobuf//types/known/emptypb",
+        "@org_golang_google_protobuf//types/known/fieldmaskpb",
+        "@org_golang_google_protobuf//types/known/sourcecontextpb",
+        "@org_golang_google_protobuf//types/known/structpb",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+        "@org_golang_google_protobuf//types/known/typepb",
+        "@org_golang_google_protobuf//types/known/wrapperspb",
+        "@org_golang_google_protobuf//types/pluginpb",
+    ],
+)
