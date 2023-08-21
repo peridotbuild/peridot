@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+rm -rf vendor
+go mod tidy -e
+go mod vendor -e
+find vendor -name "BUILD.bazel" -delete
+find vendor -name "BUILD" -delete
+bazel run //:gazelle
+bazel run //:gazelle-update-repos

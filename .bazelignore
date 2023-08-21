@@ -1,0 +1,8 @@
+.ijwb
+.idea
+bazel-bin
+bazel-genfiles
+bazel-out
+bazel-testlogs
+bazel-peridot
+node_modules

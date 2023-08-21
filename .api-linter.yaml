@@ -1,0 +1,8 @@
+- included_paths:
+    - "**/*"
+  disabled_rules:
+    - "core::0191::proto-package"
+    - "core::0123::resource-annotation"
+    - "core::0132::request-parent-required"
+    - "core::0133::request-parent-required"
+    - "core::0131::request-name-reference"

@@ -1,0 +1,14 @@
+core.workflow(
+    name = "default",
+    origin = git.github_origin(
+        url = "https://github.com/googleapis/googleapis",
+        ref = "a85e6dfebd30932fbf8bfb1ce5600b2d6d645e9b",
+    ),
+    destination = folder.destination(),
+    origin_files = glob(["google/api/*.proto", "LICENSE"]),
+    destination_files = glob(["third_party/googleapis/**"], exclude = ["README_INTERNAL.txt"]),
+    authoring = authoring.pass_thru("peridot-copybara <peridot+copybara@lists.resf.org>"),
+    transformations = [
+        core.move("", "third_party/googleapis"),
+    ],
+)

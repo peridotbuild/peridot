@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "duration",
+    srcs = ["duration.go"],
+    importmap = "go.resf.org/peridot/vendor/k8s.io/apimachinery/pkg/util/duration",
+    importpath = "k8s.io/apimachinery/pkg/util/duration",
+    visibility = ["//visibility:public"],
+)

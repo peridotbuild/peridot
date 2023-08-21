@@ -1,0 +1,5 @@
+# Due to the overhead of symlinks and the amount of files to symlink with Node applications
+# It's better to disable sandboxing for macOS during development.
+# This reduces esbuild bundle times from 3.5s+ to approx. 0.5s.
+build:macdev --spawn_strategy=local
+run:macdev --spawn_strategy=local
