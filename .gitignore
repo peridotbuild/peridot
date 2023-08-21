@@ -2,3 +2,4 @@
 .ijwb
 bazel-*
 node_modules
+.DS_Store
