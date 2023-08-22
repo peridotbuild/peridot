@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "authorization",
+    srcs = [
+        "authorizer.go",
+        "authorizer_mock.go",
+        "claim_mapper.go",
+        "claim_mapper_mock.go",
+        "default_authorizer.go",
+        "default_jwt_claim_mapper.go",
+        "default_token_key_provider.go",
+        "frontend_api.go",
+        "interceptor.go",
+        "noop_authorizer.go",
+        "roles.go",
+        "token_key_provider.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.temporal.io/server/common/authorization",
+    importpath = "go.temporal.io/server/common/authorization",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/golang-jwt/jwt/v4:jwt",
+        "//vendor/github.com/golang/mock/gomock",
+        "//vendor/go.temporal.io/api/serviceerror",
+        "//vendor/go.temporal.io/server/common/config",
+        "//vendor/go.temporal.io/server/common/log",
+        "//vendor/go.temporal.io/server/common/log/tag",
+        "//vendor/go.temporal.io/server/common/metrics",
+        "//vendor/gopkg.in/square/go-jose.v2:go-jose_v2",
+        "@org_golang_google_grpc//:go_default_library",
+        "@org_golang_google_grpc//credentials",
+        "@org_golang_google_grpc//metadata",
+        "@org_golang_google_grpc//peer",
+    ],
+)

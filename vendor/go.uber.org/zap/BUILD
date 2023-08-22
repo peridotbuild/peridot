@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "zap",
+    srcs = [
+        "array.go",
+        "array_go118.go",
+        "config.go",
+        "doc.go",
+        "encoder.go",
+        "error.go",
+        "field.go",
+        "flag.go",
+        "global.go",
+        "http_handler.go",
+        "level.go",
+        "logger.go",
+        "options.go",
+        "sink.go",
+        "stacktrace.go",
+        "sugar.go",
+        "time.go",
+        "writer.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.uber.org/zap",
+    importpath = "go.uber.org/zap",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/go.uber.org/atomic",
+        "//vendor/go.uber.org/multierr",
+        "//vendor/go.uber.org/zap/buffer",
+        "//vendor/go.uber.org/zap/internal",
+        "//vendor/go.uber.org/zap/internal/bufferpool",
+        "//vendor/go.uber.org/zap/zapcore",
+    ],
+)

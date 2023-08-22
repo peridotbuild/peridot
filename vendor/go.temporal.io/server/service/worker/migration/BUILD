@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "migration",
+    srcs = [
+        "activities.go",
+        "force_replication_workflow.go",
+        "fx.go",
+        "handover_workflow.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.temporal.io/server/service/worker/migration",
+    importpath = "go.temporal.io/server/service/worker/migration",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/go.temporal.io/api/common/v1:common",
+        "//vendor/go.temporal.io/api/enums/v1:enums",
+        "//vendor/go.temporal.io/api/replication/v1:replication",
+        "//vendor/go.temporal.io/api/serviceerror",
+        "//vendor/go.temporal.io/api/workflowservice/v1:workflowservice",
+        "//vendor/go.temporal.io/sdk/activity",
+        "//vendor/go.temporal.io/sdk/temporal",
+        "//vendor/go.temporal.io/sdk/worker",
+        "//vendor/go.temporal.io/sdk/workflow",
+        "//vendor/go.temporal.io/server/api/historyservice/v1:historyservice",
+        "//vendor/go.temporal.io/server/common/config",
+        "//vendor/go.temporal.io/server/common/definition",
+        "//vendor/go.temporal.io/server/common/log",
+        "//vendor/go.temporal.io/server/common/log/tag",
+        "//vendor/go.temporal.io/server/common/metrics",
+        "//vendor/go.temporal.io/server/common/namespace",
+        "//vendor/go.temporal.io/server/common/persistence",
+        "//vendor/go.temporal.io/server/common/quotas",
+        "//vendor/go.temporal.io/server/service/worker/common",
+        "//vendor/go.uber.org/fx",
+    ],
+)

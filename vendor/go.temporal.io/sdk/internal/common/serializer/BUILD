@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "serializer",
+    srcs = [
+        "jsonpb.go",
+        "serializer.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.temporal.io/sdk/internal/common/serializer",
+    importpath = "go.temporal.io/sdk/internal/common/serializer",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/go.temporal.io/sdk:__subpackages__",
+    ],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/jsonpb",
+        "//vendor/github.com/gogo/protobuf/proto",
+        "//vendor/go.temporal.io/api/common/v1:common",
+        "//vendor/go.temporal.io/api/enums/v1:enums",
+        "//vendor/go.temporal.io/api/history/v1:history",
+        "//vendor/go.temporal.io/api/serviceerror",
+    ],
+)

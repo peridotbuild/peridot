@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "global",
+    srcs = [
+        "internal_logging.go",
+        "propagator.go",
+        "state.go",
+        "trace.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.opentelemetry.io/otel/internal/global",
+    importpath = "go.opentelemetry.io/otel/internal/global",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/go.opentelemetry.io/otel:__subpackages__",
+    ],
+    deps = [
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/go-logr/stdr",
+        "//vendor/go.opentelemetry.io/otel/attribute",
+        "//vendor/go.opentelemetry.io/otel/codes",
+        "//vendor/go.opentelemetry.io/otel/propagation",
+        "//vendor/go.opentelemetry.io/otel/trace",
+    ],
+)

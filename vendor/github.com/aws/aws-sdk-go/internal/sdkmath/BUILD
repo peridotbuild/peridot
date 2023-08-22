@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "sdkmath",
+    srcs = [
+        "floor.go",
+        "floor_go1.9.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/aws/aws-sdk-go/internal/sdkmath",
+    importpath = "github.com/aws/aws-sdk-go/internal/sdkmath",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/aws/aws-sdk-go:__subpackages__",
+    ],
+)

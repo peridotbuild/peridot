@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "apiv2",
+    srcs = [
+        "doc.go",
+        "metadata.go",
+        "storage_client.go",
+        "version.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/cloud.google.com/go/storage/internal/apiv2",
+    importpath = "cloud.google.com/go/storage/internal/apiv2",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/cloud.google.com/go/storage:__subpackages__",
+    ],
+    deps = [
+        "//vendor/cloud.google.com/go/iam/apiv1/iampb",
+        "//vendor/cloud.google.com/go/storage/internal",
+        "//vendor/cloud.google.com/go/storage/internal/apiv2/stubs",
+        "@com_github_googleapis_gax_go_v2//:gax-go",
+        "@org_golang_google_api//iterator",
+        "@org_golang_google_api//option",
+        "@org_golang_google_api//option/internaloption",
+        "@org_golang_google_api//transport/grpc",
+        "@org_golang_google_grpc//:go_default_library",
+        "@org_golang_google_grpc//metadata",
+        "@org_golang_google_protobuf//proto",
+    ],
+)

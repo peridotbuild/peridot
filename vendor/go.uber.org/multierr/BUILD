@@ -1,0 +1,10 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "multierr",
+    srcs = ["error.go"],
+    importmap = "go.resf.org/peridot/vendor/go.uber.org/multierr",
+    importpath = "go.uber.org/multierr",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/go.uber.org/atomic"],
+)

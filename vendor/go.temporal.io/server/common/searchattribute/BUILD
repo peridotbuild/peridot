@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "searchattribute",
+    srcs = [
+        "defs.go",
+        "encode.go",
+        "encode_value.go",
+        "manager.go",
+        "mapper.go",
+        "mapper_mock.go",
+        "name_type_map.go",
+        "search_attirbute.go",
+        "search_attribute_mock.go",
+        "stringify.go",
+        "system_provider.go",
+        "test_provider.go",
+        "validator.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.temporal.io/server/common/searchattribute",
+    importpath = "go.temporal.io/server/common/searchattribute",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/golang/mock/gomock",
+        "//vendor/go.temporal.io/api/common/v1:common",
+        "//vendor/go.temporal.io/api/enums/v1:enums",
+        "//vendor/go.temporal.io/api/serviceerror",
+        "//vendor/go.temporal.io/server/api/persistence/v1:persistence",
+        "//vendor/go.temporal.io/server/common/clock",
+        "//vendor/go.temporal.io/server/common/dynamicconfig",
+        "//vendor/go.temporal.io/server/common/headers",
+        "//vendor/go.temporal.io/server/common/payload",
+        "//vendor/go.temporal.io/server/common/persistence",
+    ],
+)

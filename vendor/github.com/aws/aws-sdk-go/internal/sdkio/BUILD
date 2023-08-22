@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "sdkio",
+    srcs = [
+        "byte.go",
+        "io_go1.6.go",
+        "io_go1.7.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/aws/aws-sdk-go/internal/sdkio",
+    importpath = "github.com/aws/aws-sdk-go/internal/sdkio",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/aws/aws-sdk-go:__subpackages__",
+    ],
+)

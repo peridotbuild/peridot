@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "sqlite",
+    srcs = [
+        "admin.go",
+        "cluster_metadata.go",
+        "conn_pool.go",
+        "db.go",
+        "driver.go",
+        "events.go",
+        "execution.go",
+        "execution_maps.go",
+        "namespace.go",
+        "plugin.go",
+        "queue.go",
+        "shard.go",
+        "task.go",
+        "typeconv.go",
+        "visibility.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.temporal.io/server/common/persistence/sql/sqlplugin/sqlite",
+    importpath = "go.temporal.io/server/common/persistence/sql/sqlplugin/sqlite",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/iancoleman/strcase",
+        "//vendor/github.com/jmoiron/sqlx",
+        "//vendor/go.temporal.io/api/serviceerror",
+        "//vendor/go.temporal.io/server/common/config",
+        "//vendor/go.temporal.io/server/common/persistence",
+        "//vendor/go.temporal.io/server/common/persistence/sql",
+        "//vendor/go.temporal.io/server/common/persistence/sql/sqlplugin",
+        "//vendor/go.temporal.io/server/common/resolver",
+        "//vendor/go.temporal.io/server/schema/sqlite",
+        "//vendor/modernc.org/sqlite",
+        "//vendor/modernc.org/sqlite/lib",
+    ],
+)

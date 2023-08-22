@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "typeparams",
+    srcs = [
+        "common.go",
+        "coretype.go",
+        "enabled_go117.go",
+        "enabled_go118.go",
+        "normalize.go",
+        "termlist.go",
+        "typeparams_go117.go",
+        "typeparams_go118.go",
+        "typeterm.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/golang.org/x/tools/internal/typeparams",
+    importpath = "golang.org/x/tools/internal/typeparams",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/golang.org/x/tools:__subpackages__",
+    ],
+)

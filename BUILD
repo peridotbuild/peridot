@@ -8,12 +8,15 @@ npm_link_all_packages(name = "node_modules")
 exports_files(["tsconfig.json"])
 
 # gazelle:prefix go.resf.org/peridot
+# gazelle:build_file_name BUILD
 # gazelle:go_visibility //third_party:__subpackages__
 # gazelle:exclude third_party/googleapis
 # gazelle:exclude vendor/go.resf.org/peridot
 # gazelle:exclude vendor/google.golang.org
 # gazelle:exclude vendor/github.com/golang/protobuf
 # gazelle:exclude vendor/golang.org/x/net
+# gazelle:exclude vendor/golang.org/x/oauth2
+# gazelle:exclude vendor/github.com/googleapis/gax-go/v2
 # gazelle:exclude vendor.go
 # gazelle:go_grpc_compilers @io_bazel_rules_go//proto:go_grpc,//:go_gen_grpc_gateway
 # gazelle:resolve go github.com/bazelbuild/bazel-watcher/internal/ibazel/profiler //third_party/github.com/bazelbuild/bazel-watcher/internal/ibazel/profiler

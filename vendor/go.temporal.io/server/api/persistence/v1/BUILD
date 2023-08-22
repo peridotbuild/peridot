@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "persistence",
+    srcs = [
+        "cluster_metadata.pb.go",
+        "executions.pb.go",
+        "history_tree.pb.go",
+        "namespaces.pb.go",
+        "predicates.pb.go",
+        "queue_metadata.pb.go",
+        "queues.pb.go",
+        "tasks.pb.go",
+        "workflow_mutable_state.pb.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.temporal.io/server/api/persistence/v1",
+    importpath = "go.temporal.io/server/api/persistence/v1",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/gogoproto",
+        "//vendor/github.com/gogo/protobuf/proto",
+        "//vendor/github.com/gogo/protobuf/sortkeys",
+        "//vendor/github.com/gogo/protobuf/types",
+        "//vendor/go.temporal.io/api/common/v1:common",
+        "//vendor/go.temporal.io/api/enums/v1:enums",
+        "//vendor/go.temporal.io/api/failure/v1:failure",
+        "//vendor/go.temporal.io/api/history/v1:history",
+        "//vendor/go.temporal.io/api/namespace/v1:namespace",
+        "//vendor/go.temporal.io/api/taskqueue/v1:taskqueue",
+        "//vendor/go.temporal.io/api/version/v1:version",
+        "//vendor/go.temporal.io/api/workflow/v1:workflow",
+        "//vendor/go.temporal.io/server/api/clock/v1:clock",
+        "//vendor/go.temporal.io/server/api/enums/v1:enums",
+        "//vendor/go.temporal.io/server/api/history/v1:history",
+    ],
+)

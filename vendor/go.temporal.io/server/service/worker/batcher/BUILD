@@ -1,0 +1,37 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "batcher",
+    srcs = [
+        "activities.go",
+        "batcher.go",
+        "fx.go",
+        "workflow.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.temporal.io/server/service/worker/batcher",
+    importpath = "go.temporal.io/server/service/worker/batcher",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/go.temporal.io/api/common/v1:common",
+        "//vendor/go.temporal.io/api/enums/v1:enums",
+        "//vendor/go.temporal.io/api/serviceerror",
+        "//vendor/go.temporal.io/api/workflowservice/v1:workflowservice",
+        "//vendor/go.temporal.io/sdk/activity",
+        "//vendor/go.temporal.io/sdk/client",
+        "//vendor/go.temporal.io/sdk/temporal",
+        "//vendor/go.temporal.io/sdk/worker",
+        "//vendor/go.temporal.io/sdk/workflow",
+        "//vendor/go.temporal.io/server/common/dynamicconfig",
+        "//vendor/go.temporal.io/server/common/headers",
+        "//vendor/go.temporal.io/server/common/log",
+        "//vendor/go.temporal.io/server/common/log/tag",
+        "//vendor/go.temporal.io/server/common/metrics",
+        "//vendor/go.temporal.io/server/common/namespace",
+        "//vendor/go.temporal.io/server/common/primitives",
+        "//vendor/go.temporal.io/server/common/sdk",
+        "//vendor/go.temporal.io/server/common/searchattribute",
+        "//vendor/go.temporal.io/server/service/worker/common",
+        "//vendor/go.uber.org/fx",
+        "//vendor/golang.org/x/time/rate",
+    ],
+)

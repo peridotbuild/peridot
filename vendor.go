@@ -22,4 +22,6 @@ import (
 	_ "github.com/googleapis/api-linter/cmd/api-linter"
 	// ibazel
 	_ "github.com/bazelbuild/bazel-watcher/cmd/ibazel"
+	// temporalite
+	_ "github.com/temporalio/temporalite/cmd/temporalite"
 )

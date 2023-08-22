@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "trace",
+    srcs = [
+        "batch_span_processor.go",
+        "doc.go",
+        "event.go",
+        "evictedqueue.go",
+        "id_generator.go",
+        "link.go",
+        "provider.go",
+        "sampler_env.go",
+        "sampling.go",
+        "simple_span_processor.go",
+        "snapshot.go",
+        "span.go",
+        "span_exporter.go",
+        "span_limits.go",
+        "span_processor.go",
+        "tracer.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/go.opentelemetry.io/otel/sdk/trace",
+    importpath = "go.opentelemetry.io/otel/sdk/trace",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/go.opentelemetry.io/otel",
+        "//vendor/go.opentelemetry.io/otel/attribute",
+        "//vendor/go.opentelemetry.io/otel/codes",
+        "//vendor/go.opentelemetry.io/otel/internal/global",
+        "//vendor/go.opentelemetry.io/otel/sdk/instrumentation",
+        "//vendor/go.opentelemetry.io/otel/sdk/internal",
+        "//vendor/go.opentelemetry.io/otel/sdk/internal/env",
+        "//vendor/go.opentelemetry.io/otel/sdk/resource",
+        "//vendor/go.opentelemetry.io/otel/semconv/v1.10.0:v1_10_0",
+        "//vendor/go.opentelemetry.io/otel/trace",
+    ],
+)
