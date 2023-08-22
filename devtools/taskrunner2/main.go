@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"github.com/urfave/cli/v2"
 	base "go.resf.org/peridot/base/go"
 	"os"
@@ -32,13 +33,37 @@ func getBazelArgs(target string) []string {
 
 func spawnCmd(bin string, target string) error {
 	cmd := exec.Command(bin, getBazelArgs(target)...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 
-	err := cmd.Start()
+	// Capture stdout and stderr and print it with [target]: as prefix
+	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	// print stdout
+	go func() {
+		scanner := bufio.NewScanner(stdoutPipe)
+		for scanner.Scan() {
+			base.LogInfof("[%s]: %s", target, scanner.Text())
+		}
+	}()
+
+	// print stderr
+	go func() {
+		scanner := bufio.NewScanner(stderrPipe)
+		for scanner.Scan() {
+			base.LogInfof("[%s]: %s", target, scanner.Text())
+		}
+	}()
 
 	// if user terminates the main process, kill the ibazel process
 	go func() {
