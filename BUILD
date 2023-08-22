@@ -22,7 +22,7 @@ npm_link_all_packages(name = "node_modules")
 exports_files(["tsconfig.json"])
 
 # gazelle:prefix go.resf.org/peridot
-# gazelle:build_file_name BUILD
+# gazelle:build_file_name BUILD,BUILD.bazel
 # gazelle:go_visibility //third_party:__subpackages__
 # gazelle:exclude third_party/googleapis
 # gazelle:exclude vendor/go.resf.org/peridot

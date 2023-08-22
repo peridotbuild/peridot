@@ -5,5 +5,11 @@ go mod tidy -e
 go mod vendor -e
 find vendor -name "BUILD.bazel" -delete
 find vendor -name "BUILD" -delete
+
+# if the vendor package has a build/BUILD directory/file, then force BUILD.bazel
+for d in $(find vendor -iname build); do
+  echo '' > $(dirname $d)/BUILD.bazel
+done
+
 bazel run //:gazelle
 bazel run //:gazelle-update-repos
