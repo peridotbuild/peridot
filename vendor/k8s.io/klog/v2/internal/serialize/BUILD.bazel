@@ -5,6 +5,9 @@ go_library(
     srcs = ["keyvalues.go"],
     importmap = "go.resf.org/peridot/vendor/k8s.io/klog/v2/internal/serialize",
     importpath = "k8s.io/klog/v2/internal/serialize",
-    visibility = ["//vendor/k8s.io/klog/v2:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/k8s.io/klog/v2:__subpackages__",
+    ],
     deps = ["//vendor/github.com/go-logr/logr"],
 )

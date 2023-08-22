@@ -5,6 +5,9 @@ go_library(
     srcs = ["buffer.go"],
     importmap = "go.resf.org/peridot/vendor/k8s.io/klog/v2/internal/buffer",
     importpath = "k8s.io/klog/v2/internal/buffer",
-    visibility = ["//vendor/k8s.io/klog/v2:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/k8s.io/klog/v2:__subpackages__",
+    ],
     deps = ["//vendor/k8s.io/klog/v2/internal/severity"],
 )

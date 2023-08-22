@@ -8,6 +8,9 @@ go_library(
     ],
     importmap = "go.resf.org/peridot/vendor/github.com/golang/glog/internal/logsink",
     importpath = "github.com/golang/glog/internal/logsink",
-    visibility = ["//vendor/github.com/golang/glog:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/golang/glog:__subpackages__",
+    ],
     deps = ["//vendor/github.com/golang/glog/internal/stackdump"],
 )

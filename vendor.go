@@ -20,4 +20,6 @@ import (
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	// api-linter
 	_ "github.com/googleapis/api-linter/cmd/api-linter"
+	// ibazel
+	_ "github.com/bazelbuild/bazel-watcher/cmd/ibazel"
 )

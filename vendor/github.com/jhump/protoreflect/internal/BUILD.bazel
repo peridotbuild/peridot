@@ -8,7 +8,10 @@ go_library(
     ],
     importmap = "go.resf.org/peridot/vendor/github.com/jhump/protoreflect/internal",
     importpath = "github.com/jhump/protoreflect/internal",
-    visibility = ["//vendor/github.com/jhump/protoreflect:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/jhump/protoreflect:__subpackages__",
+    ],
     deps = [
         "@com_github_golang_protobuf//proto:go_default_library",
         "@org_golang_google_protobuf//types/descriptorpb",

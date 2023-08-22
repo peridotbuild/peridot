@@ -1,5 +1,5 @@
 .idea
 .ijwb
-bazel-*
+/bazel-*
 node_modules
 .DS_Store

@@ -11,7 +11,10 @@ go_library(
     ],
     importmap = "go.resf.org/peridot/vendor/github.com/grpc-ecosystem/grpc-gateway/v2/internal/descriptor",
     importpath = "github.com/grpc-ecosystem/grpc-gateway/v2/internal/descriptor",
-    visibility = ["//vendor/github.com/grpc-ecosystem/grpc-gateway/v2:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2:__subpackages__",
+    ],
     deps = [
         "//vendor/github.com/golang/glog",
         "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2/internal/casing",

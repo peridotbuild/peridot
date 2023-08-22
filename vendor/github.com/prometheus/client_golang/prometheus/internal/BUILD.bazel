@@ -11,7 +11,10 @@ go_library(
     ],
     importmap = "go.resf.org/peridot/vendor/github.com/prometheus/client_golang/prometheus/internal",
     importpath = "github.com/prometheus/client_golang/prometheus/internal",
-    visibility = ["//vendor/github.com/prometheus/client_golang/prometheus:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/prometheus/client_golang/prometheus:__subpackages__",
+    ],
     deps = [
         "//vendor/github.com/prometheus/client_model/go",
         "//vendor/github.com/prometheus/common/model",

@@ -11,5 +11,8 @@ go_library(
     ],
     importmap = "go.resf.org/peridot/vendor/github.com/prometheus/procfs/internal/util",
     importpath = "github.com/prometheus/procfs/internal/util",
-    visibility = ["//vendor/github.com/prometheus/procfs:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/prometheus/procfs:__subpackages__",
+    ],
 )

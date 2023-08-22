@@ -19,7 +19,10 @@ go_library(
     ],
     importmap = "go.resf.org/peridot/vendor/github.com/googleapis/api-linter/rules/internal/utils",
     importpath = "github.com/googleapis/api-linter/rules/internal/utils",
-    visibility = ["//vendor/github.com/googleapis/api-linter/rules:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/googleapis/api-linter/rules:__subpackages__",
+    ],
     deps = [
         "//vendor/bitbucket.org/creachadair/stringset",
         "//vendor/cloud.google.com/go/longrunning/autogen/longrunningpb",

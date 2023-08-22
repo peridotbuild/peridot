@@ -5,5 +5,8 @@ go_library(
     srcs = ["dbg.go"],
     importmap = "go.resf.org/peridot/vendor/k8s.io/klog/v2/internal/dbg",
     importpath = "k8s.io/klog/v2/internal/dbg",
-    visibility = ["//vendor/k8s.io/klog/v2:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/k8s.io/klog/v2:__subpackages__",
+    ],
 )

@@ -10,6 +10,25 @@ github.com/antlr/antlr4/runtime/Go/antlr/v4
 # github.com/bahlo/generic-list-go v0.2.0
 ## explicit; go 1.18
 github.com/bahlo/generic-list-go
+# github.com/bazelbuild/bazel-watcher v0.23.7
+## explicit; go 1.19
+github.com/bazelbuild/bazel-watcher/cmd/ibazel
+github.com/bazelbuild/bazel-watcher/internal/bazel
+github.com/bazelbuild/bazel-watcher/internal/ibazel
+github.com/bazelbuild/bazel-watcher/internal/ibazel/command
+github.com/bazelbuild/bazel-watcher/internal/ibazel/fswatcher
+github.com/bazelbuild/bazel-watcher/internal/ibazel/fswatcher/common
+github.com/bazelbuild/bazel-watcher/internal/ibazel/fswatcher/fsevents
+github.com/bazelbuild/bazel-watcher/internal/ibazel/fswatcher/fsnotify
+github.com/bazelbuild/bazel-watcher/internal/ibazel/lifecycle_hooks
+github.com/bazelbuild/bazel-watcher/internal/ibazel/live_reload
+github.com/bazelbuild/bazel-watcher/internal/ibazel/log
+github.com/bazelbuild/bazel-watcher/internal/ibazel/output_runner
+github.com/bazelbuild/bazel-watcher/internal/ibazel/process_group
+github.com/bazelbuild/bazel-watcher/internal/ibazel/profiler
+github.com/bazelbuild/bazel-watcher/internal/ibazel/workspace
+github.com/bazelbuild/bazel-watcher/third_party/bazel/master/src/main/protobuf/analysis
+github.com/bazelbuild/bazel-watcher/third_party/bazel/master/src/main/protobuf/blaze_query
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -37,6 +56,12 @@ github.com/cespare/xxhash/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.2
 ## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
+# github.com/fsnotify/fsevents v0.1.1
+## explicit
+github.com/fsnotify/fsevents
+# github.com/fsnotify/fsnotify v1.6.0
+## explicit; go 1.16
+github.com/fsnotify/fsnotify
 # github.com/gertd/go-pluralize v0.2.1
 ## explicit; go 1.17
 github.com/gertd/go-pluralize
@@ -117,6 +142,11 @@ github.com/googleapis/api-linter/rules/aip0235
 github.com/googleapis/api-linter/rules/aip4232
 github.com/googleapis/api-linter/rules/internal/data
 github.com/googleapis/api-linter/rules/internal/utils
+# github.com/gopherjs/gopherjs v1.17.2
+## explicit; go 1.17
+# github.com/gorilla/websocket v1.5.0
+## explicit; go 1.12
+github.com/gorilla/websocket
 # github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 ## explicit; go 1.14
 github.com/grpc-ecosystem/go-grpc-middleware
@@ -140,6 +170,9 @@ github.com/grpc-ecosystem/grpc-gateway/v2/utilities
 # github.com/iancoleman/strcase v0.3.0
 ## explicit; go 1.16
 github.com/iancoleman/strcase
+# github.com/jaschaephraim/lrserver v0.0.0-20171129202958-50d19f603f71
+## explicit
+github.com/jaschaephraim/lrserver
 # github.com/jhump/protoreflect v1.15.1
 ## explicit; go 1.18
 github.com/jhump/protoreflect/codec
@@ -159,6 +192,8 @@ github.com/jmoiron/sqlx/reflectx
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
+# github.com/jtolds/gls v4.20.0+incompatible
+## explicit
 # github.com/lib/pq v1.10.9
 ## explicit; go 1.13
 github.com/lib/pq
@@ -174,6 +209,9 @@ github.com/mailru/easyjson/jwriter
 # github.com/mattn/go-runewidth v0.0.9
 ## explicit; go 1.9
 github.com/mattn/go-runewidth
+# github.com/mattn/go-shellwords v1.0.12
+## explicit; go 1.13
+github.com/mattn/go-shellwords
 # github.com/matttproud/golang_protobuf_extensions v1.0.4
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
@@ -213,6 +251,10 @@ github.com/russross/blackfriday/v2
 # github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
 github.com/sirupsen/logrus
+# github.com/smarty/assertions v1.15.1
+## explicit; go 1.18
+# github.com/smartystreets/assertions v1.15.1 => github.com/smarty/assertions v1.15.1
+## explicit; go 1.18
 # github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
@@ -447,3 +489,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# github.com/smartystreets/assertions v1.15.1 => github.com/smarty/assertions v1.15.1

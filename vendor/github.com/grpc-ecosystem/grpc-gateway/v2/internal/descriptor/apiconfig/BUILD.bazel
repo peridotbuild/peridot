@@ -5,7 +5,10 @@ go_library(
     srcs = ["apiconfig.pb.go"],
     importmap = "go.resf.org/peridot/vendor/github.com/grpc-ecosystem/grpc-gateway/v2/internal/descriptor/apiconfig",
     importpath = "github.com/grpc-ecosystem/grpc-gateway/v2/internal/descriptor/apiconfig",
-    visibility = ["//vendor/github.com/grpc-ecosystem/grpc-gateway/v2:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2:__subpackages__",
+    ],
     deps = [
         "@go_googleapis//google/api:annotations_go_proto",
         "@org_golang_google_protobuf//reflect/protoreflect",

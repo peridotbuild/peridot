@@ -5,6 +5,9 @@ go_library(
     srcs = ["data.go"],
     importmap = "go.resf.org/peridot/vendor/github.com/googleapis/api-linter/rules/internal/data",
     importpath = "github.com/googleapis/api-linter/rules/internal/data",
-    visibility = ["//vendor/github.com/googleapis/api-linter/rules:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/googleapis/api-linter/rules:__subpackages__",
+    ],
     deps = ["//vendor/bitbucket.org/creachadair/stringset"],
 )

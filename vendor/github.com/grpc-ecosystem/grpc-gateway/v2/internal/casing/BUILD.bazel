@@ -5,5 +5,8 @@ go_library(
     srcs = ["camel.go"],
     importmap = "go.resf.org/peridot/vendor/github.com/grpc-ecosystem/grpc-gateway/v2/internal/casing",
     importpath = "github.com/grpc-ecosystem/grpc-gateway/v2/internal/casing",
-    visibility = ["//vendor/github.com/grpc-ecosystem/grpc-gateway/v2:__subpackages__"],
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2:__subpackages__",
+    ],
 )
