@@ -24,4 +24,6 @@ import (
 	_ "github.com/bazelbuild/bazel-watcher/cmd/ibazel"
 	// temporalite
 	_ "github.com/temporalio/temporalite/cmd/temporalite"
+	// dex
+	_ "github.com/dexidp/dex/cmd/dex"
 )

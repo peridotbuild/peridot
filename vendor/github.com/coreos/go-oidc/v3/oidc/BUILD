@@ -12,7 +12,7 @@ go_library(
     importpath = "github.com/coreos/go-oidc/v3/oidc",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/gopkg.in/square/go-jose.v2:go-jose_v2",
+        "//vendor/github.com/go-jose/go-jose/v3:go-jose",
         "@org_golang_x_oauth2//:oauth2",
     ],
 )

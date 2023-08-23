@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "hcl",
+    srcs = [
+        "diagnostic.go",
+        "diagnostic_text.go",
+        "diagnostic_typeparams.go",
+        "didyoumean.go",
+        "doc.go",
+        "eval_context.go",
+        "expr_call.go",
+        "expr_list.go",
+        "expr_map.go",
+        "expr_unwrap.go",
+        "merged.go",
+        "ops.go",
+        "pos.go",
+        "pos_scanner.go",
+        "schema.go",
+        "static_expr.go",
+        "structure.go",
+        "structure_at_pos.go",
+        "traversal.go",
+        "traversal_for_expr.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/hashicorp/hcl/v2",
+    importpath = "github.com/hashicorp/hcl/v2",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/agext/levenshtein",
+        "//vendor/github.com/apparentlymart/go-textseg/v13/textseg",
+        "//vendor/github.com/mitchellh/go-wordwrap",
+        "//vendor/github.com/zclconf/go-cty/cty",
+        "//vendor/github.com/zclconf/go-cty/cty/convert",
+        "//vendor/github.com/zclconf/go-cty/cty/function",
+    ],
+)

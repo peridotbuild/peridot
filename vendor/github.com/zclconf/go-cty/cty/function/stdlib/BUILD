@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "stdlib",
+    srcs = [
+        "bool.go",
+        "bytes.go",
+        "collection.go",
+        "conversion.go",
+        "csv.go",
+        "datetime.go",
+        "doc.go",
+        "format.go",
+        "format_fsm.go",
+        "general.go",
+        "json.go",
+        "number.go",
+        "regexp.go",
+        "sequence.go",
+        "set.go",
+        "string.go",
+        "string_replace.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/zclconf/go-cty/cty/function/stdlib",
+    importpath = "github.com/zclconf/go-cty/cty/function/stdlib",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/apparentlymart/go-textseg/v13/textseg",
+        "//vendor/github.com/zclconf/go-cty/cty",
+        "//vendor/github.com/zclconf/go-cty/cty/convert",
+        "//vendor/github.com/zclconf/go-cty/cty/function",
+        "//vendor/github.com/zclconf/go-cty/cty/gocty",
+        "//vendor/github.com/zclconf/go-cty/cty/json",
+    ],
+)
