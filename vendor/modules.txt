@@ -948,6 +948,12 @@ go.opentelemetry.io/proto/otlp/common/v1
 go.opentelemetry.io/proto/otlp/metrics/v1
 go.opentelemetry.io/proto/otlp/resource/v1
 go.opentelemetry.io/proto/otlp/trace/v1
+# go.resf.org/peridot/third_party/bazel/src/main/protobuf v0.0.0-00010101000000-000000000000 => ./bazel-bin/third_party/bazel/src/main/protobuf/blaze_query_go_proto_/go.resf.org/peridot/third_party/bazel/src/main/protobuf
+## explicit
+go.resf.org/peridot/third_party/bazel/src/main/protobuf
+# go.resf.org/peridot/tools/mothership/pb v0.0.0-00010101000000-000000000000 => ./bazel-bin/tools/mothership/proto/v1/mothershippb_go_proto_/go.resf.org/peridot/tools/mothership/pb
+## explicit
+go.resf.org/peridot/tools/mothership/pb
 # go.starlark.net v0.0.0-20230814145427-12f4cb8177e4
 ## explicit; go 1.16
 go.starlark.net/internal/compile
@@ -1582,3 +1588,5 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 # github.com/coreos/bbolt v1.3.7 => go.etcd.io/bbolt v1.3.7
 # github.com/smartystreets/assertions v1.15.1 => github.com/smarty/assertions v1.15.1
+# go.resf.org/peridot/tools/mothership/pb => ./bazel-bin/tools/mothership/proto/v1/mothershippb_go_proto_/go.resf.org/peridot/tools/mothership/pb
+# go.resf.org/peridot/third_party/bazel/src/main/protobuf => ./bazel-bin/third_party/bazel/src/main/protobuf/blaze_query_go_proto_/go.resf.org/peridot/third_party/bazel/src/main/protobuf

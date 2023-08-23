@@ -16,11 +16,12 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.2
 	github.com/prometheus/client_golang v1.16.0
-	github.com/sirupsen/logrus v1.9.3
 	github.com/temporalio/temporalite v0.3.0
 	github.com/urfave/cli/v2 v2.25.7
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	go.ciq.dev/pika v0.0.0-20230819201750-737c3e8f413d
+	go.resf.org/peridot/third_party/bazel/src/main/protobuf v0.0.0-00010101000000-000000000000
+	go.resf.org/peridot/tools/mothership/pb v0.0.0-00010101000000-000000000000
 	go.starlark.net v0.0.0-20230814145427-12f4cb8177e4
 	golang.org/x/mod v0.10.0
 	google.golang.org/grpc v1.57.0
@@ -155,6 +156,7 @@ require (
 	github.com/russellhaering/goxmldsig v1.4.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smarty/assertions v1.15.1 // indirect
 	github.com/smartystreets/assertions v1.15.1 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
@@ -237,3 +239,7 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+replace go.resf.org/peridot/tools/mothership/pb => ./bazel-bin/tools/mothership/proto/v1/mothershippb_go_proto_/go.resf.org/peridot/tools/mothership/pb
+
+replace go.resf.org/peridot/third_party/bazel/src/main/protobuf => ./bazel-bin/third_party/bazel/src/main/protobuf/blaze_query_go_proto_/go.resf.org/peridot/third_party/bazel/src/main/protobuf
