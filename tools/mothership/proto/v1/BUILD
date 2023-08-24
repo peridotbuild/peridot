@@ -19,14 +19,11 @@ load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 proto_library(
     name = "mothershippb_proto",
     srcs = [
-        "bugtracker.proto",
         "entry.proto",
         "srpm_archiver.proto",
-        "worker.proto",
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@com_google_protobuf//:empty_proto",
         "@com_google_protobuf//:timestamp_proto",
         "@com_google_protobuf//:wrappers_proto",
         "@go_googleapis//google/api:annotations_proto",

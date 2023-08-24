@@ -22,8 +22,10 @@ go_library(
         "frontend_server.go",
         "grpc.go",
         "log.go",
+        "pb.go",
         "pointer.go",
         "slice.go",
+        "wrapper_helpers.go",
     ],
     importpath = "go.resf.org/peridot/base/go",
     visibility = ["//visibility:public"],
@@ -37,5 +39,6 @@ go_library(
         "//vendor/go.ciq.dev/pika",
         "@org_golang_google_grpc//:go_default_library",
         "@org_golang_google_grpc//credentials/insecure",
+        "@org_golang_google_protobuf//types/known/timestamppb",
     ],
 )
