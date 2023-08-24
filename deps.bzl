@@ -675,6 +675,12 @@ def go_dependencies():
         sum = "h1:yAGX7huGHXlcLOEtBnF4w7FQwA26wojNCwOYAEhLjQM=",
         version = "v0.0.4",
     )
+    go_repository(
+        name = "com_github_google_addlicense",
+        importpath = "github.com/google/addlicense",
+        sum = "h1:jpVf9qPbU8rz5MxKo7d+RMcNHkqxi4YJi/laauX4aAE=",
+        version = "v1.1.1",
+    )
 
     go_repository(
         name = "com_github_google_btree",

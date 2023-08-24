@@ -26,4 +26,6 @@ import (
 	_ "github.com/temporalio/temporalite/cmd/temporalite"
 	// dex
 	_ "github.com/dexidp/dex/cmd/dex"
+	// addlicense
+	_ "github.com/google/addlicense"
 )

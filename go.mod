@@ -11,6 +11,7 @@ require (
 	github.com/bazelbuild/bazel-watcher v0.23.7
 	github.com/dexidp/dex v0.0.0-20230804184036-a9d1fd31c329
 	github.com/gogo/status v1.1.1
+	github.com/google/addlicense v1.1.1
 	github.com/googleapis/api-linter v1.56.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
