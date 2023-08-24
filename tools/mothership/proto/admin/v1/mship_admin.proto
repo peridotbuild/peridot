@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package peridot.tools.mothership.admin.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/empty.proto";
+import "tools/mothership/proto/admin/v1/worker.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "MshipAdminProto";
+option java_package = "org.resf.peridot.tools.mothership.admin.v1";
+option go_package = "go.resf.org/peridot/tools/mothership/admin/pb;mshipadminpb";
+
+// Service to manage Mothership/SrpmArchiver instances.
+service MshipAdmin {
+  // Gets a worker
+  rpc GetWorker(GetWorkerRequest) returns (Worker) {
+    option (google.api.http) = {
+      get: "/v1/{name=workers/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Lists the workers registered
+  rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse) {
+    option (google.api.http) = {
+      get: "/v1/workers"
+    };
+  }
+
+  // Creates a worker
+  rpc CreateWorker(CreateWorkerRequest) returns (Worker) {
+    option (google.api.http) = {
+      post: "/v1/workers"
+      body: "worker"
+    };
+    option (google.api.method_signature) = "worker,worker_id";
+  }
+
+  // Deletes a worker
+  // Only deletes the worker entry, but not the references to the worker
+  // from entries this worker has created.
+  rpc DeleteWorker(DeleteWorkerRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/{name=workers/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+}
+
+// GetWorkerRequest is the request message for GetWorker.
+message GetWorkerRequest {
+  // Required. The name of the worker to retrieve.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// ListWorkersRequest is the request message for ListWorkers.
+message ListWorkersRequest {
+  // The maximum number of workers to return.
+  // If not specified, the server will pick an appropriate default.
+  int32 page_size = 1;
+
+  // A page token, received from a previous `ListWorkers` call.
+  // Provide this to retrieve the subsequent page.
+  // When paginating, all other parameters provided to `ListWorkers` must match
+  // the call that provided the page token.
+  string page_token = 2;
+
+  // The filter to apply to list of workers.
+  // Supports all fields of the `Worker` resource.
+  string filter = 3;
+
+  // The order to apply to the list of workers.
+  // Supports all fields of the `Worker` resource.
+  // Needs a suffix of either `asc` or `desc`.
+  // Example: `name asc`, `created_at desc`.
+  string order_by = 4;
+}
+
+// ListWorkersResponse is the response message for ListWorkers.
+message ListWorkersResponse {
+  // The workers belonging to the requested project.
+  repeated Worker workers = 1;
+
+  // A token, which can be sent as `page_token` to retrieve the next page.
+  // If this field is omitted, there are no subsequent pages.
+  string next_page_token = 2;
+}
+
+// CreateWorkerRequest is the request message for CreateWorker.
+message CreateWorkerRequest {
+  // Required. The worker to create.
+  Worker worker = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Required. The worker name to use.
+  string worker_id = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// DeleteWorkerRequest is the request message for DeleteWorker.
+message DeleteWorkerRequest {
+  // Required. The name of the worker to delete.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
