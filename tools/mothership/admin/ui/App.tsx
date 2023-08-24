@@ -15,7 +15,6 @@
  */
 
 import React from 'react';
-import { Link, Route, Routes } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
@@ -28,25 +27,31 @@ import ListAltIcon from '@mui/icons-material/ListAlt';
 
 import { Dashboard } from './Dashboard';
 import { Drawer } from 'base/ts/mui/Drawer';
+import { Route, Routes } from 'react-router-dom';
 
 export const App = () => {
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar
         position="fixed"
+        elevation={0}
         sx={{ zIndex: (theme: Theme) => theme.zIndex.drawer + 1 }}
       >
         <Toolbar variant="dense">
-          <Link to="/">
-            <img src="/_ga/mship_gopher.png" height="43.5px" />
-          </Link>
-          <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
-            <Button className="native-link" href="/admin">
-              Admin
-            </Button>
-          </Box>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Mship Admin
+          </Typography>
         </Toolbar>
       </AppBar>
+      <Drawer
+        sections={[
+          {
+            links: [
+              { text: 'Dashboard', href: '/', icon: <DashboardIcon /> },
+            ],
+          },
+        ]}
+      />
       <Box component="main" sx={{ p: 3, flexGrow: 1 }}>
         <Toolbar variant="dense" />
         <Routes>

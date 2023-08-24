@@ -3,3 +3,6 @@
 /bazel-*
 node_modules
 .DS_Store
+
+# ignore nfv2 generated content
+vendor/go.resf.org/peridot
