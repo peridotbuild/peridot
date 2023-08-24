@@ -21,3 +21,12 @@
     - "core::0133::http-uri-parent"
     - "core::0132::request-parent-required"
     - "core::0133::request-parent-required"
+- included_paths:
+    - "third_party/**/*.proto"
+    - "vendor/**/*.proto"
+    - "node_modules/**/*.proto"
+    - "bazel-bin/**/*.proto"
+    - "bazel-peridot/**/*.proto"
+    - "bazel-out/**/*.proto"
+  disabled_rules:
+    - all
