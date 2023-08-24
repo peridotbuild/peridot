@@ -27,8 +27,10 @@ ui_bundle(
 go_library(
     name = "ui_lib",
     srcs = ["main.go"],
+    # keep
     embedsrcs = [
-        ":bundle.js",  # keep
+        ":bundle",  # keep
+        "mship_gopher.png",  # keep
     ],
     importpath = "go.resf.org/peridot/tools/mothership/ui",
     visibility = ["//visibility:private"],
