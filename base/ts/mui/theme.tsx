@@ -35,13 +35,7 @@ const LinkBehavior = React.forwardRef<
 
 export const peridotThemeOptions: ThemeOptions = {
   palette: {
-    mode: 'light',
-    primary: {
-      main: '#1c2834',
-    },
-    secondary: {
-      main: '#168afd',
-    },
+    mode: 'dark',
   },
   components: {
     MuiLink: {
