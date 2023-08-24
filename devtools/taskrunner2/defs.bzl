@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-def taskrunner2(name, targets = [], watch_targets = []):
+def taskrunner2(name, targets = [], watch_targets = [], dev_frontend_flags = False):
     args = []
 
     for target in targets:
@@ -22,6 +22,9 @@ def taskrunner2(name, targets = [], watch_targets = []):
     for target in watch_targets:
         args.append("-w")
         args.append(target)
+
+    if dev_frontend_flags:
+        args.append("--dev-frontend-flags")
 
     # generate args output
     native.genrule(
