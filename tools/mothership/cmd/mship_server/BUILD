@@ -28,6 +28,18 @@ go_library(
 
 go_binary(
     name = "mship_api",
-    embed = [":mship_api_lib"],
+    embed = [":mship_server_lib"],
     visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "mship_server_lib",
+    srcs = ["main.go"],
+    importpath = "go.resf.org/peridot/tools/mothership/cmd/mship_server",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//base/go",
+        "//tools/mothership/rpc",
+        "//vendor/github.com/urfave/cli/v2:cli",
+    ],
 )
