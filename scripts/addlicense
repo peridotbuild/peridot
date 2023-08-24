@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+bazel build //vendor/github.com/google/addlicense
+bin_path="bazel-bin/vendor/github.com/google/addlicense/addlicense_/addlicense"
+
+$bin_path \
+  -c "Peridot Authors" \
+  -ignore "vendor/**" \
+  -ignore "third_party/**" \
+  -ignore "node_modules/**" \
+  -ignore ".ijwb/**" \
+  -ignore ".idea/**" \
+  -ignore ".vscode/**" \
+  -ignore "pnpm-lock.yaml" \
+  -ignore ".api-linter.yaml" \
+  -v \
+  .

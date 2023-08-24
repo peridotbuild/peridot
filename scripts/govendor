@@ -11,5 +11,16 @@ for d in $(find vendor -iname build); do
   echo '' > $(dirname $d)/BUILD.bazel
 done
 
+# run nfv2 to generate replace entries for generated content
+# we don't want to invoke bazel all the time so check if it's built already
+if [[ ! -f bazel-bin/devtools/nfv2/nfv2_/nfv2 ]]; then
+  bazel build //devtools/nfv2
+fi
+# it's meant to be run with bazel but it only requires the workspace directory env
+BUILD_WORKSPACE_DIRECTORY="$(pwd)" bazel-bin/devtools/nfv2/nfv2_/nfv2
+
 bazel run //:gazelle
-bazel run //:gazelle-update-repos
+# we don't care about the local repository warnings from updating the deps.bzl file
+# obviously ignoring all errors is stupid, but the warnings are too noisy
+# todo(mustafa): figure out a filter for the warnings
+bazel run //:gazelle-update-repos 2>/dev/null

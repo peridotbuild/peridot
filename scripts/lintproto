@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+bazel build //vendor/github.com/googleapis/api-linter/cmd/api-linter
+bin_path="bazel-bin/vendor/github.com/googleapis/api-linter/cmd/api-linter/api-linter_/api-linter"
+
+$bin_path \
+  $(find . -name "*.proto" ! -path "./vendor/*" ! -path "./third_party/*" ! -path "./node_modules/*" ! -path "./bazel-*") \
+  -I . \
+  -I third_party/googleapis \
+  --config .api-linter.yaml
