@@ -14,12 +14,12 @@
 
 syntax = "proto3";
 
-package peridot.tools.mothership.v1;
+package peridot.tools.mothership.admin.v1;
 
 option java_multiple_files = true;
 option java_outer_classname = "BugtrackerProto";
-option java_package = "org.resf.peridot.tools.mothership.v1";
-option go_package = "go.resf.org/peridot/tools/mothership/pb;mothershippb";
+option java_package = "org.resf.peridot.tools.mothership.admin.v1";
+option go_package = "go.resf.org/peridot/tools/mothership/admin/pb;mshipadminpb";
 
 // BugTrackerConfig is the configuration for a bug tracker.
 // Usually, the bug tracker is a third-party service, such as Mantis or Track

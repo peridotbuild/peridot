@@ -14,15 +14,15 @@
 
 syntax = "proto3";
 
-package peridot.tools.mothership.v1;
+package peridot.tools.mothership.admin.v1;
 
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 
 option java_multiple_files = true;
 option java_outer_classname = "WorkerProto";
-option java_package = "org.resf.peridot.tools.mothership.v1";
-option go_package = "go.resf.org/peridot/tools/mothership/pb;mothershippb";
+option java_package = "org.resf.peridot.tools.mothership.admin.v1";
+option go_package = "go.resf.org/peridot/tools/mothership/admin/pb;mshipadminpb";
 
 // Worker is a client registered with Mothership that can submit SRPMs.
 // Usually these clients are servers that run the Linux distro that is being
