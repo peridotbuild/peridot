@@ -1,9 +1,9 @@
-<center>
+<p align="center">
   <picture>
     <img src="ui/mship_gopher_dark.png" alt="Mship" height="150">
   </picture>
-</center>
-<center>Tool to archive RPM packages and attest to their authenticity</center>
+</p>
+<p align="center">Tool to archive RPM packages and attest to their authenticity</p>
 <hr />
 
 ### Development
