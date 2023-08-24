@@ -16,4 +16,14 @@
 
 set -euo pipefail
 
+# check if a process is already running
+# we don't have a lock so just use ps and grep
+if ps aux | grep -v grep | grep "temporalite start" ; then
+  # we're not going to fail, but silently exit with a small warning
+  # this is due to different services in this repo including devtemporal as a target
+  # in taskrunner2, but some situations may warrant a dedicated devtemporal
+  echo "WARNING: devtemporal already running, not starting a new one"
+  exit 0
+fi
+
 vendor/github.com/temporalio/temporalite/cmd/temporalite/temporalite_/temporalite start --log-format pretty --log-level error
