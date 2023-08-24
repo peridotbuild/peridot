@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@aspect_rules_swc//swc:defs.bzl", "swc")
 load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
+load("//tools/build_rules/ui_library:defs.bzl", "ui_library")
 
 def ui_bundle(name, srcs = [], data = [], deps = [], css = False):
-    swc(
+    ui_library(
         name = name + "_lib",
         srcs = native.glob([
             "*.tsx",
@@ -40,7 +40,10 @@ def ui_bundle(name, srcs = [], data = [], deps = [], css = False):
             "//:node_modules/react-dom",
             "//:node_modules/react-router",
             "//:node_modules/react-router-dom",
+            "//:node_modules/tslib",
         ],
+        output_dir = True,
+        splitting = True,
         entry_point = "entrypoint.tsx",
         # The transpiling is done with swc, so we don't need to do it here.
         target = "esnext",
