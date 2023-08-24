@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -63,11 +64,34 @@ func spawnCmd(bin string, target string) error {
 		return err
 	}
 
+	shortTarget := target
+	if len(shortTarget) > 20 {
+		// Ignoring the first //, split by / then only use the first character in each part
+		// except for the last part where the full name is used (including the :X part).
+		// This is to make the output more readable.
+		shortTarget = ""
+		start := target
+		if strings.HasPrefix(start, "//") {
+			start = start[2:]
+			shortTarget = "//"
+		}
+		parts := strings.Split(start, "/")
+
+		for i, part := range parts {
+			if i == len(parts)-1 {
+				shortTarget += part
+			} else {
+				// Add the slash back
+				shortTarget += string(part[0]) + "/"
+			}
+		}
+	}
+
 	// print stdout
 	go func() {
 		scanner := bufio.NewScanner(stdoutPipe)
 		for scanner.Scan() {
-			base.LogInfof("[%s]: %s", target, scanner.Text())
+			base.LogInfof("[%s]: %s", shortTarget, scanner.Text())
 		}
 	}()
 
@@ -75,7 +99,7 @@ func spawnCmd(bin string, target string) error {
 	go func() {
 		scanner := bufio.NewScanner(stderrPipe)
 		for scanner.Scan() {
-			base.LogInfof("[%s]: %s", target, scanner.Text())
+			base.LogInfof("[%s]: %s", shortTarget, scanner.Text())
 		}
 	}()
 
@@ -103,6 +127,14 @@ func spawnIbazel(target string) error {
 func run(ctx *cli.Context) error {
 	// add interrupt handler
 	signal.Notify(interrupt, os.Interrupt, os.Kill)
+
+	// add default frontend flags if needed
+	if ctx.Bool("dev-frontend-flags") {
+		base.ChangeDefaultForEnvVar(base.EnvVarFrontendSelf, "http://localhost:9111")
+		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCIssuer, "http://localhost:5556/dex")
+		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCClientID, "local")
+		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCClientSecret, "local")
+	}
 
 	// get current wd and make the ibazel path relative to it
 	wd, err := os.Getwd()
@@ -161,6 +193,10 @@ func main() {
 				Name:    "watch-targets",
 				Aliases: []string{"w"},
 				Usage:   "targets to watch for changes",
+			},
+			&cli.BoolFlag{
+				Name:  "dev-frontend-flags",
+				Usage: "use the default frontend flags for development",
 			},
 		},
 	}
