@@ -22,17 +22,19 @@ import (
 type EnvVar string
 
 const (
-	EnvVarGRPCPort                  EnvVar = "GRPC_PORT"
-	EnvVarGatewayPort               EnvVar = "GATEWAY_PORT"
-	EnvVarDatabaseURL               EnvVar = "DATABASE_URL"
-	EnvVarFrontendPort              EnvVar = "FRONTEND_PORT"
-	EnvVarFrontendOIDCIssuer        EnvVar = "FRONTEND_OIDC_ISSUER"
-	EnvVarFrontendOIDCClientID      EnvVar = "FRONTEND_OIDC_CLIENT_ID"
-	EnvVarFrontendOIDCClientSecret  EnvVar = "FRONTEND_OIDC_CLIENT_SECRET"
-	EnvVarFrontendRequiredOIDCGroup EnvVar = "FRONTEND_REQUIRED_OIDC_GROUP"
-	EnvVarFrontendAdminOIDCGroup    EnvVar = "FRONTEND_ADMIN_OIDC_GROUP"
-	EnvVarTemporalNamespace         EnvVar = "TEMPORAL_NAMESPACE"
-	EnvVarTemporalAddress           EnvVar = "TEMPORAL_ADDRESS"
+	EnvVarGRPCPort                     EnvVar = "GRPC_PORT"
+	EnvVarGatewayPort                  EnvVar = "GATEWAY_PORT"
+	EnvVarDatabaseURL                  EnvVar = "DATABASE_URL"
+	EnvVarFrontendPort                 EnvVar = "FRONTEND_PORT"
+	EnvVarFrontendOIDCIssuer           EnvVar = "FRONTEND_OIDC_ISSUER"
+	EnvVarFrontendOIDCClientID         EnvVar = "FRONTEND_OIDC_CLIENT_ID"
+	EnvVarFrontendOIDCClientSecret     EnvVar = "FRONTEND_OIDC_CLIENT_SECRET"
+	EnvVarFrontendOIDCUserInfoOverride EnvVar = "FRONTEND_OIDC_USERINFO_OVERRIDE"
+	EnvVarFrontendRequiredOIDCGroup    EnvVar = "FRONTEND_REQUIRED_OIDC_GROUP"
+	EnvVarTemporalNamespace            EnvVar = "TEMPORAL_NAMESPACE"
+	EnvVarTemporalAddress              EnvVar = "TEMPORAL_ADDRESS"
+	EnvVarFrontendAllowUnauthenticated EnvVar = "FRONTEND_ALLOW_UNAUTHENTICATED"
+	EnvVarFrontendSelf                 EnvVar = "FRONTEND_SELF"
 )
 
 var defaultCliFlagsDatabaseOnly = []cli.Flag{
@@ -107,17 +109,24 @@ var defaultFrontendCliFlags = append(defaultFrontendNoAuthCliFlags, []cli.Flag{
 		EnvVars: []string{string(EnvVarFrontendOIDCClientSecret)},
 	},
 	&cli.StringFlag{
+		Name:    "oidc-userinfo-override",
+		Usage:   "OIDC userinfo override",
+		EnvVars: []string{string(EnvVarFrontendOIDCUserInfoOverride)},
+	},
+	&cli.StringFlag{
 		Name:    "required-oidc-group",
 		Usage:   "OIDC group that is required to access the frontend",
 		EnvVars: []string{string(EnvVarFrontendRequiredOIDCGroup)},
 	},
-}...)
-
-var defaultFrontendAdminCliFlags = append(defaultFrontendCliFlags, []cli.Flag{
 	&cli.StringFlag{
-		Name:    "admin-oidc-group",
-		Usage:   "OIDC group that is allowed to access the admin page",
-		EnvVars: []string{string(EnvVarFrontendAdminOIDCGroup)},
+		Name:    "allow-unauthenticated",
+		Usage:   "Allow unauthenticated access to the frontend",
+		EnvVars: []string{string(EnvVarFrontendAllowUnauthenticated)},
+	},
+	&cli.StringFlag{
+		Name:    "self",
+		Usage:   "Endpoint pointing to the frontend",
+		EnvVars: []string{string(EnvVarFrontendSelf)},
 	},
 }...)
 
@@ -146,16 +155,25 @@ func WithDefaultFrontendCliFlags(flags ...cli.Flag) []cli.Flag {
 	return append(defaultFrontendCliFlags, flags...)
 }
 
-// WithDefaultFrontendAdminCliFlags adds the default frontend cli flags to the app.
-func WithDefaultFrontendAdminCliFlags(flags ...cli.Flag) []cli.Flag {
-	return append(defaultFrontendAdminCliFlags, flags...)
-}
-
 // FlagsToGRPCServerOptions converts the cli flags to gRPC server options.
 func FlagsToGRPCServerOptions(ctx *cli.Context) []GRPCServerOption {
 	return []GRPCServerOption{
 		WithGRPCPort(ctx.Int("grpc-port")),
 		WithGatewayPort(ctx.Int("gateway-port")),
+	}
+}
+
+// FlagsToFrontendInfo converts the cli flags to frontend info.
+func FlagsToFrontendInfo(ctx *cli.Context) *FrontendInfo {
+	return &FrontendInfo{
+		Title:                ctx.App.Name,
+		Self:                 ctx.String("self"),
+		AllowUnauthenticated: ctx.Bool("allow-unauthenticated"),
+		OIDCIssuer:           ctx.String("oidc-issuer"),
+		OIDCClientID:         ctx.String("oidc-client-id"),
+		OIDCClientSecret:     ctx.String("oidc-client-secret"),
+		OIDCGroup:            ctx.String("required-oidc-group"),
+		OIDCUserInfoOverride: ctx.String("oidc-userinfo-override"),
 	}
 }
 

@@ -16,6 +16,7 @@ package base
 
 import (
 	"crypto/sha256"
+	"embed"
 	"encoding/hex"
 	"fmt"
 	"mime"
@@ -28,6 +29,33 @@ import (
 type FrontendInfo struct {
 	// Title to add to the HTML page
 	Title string
+
+	// Self is the URL to the frontend server
+	Self string
+
+	// NoAuth is a flag to disable authentication
+	NoAuth bool
+
+	// AllowUnauthenticated is a flag to allow unauthenticated users
+	AllowUnauthenticated bool
+
+	// OIDCIssuer is the issuer to use for authentication
+	OIDCIssuer string
+
+	// OIDCClientID is the client ID to use for authentication
+	OIDCClientID string
+
+	// OIDCClientSecret is the client secret to use for authentication
+	OIDCClientSecret string
+
+	// OIDCGroup is the group to check for authentication
+	OIDCGroup string
+
+	// OIDCUserInfoOverride is a flag to override the userinfo endpoint
+	OIDCUserInfoOverride string
+
+	// AdditionalContent is a map of paths to content to serve
+	AdditionalContent map[string][]byte
 }
 
 var frontendHtmlTemplate = `
@@ -48,7 +76,7 @@ var frontendHtmlTemplate = `
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap"
     />
 </head>
-<body style="background-color:#f1f5f9;">
+<body>
     <div id="app"></div>
 
     <script src="{{.BundleJS}}"></script>
@@ -56,7 +84,27 @@ var frontendHtmlTemplate = `
 </html>
 `
 
-func FrontendServer(info *FrontendInfo, kv ...string) {
+func readDir(embedfs *embed.FS, root string) ([]string, error) {
+	var paths []string
+	entries, err := embedfs.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			subPaths, err := readDir(embedfs, filepath.Join(root, entry.Name()))
+			if err != nil {
+				return nil, err
+			}
+			paths = append(paths, subPaths...)
+		} else {
+			paths = append(paths, filepath.Join(root, entry.Name()))
+		}
+	}
+	return paths, nil
+}
+
+func FrontendServer(info *FrontendInfo, embedfs *embed.FS) {
 	port := 9111
 	if info == nil {
 		info = &FrontendInfo{}
@@ -70,26 +118,41 @@ func FrontendServer(info *FrontendInfo, kv ...string) {
 	}
 	newTemplate = strings.ReplaceAll(newTemplate, "{{.Title}}", info.Title)
 
-	pathToContent := map[string]string{}
-	// KV is a list of key-value pairs, where the key is the alias and the value
-	// is the actual file content.
-	for i := 0; i < len(kv); i += 2 {
-		content := kv[i+1]
+	pathToContent := map[string][]byte{}
+
+	// Read the files from the embedfs
+	paths, err := readDir(embedfs, "bundle")
+	if err != nil {
+		LogFatalf("failed to read embedfs: %v", err)
+	}
+
+	for _, path := range paths {
+		content, err := embedfs.ReadFile(path)
+		if err != nil {
+			LogFatalf("failed to read embedfs: %v", err)
+		}
 
 		// Sha256 hash of the content to add to name
 		hash := sha256.New()
-		hash.Write([]byte(content))
+		hash.Write(content)
 		hashSum := hex.EncodeToString(hash.Sum(nil))
 
-		ext := filepath.Ext(kv[i])
-		noExtName := kv[i][:len(kv[i])-len(ext)]
-		path := fmt.Sprintf("/_ga/%s.%s%s", noExtName, hashSum[:8], ext)
+		ext := filepath.Ext(path)
+		noExtName := path[:len(path)-len(ext)]
+		newPath := fmt.Sprintf("/_ga/%s.%s%s", noExtName, hashSum[:8], ext)
 
-		pathToContent[path] = content
+		pathToContent[newPath] = content
 
-		// If name is bundle.js, replace the template
-		if kv[i] == "bundle.js" {
-			newTemplate = strings.ReplaceAll(newTemplate, "{{.BundleJS}}", path)
+		// If name is entrypoint.js, replace the template
+		if filepath.Base(path) == "entrypoint.js" {
+			newTemplate = strings.ReplaceAll(newTemplate, "{{.BundleJS}}", newPath)
+		}
+	}
+
+	// Add additional content
+	if info.AdditionalContent != nil {
+		for path, content := range info.AdditionalContent {
+			pathToContent[path] = content
 		}
 	}
 
@@ -118,6 +181,11 @@ func FrontendServer(info *FrontendInfo, kv ...string) {
 	http.HandleFunc("/_ga/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte("ok"))
+	})
+
+	// Handle auth routes
+	http.HandleFunc("/auth/oidc/login", func(w http.ResponseWriter, r *http.Request) {
+
 	})
 
 	LogInfof("starting frontend server on port %d", port)
