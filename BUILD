@@ -19,7 +19,7 @@ load("@npm//:defs.bzl", "npm_link_all_packages")
 
 npm_link_all_packages(name = "node_modules")
 
-exports_files(["tsconfig.json"])
+exports_files([".swcrc"])
 
 # gazelle:prefix go.resf.org/peridot
 # gazelle:build_file_name BUILD,BUILD.bazel
