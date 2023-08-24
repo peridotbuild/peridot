@@ -16,8 +16,10 @@ load("//devtools/taskrunner2:defs.bzl", "taskrunner2")
 
 taskrunner2(
     name = "mothership",
+    dev_frontend_flags = True,
     targets = [
         "//devtools/devtemporal",
+        "//devtools/devdex",
     ],
     watch_targets = [
         "//tools/mothership/cmd/mship_api",
