@@ -2,8 +2,7 @@ load("//tools/build_rules/copybara:copybara.bzl", "copybara")
 
 copybara_list = [
     "googleapis",
-    "pika",
-    "rules_dart",
+    "bazel",
 ]
 
 def declare_targets():
