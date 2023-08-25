@@ -15,6 +15,7 @@
  */
 
 import React from 'react';
+import { matchPath, useLocation } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
@@ -45,40 +46,48 @@ export interface DrawerProps {
 const drawerWidth = 240;
 
 export const Drawer = (props: DrawerProps) => {
+  const location = useLocation();
+
   return (
     <MuiDrawer
-      variant='permanent'
+      variant="permanent"
       sx={{
         width: drawerWidth,
         flexShrink: 0,
-        [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box' }
+        [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box' },
       }}
     >
-      <Toolbar variant='dense' />
+      <Toolbar variant="dense" />
       <Box sx={{ overflow: 'auto' }}>
-        <List>
+        <List sx={{py: 0}}>
           {props.sections.map((section: DrawerSection) => (
-            <>
+            <React.Fragment key={section.title}>
               {section.title && <ListSubheader>{section.title}</ListSubheader>}
               {section.links.map((link: DrawerLink) => (
-                <ListItem key={link.href} disablePadding sx={{ display: 'block' }} dense>
+                <ListItem
+                  key={link.href}
+                  disablePadding
+                  sx={{ display: 'block' }}
+                >
                   <ListItemButton
+                    selected={
+                      matchPath(
+                        link.href,
+                        location.pathname,
+                      ) != null
+                    }
                     href={link.href}
                     sx={{
                       justifyContent: 'center',
-                      px: 2.5
+                      px: 2.5,
                     }}
                   >
-                    {link.icon && (
-                      <ListItemIcon>
-                        {link.icon}
-                      </ListItemIcon>
-                    )}
+                    {link.icon && <ListItemIcon>{link.icon}</ListItemIcon>}
                     <ListItemText primary={link.text} />
                   </ListItemButton>
                 </ListItem>
               ))}
-            </>
+            </React.Fragment>
           ))}
         </List>
       </Box>
