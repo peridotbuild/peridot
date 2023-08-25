@@ -26,4 +26,4 @@ if ps aux | grep -v grep | grep "temporalite start" ; then
   exit 0
 fi
 
-vendor/github.com/temporalio/temporalite/cmd/temporalite/temporalite_/temporalite start --log-format pretty --log-level error
+vendor/github.com/temporalio/temporalite/cmd/temporalite/temporalite_/temporalite start --log-format pretty --log-level fatal --ephemeral
