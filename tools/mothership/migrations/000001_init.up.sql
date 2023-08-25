@@ -17,4 +17,4 @@ CREATE TABLE entries
   worker_id   VARCHAR(255) REFERENCES workers (worker_id),
   batch_name  VARCHAR(255),
   user_email  TEXT
-)
+);

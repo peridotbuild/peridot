@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
-rm -rf vendor
+set -euo pipefail
+
 go mod tidy -e
+rm -rf vendor
 go mod vendor -e
 find vendor -name "BUILD.bazel" -delete
 find vendor -name "BUILD" -delete
