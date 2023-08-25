@@ -85,9 +85,9 @@ func (p *PageToken[T]) pageToken(b QuerySet[T], options AIPFilterOptions) (Query
 		return nil, fmt.Errorf("page size cannot be less than 1")
 	}
 
-	// Return error if page size is greater than 1000
-	if p.PageSize > 1000 {
-		return nil, fmt.Errorf("page size cannot be greater than 1000")
+	// Return error if page size is greater than 100
+	if p.PageSize > 100 {
+		return nil, fmt.Errorf("page size cannot be greater than 100")
 	}
 
 	b.Offset(int(p.Offset))

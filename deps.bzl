@@ -16,6 +16,13 @@ load("@bazel_gazelle//:deps.bzl", "go_repository")
 
 def go_dependencies():
     go_repository(
+        name = "build_buf_gen_go_bufbuild_protovalidate_protocolbuffers_go",
+        importpath = "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go",
+        sum = "h1:tdpHgTbmbvEIARu+bixzmleMi14+3imnpoFXz+Qzjp4=",
+        version = "v1.31.0-20230802163732-1c33ebd9ecfa.1",
+    )
+
+    go_repository(
         name = "co_honnef_go_tools",
         importpath = "honnef.co/go/tools",
         sum = "h1:UoveltGrhghAA7ePc+e+QYDHXrBps2PqFZiHkGR/xK8=",
@@ -70,8 +77,8 @@ def go_dependencies():
     go_repository(
         name = "com_github_antlr_antlr4_runtime_go_antlr_v4",
         importpath = "github.com/antlr/antlr4/runtime/Go/antlr/v4",
-        sum = "h1:7RFfzj4SSt6nnvCPbCqijJi1nWCd+TqAT3bYCStRC18=",
-        version = "v4.0.0-20230305170008-8188dc5388df",
+        sum = "h1:goHVqTbFX3AIo0tzGr14pgfAW2ZfPChKO21Z9MGf/gk=",
+        version = "v4.0.0-20230512164433-5d1fd1a340c9",
     )
     go_repository(
         name = "com_github_apache_thrift",
@@ -197,6 +204,12 @@ def go_dependencies():
         importpath = "github.com/bufbuild/protocompile",
         sum = "h1:LbFKd2XowZvQ/kajzguUp2DC9UEIQhIq77fZZlaQsNA=",
         version = "v0.4.0",
+    )
+    go_repository(
+        name = "com_github_bufbuild_protovalidate_go",
+        importpath = "github.com/bufbuild/protovalidate-go",
+        sum = "h1:pJr07sYhliyfj/STAM7hU4J3FKpVeLVKvOBmOTN8j+s=",
+        version = "v0.2.1",
     )
 
     go_repository(
@@ -688,6 +701,12 @@ def go_dependencies():
         sum = "h1:gK4Kx5IaGY9CD5sPJ36FHiBJ6ZXl0kilRiiCj+jdYp4=",
         version = "v1.0.1",
     )
+    go_repository(
+        name = "com_github_google_cel_go",
+        importpath = "github.com/google/cel-go",
+        sum = "h1:s2151PDGy/eqpCI80/8dl4VL3xTkqI/YubXLXCFw0mw=",
+        version = "v0.17.1",
+    )
 
     go_repository(
         name = "com_github_google_gnostic_models",
@@ -832,6 +851,13 @@ def go_dependencies():
         sum = "h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=",
         version = "v1.4.0",
     )
+    go_repository(
+        name = "com_github_grpc_ecosystem_go_grpc_middleware_v2",
+        importpath = "github.com/grpc-ecosystem/go-grpc-middleware/v2",
+        sum = "h1:2cz5kSrxzMYHiWOBbKj8itQm+nRykkB8aMv4ThcHYHA=",
+        version = "v2.0.0",
+    )
+
     go_repository(
         name = "com_github_grpc_ecosystem_go_grpc_prometheus",
         importpath = "github.com/grpc-ecosystem/go-grpc-prometheus",
@@ -2820,14 +2846,14 @@ def go_dependencies():
     go_repository(
         name = "org_golang_x_crypto",
         importpath = "golang.org/x/crypto",
-        sum = "h1:6Ewdq3tDic1mg5xRO4milcWCfMVQhI4NkqWWvqejpuA=",
-        version = "v0.11.0",
+        sum = "h1:tFM/ta59kqch6LlvYnPa0yx5a83cL2nHflFhYKvv9Yk=",
+        version = "v0.12.0",
     )
     go_repository(
         name = "org_golang_x_exp",
         importpath = "golang.org/x/exp",
-        sum = "h1:mCRnTeVUjcrhlRmO0VK8a6k6Rrf6TF9htwo2pJVSjIU=",
-        version = "v0.0.0-20230515195305-f3d0a9c9a5cc",
+        sum = "h1:k/i9J1pBpvlfR+9QsetwPyERsqu1GIbi967PQMq3Ivc=",
+        version = "v0.0.0-20230522175609-2e198f4a06a1",
     )
     go_repository(
         name = "org_golang_x_image",
@@ -2858,8 +2884,8 @@ def go_dependencies():
     go_repository(
         name = "org_golang_x_net",
         importpath = "golang.org/x/net",
-        sum = "h1:Nvo8UFsZ8X3BhAC9699Z1j7XQ3rsZnUUm7jfBEk1ueY=",
-        version = "v0.13.0",
+        sum = "h1:BONx9s002vGdD9umnlX1Po8vOZmrgH34qlHcD1MfK14=",
+        version = "v0.14.0",
     )
     go_repository(
         name = "org_golang_x_oauth2",
@@ -2882,8 +2908,8 @@ def go_dependencies():
     go_repository(
         name = "org_golang_x_term",
         importpath = "golang.org/x/term",
-        sum = "h1:3R7pNqamzBraeqj/Tj8qt1aQ2HpmlC+Cx/qL/7hn4/c=",
-        version = "v0.10.0",
+        sum = "h1:F9tnn/DA/Im8nCwm+fX+1/eBwi4qFjRT++MhtVC4ZX0=",
+        version = "v0.11.0",
     )
     go_repository(
         name = "org_golang_x_text",

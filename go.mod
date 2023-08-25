@@ -9,11 +9,12 @@ replace (
 
 require (
 	github.com/bazelbuild/bazel-watcher v0.23.7
+	github.com/coreos/go-oidc/v3 v3.6.0
 	github.com/dexidp/dex v0.0.0-20230804184036-a9d1fd31c329
-	github.com/gogo/status v1.1.1
 	github.com/google/addlicense v1.1.1
 	github.com/googleapis/api-linter v1.56.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.2
 	github.com/prometheus/client_golang v1.16.0
@@ -22,9 +23,11 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	go.ciq.dev/pika v0.0.0-20230819201750-737c3e8f413d
 	go.resf.org/peridot/third_party/bazel/src/main/protobuf v0.0.0-00010101000000-000000000000
+	go.resf.org/peridot/tools/mothership/admin/pb v0.0.0-00010101000000-000000000000
 	go.resf.org/peridot/tools/mothership/pb v0.0.0-00010101000000-000000000000
 	go.starlark.net v0.0.0-20230814145427-12f4cb8177e4
 	golang.org/x/mod v0.10.0
+	golang.org/x/oauth2 v0.10.0
 	google.golang.org/grpc v1.57.0
 	google.golang.org/protobuf v1.31.0
 	k8s.io/api v0.28.0
@@ -49,7 +52,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
 	github.com/agext/levenshtein v1.2.1 // indirect
-	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df // indirect
+	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230512164433-5d1fd1a340c9 // indirect
 	github.com/apache/thrift v0.16.0 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.44.41 // indirect
@@ -64,7 +67,6 @@ require (
 	github.com/cactus/go-statsd-client/statsd v0.0.0-20200423205355-cb0885a1018c // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/coreos/go-oidc/v3 v3.6.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
@@ -88,6 +90,7 @@ require (
 	github.com/gogo/gateway v1.1.0 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/gogo/status v1.1.1 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect
 	github.com/golang/glog v1.1.0 // indirect
@@ -203,10 +206,9 @@ require (
 	go.uber.org/fx v1.17.1 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.23.0 // indirect
-	golang.org/x/crypto v0.11.0 // indirect
-	golang.org/x/exp v0.0.0-20230515195305-f3d0a9c9a5cc // indirect
-	golang.org/x/net v0.13.0 // indirect
-	golang.org/x/oauth2 v0.10.0 // indirect
+	golang.org/x/crypto v0.12.0 // indirect
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
+	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
@@ -244,3 +246,5 @@ require (
 replace go.resf.org/peridot/tools/mothership/pb => ./bazel-bin/tools/mothership/proto/v1/mothershippb_go_proto_/go.resf.org/peridot/tools/mothership/pb
 
 replace go.resf.org/peridot/third_party/bazel/src/main/protobuf => ./bazel-bin/third_party/bazel/src/main/protobuf/blaze_query_go_proto_/go.resf.org/peridot/third_party/bazel/src/main/protobuf
+
+replace go.resf.org/peridot/tools/mothership/admin/pb => ./bazel-bin/tools/mothership/proto/admin/v1/mshipadminpb_go_proto_/go.resf.org/peridot/tools/mothership/admin/pb

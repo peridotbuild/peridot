@@ -1,0 +1,41 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "genopenapi",
+    srcs = [
+        "doc.go",
+        "format.go",
+        "generator.go",
+        "helpers.go",
+        "helpers_go111_old.go",
+        "naming.go",
+        "template.go",
+        "types.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/internal/genopenapi",
+    importpath = "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/internal/genopenapi",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2:__subpackages__",
+    ],
+    deps = [
+        "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2/internal/casing",
+        "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2/internal/descriptor",
+        "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2/internal/generator",
+        "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options",
+        "//vendor/golang.org/x/text/cases",
+        "//vendor/golang.org/x/text/language",
+        "//vendor/gopkg.in/yaml.v3:yaml_v3",
+        "@com_github_golang_protobuf//descriptor:go_default_library_gen",
+        "@go_googleapis//google/api:annotations_go_proto",
+        "@go_googleapis//google/api:visibility_go_proto",
+        "@go_googleapis//google/rpc:status_go_proto",
+        "@io_bazel_rules_go//proto/wkt:any_go_proto",
+        "@org_golang_google_grpc//grpclog",
+        "@org_golang_google_protobuf//encoding/protojson",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/descriptorpb",
+        "@org_golang_google_protobuf//types/known/structpb",
+        "@org_golang_google_protobuf//types/pluginpb",
+    ],
+)
