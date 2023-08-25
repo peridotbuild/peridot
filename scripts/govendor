@@ -19,6 +19,10 @@ fi
 # it's meant to be run with bazel but it only requires the workspace directory env
 BUILD_WORKSPACE_DIRECTORY="$(pwd)" bazel-bin/devtools/nfv2/nfv2_/nfv2
 
+# hot patch Pika because it has a stupid low limit for page size
+# this is a hack and should be removed once we have a proper solution
+sed -i .orig 's/100/1000/g' vendor/go.ciq.dev/pika/pika_page_token.go
+
 bazel run //:gazelle
 # we don't care about the local repository warnings from updating the deps.bzl file
 # obviously ignoring all errors is stupid, but the warnings are too noisy
