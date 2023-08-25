@@ -31,7 +31,6 @@ import (
 )
 
 var ibazelPath = "vendor/github.com/bazelbuild/bazel-watcher/cmd/ibazel/ibazel_/ibazel"
-var interrupt = make(chan os.Signal, 1)
 
 func getBazelArgs(target string) []string {
 	args := []string{"run"}
@@ -47,6 +46,10 @@ func getBazelArgs(target string) []string {
 }
 
 func spawnCmd(bin string, target string) error {
+	// add interrupt handler
+	interrupt := make(chan os.Signal)
+	signal.Notify(interrupt, os.Interrupt, os.Kill)
+
 	cmd := exec.Command(bin, getBazelArgs(target)...)
 
 	// Capture stdout and stderr and print it with [target]: as prefix
@@ -125,13 +128,10 @@ func spawnIbazel(target string) error {
 }
 
 func run(ctx *cli.Context) error {
-	// add interrupt handler
-	signal.Notify(interrupt, os.Interrupt, os.Kill)
-
 	// add default frontend flags if needed
 	if ctx.Bool("dev-frontend-flags") {
 		base.ChangeDefaultForEnvVar(base.EnvVarFrontendSelf, "http://localhost:9111")
-		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCIssuer, "http://localhost:5556/dex")
+		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCIssuer, "http://127.0.0.1:5556/dex")
 		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCClientID, "local")
 		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCClientSecret, "local")
 	}
