@@ -16,16 +16,17 @@ package base
 
 import (
 	"context"
-	"errors"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/encoding/protojson"
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -47,6 +48,7 @@ type GRPCServer struct {
 	grpcPort           int
 	gatewayPort        int
 	noGrpcGateway      bool
+	noMetrics          bool
 }
 
 type GrpcEndpointRegister func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn) error
@@ -129,6 +131,39 @@ func WithNoGRPCGateway() GRPCServerOption {
 	}
 }
 
+// WithNoMetrics disables the Prometheus metrics for the gRPC server.
+func WithNoMetrics() GRPCServerOption {
+	return func(g *GRPCServer) {
+		g.noMetrics = true
+	}
+}
+
+func DefaultServeMuxOptions() []runtime.ServeMuxOption {
+	return []runtime.ServeMuxOption{
+		runtime.WithIncomingHeaderMatcher(func(s string) (string, bool) {
+			switch strings.ToLower(s) {
+			case "authorization",
+				"cookie":
+				return s, true
+			}
+
+			if strings.ToLower(s) == "content-type" {
+				return "original-content-type", true
+			}
+
+			return s, false
+		}),
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
+			MarshalOptions: protojson.MarshalOptions{
+				EmitUnpopulated: false,
+			},
+			UnmarshalOptions: protojson.UnmarshalOptions{
+				DiscardUnknown: true,
+			},
+		}),
+	}
+}
+
 // NewGRPCServer creates a new gRPC-server with gRPC-gateway, default interceptors
 // and exposed Prometheus metrics.
 func NewGRPCServer(opts ...GRPCServerOption) (*GRPCServer, error) {
@@ -157,6 +192,9 @@ func NewGRPCServer(opts ...GRPCServerOption) (*GRPCServer, error) {
 	if g.gatewayPort == 0 {
 		g.gatewayPort = g.grpcPort + 1
 	}
+	if len(g.muxOptions) == 0 {
+		g.muxOptions = DefaultServeMuxOptions()
+	}
 
 	// Always prepend the insecure dial option
 	// RESF deploys with Istio, which handles mTLS
@@ -180,15 +218,13 @@ func NewGRPCServer(opts ...GRPCServerOption) (*GRPCServer, error) {
 
 	g.server = grpc.NewServer(g.serverOptions...)
 
-	if !g.noGrpcGateway {
-		g.gatewayMux = runtime.NewServeMux(g.muxOptions...)
+	g.gatewayMux = runtime.NewServeMux(g.muxOptions...)
 
-		// Create gateway client connection
-		var err error
-		g.gatewayClientConn, err = grpc.Dial("localhost:"+strconv.Itoa(g.grpcPort), g.dialOptions...)
-		if err != nil {
-			return nil, err
-		}
+	// Create gateway client connection
+	var err error
+	g.gatewayClientConn, err = grpc.Dial("localhost:"+strconv.Itoa(g.grpcPort), g.dialOptions...)
+	if err != nil {
+		return nil, err
 	}
 
 	return g, nil
@@ -199,10 +235,6 @@ func (g *GRPCServer) RegisterService(register func(*grpc.Server)) {
 }
 
 func (g *GRPCServer) GatewayEndpoints(registerEndpoints ...GrpcEndpointRegister) error {
-	if g.noGrpcGateway {
-		return errors.New("gRPC-gateway is disabled")
-	}
-
 	for _, register := range registerEndpoints {
 		if err := register(context.Background(), g.gatewayMux, g.gatewayClientConn); err != nil {
 			return err
@@ -210,6 +242,10 @@ func (g *GRPCServer) GatewayEndpoints(registerEndpoints ...GrpcEndpointRegister)
 	}
 
 	return nil
+}
+
+func (g *GRPCServer) GatewayMux() *runtime.ServeMux {
+	return g.gatewayMux
 }
 
 func (g *GRPCServer) Start() error {
@@ -254,17 +290,19 @@ func (g *GRPCServer) Start() error {
 	}
 
 	// Serve proxmux
-	wg.Add(1)
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
+	if !g.noMetrics {
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
 
-		promMux := http.NewServeMux()
-		promMux.Handle("/metrics", promhttp.Handler())
-		err := http.ListenAndServe(":7332", promMux)
-		if err != nil {
-			LogFatalf("Prometheus mux failed to serve: %v", err.Error())
-		}
-	}(&wg)
+			promMux := http.NewServeMux()
+			promMux.Handle("/metrics", promhttp.Handler())
+			err := http.ListenAndServe(":7332", promMux)
+			if err != nil {
+				LogFatalf("Prometheus mux failed to serve: %v", err.Error())
+			}
+		}(&wg)
+	}
 
 	wg.Wait()
 

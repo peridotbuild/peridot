@@ -33,7 +33,6 @@ const (
 	EnvVarFrontendRequiredOIDCGroup    EnvVar = "FRONTEND_REQUIRED_OIDC_GROUP"
 	EnvVarTemporalNamespace            EnvVar = "TEMPORAL_NAMESPACE"
 	EnvVarTemporalAddress              EnvVar = "TEMPORAL_ADDRESS"
-	EnvVarFrontendAllowUnauthenticated EnvVar = "FRONTEND_ALLOW_UNAUTHENTICATED"
 	EnvVarFrontendSelf                 EnvVar = "FRONTEND_SELF"
 )
 
@@ -64,27 +63,38 @@ var defaultCliFlagsTemporal = append(defaultCliFlagsDatabaseOnly, []cli.Flag{
 	},
 }...)
 
-var defaultCliFlags = append(defaultCliFlagsDatabaseOnly, []cli.Flag{
+var defaultCliFlagsNoAuth = append(defaultCliFlagsDatabaseOnly, []cli.Flag{
 	&cli.IntFlag{
 		Name:    "grpc-port",
-		Aliases: []string{"p"},
 		Usage:   "gRPC port",
 		EnvVars: []string{string(EnvVarGRPCPort)},
 		Value:   8080,
 	},
 	&cli.IntFlag{
 		Name:    "gateway-port",
-		Aliases: []string{"g"},
 		Usage:   "gRPC gateway port",
 		EnvVars: []string{string(EnvVarGatewayPort)},
 		Value:   8081,
 	},
 }...)
 
+var defaultCliFlags = append(defaultCliFlagsNoAuth, []cli.Flag{
+	&cli.StringFlag{
+		Name:    "oidc-issuer",
+		Usage:   "OIDC issuer",
+		EnvVars: []string{string(EnvVarFrontendOIDCIssuer)},
+		Value:   "https://accounts.rockylinux.org/auth/realms/rocky",
+	},
+	&cli.StringFlag{
+		Name:    "required-oidc-group",
+		Usage:   "OIDC group that is required to access the frontend",
+		EnvVars: []string{string(EnvVarFrontendRequiredOIDCGroup)},
+	},
+}...)
+
 var defaultFrontendNoAuthCliFlags = []cli.Flag{
 	&cli.IntFlag{
 		Name:    "port",
-		Aliases: []string{"p"},
 		Usage:   "frontend port",
 		EnvVars: []string{string(EnvVarFrontendPort)},
 		Value:   9111,
@@ -119,11 +129,6 @@ var defaultFrontendCliFlags = append(defaultFrontendNoAuthCliFlags, []cli.Flag{
 		EnvVars: []string{string(EnvVarFrontendRequiredOIDCGroup)},
 	},
 	&cli.StringFlag{
-		Name:    "allow-unauthenticated",
-		Usage:   "Allow unauthenticated access to the frontend",
-		EnvVars: []string{string(EnvVarFrontendAllowUnauthenticated)},
-	},
-	&cli.StringFlag{
 		Name:    "self",
 		Usage:   "Endpoint pointing to the frontend",
 		EnvVars: []string{string(EnvVarFrontendSelf)},
@@ -133,6 +138,11 @@ var defaultFrontendCliFlags = append(defaultFrontendNoAuthCliFlags, []cli.Flag{
 // WithDefaultCliFlags adds the default cli flags to the app.
 func WithDefaultCliFlags(flags ...cli.Flag) []cli.Flag {
 	return append(defaultCliFlags, flags...)
+}
+
+// WithDefaultCliFlagsNoAuth adds the default cli flags to the app.
+func WithDefaultCliFlagsNoAuth(flags ...cli.Flag) []cli.Flag {
+	return append(defaultCliFlagsNoAuth, flags...)
 }
 
 // WithDefaultCliFlagsTemporal adds the default cli flags to the app.
@@ -167,13 +177,21 @@ func FlagsToGRPCServerOptions(ctx *cli.Context) []GRPCServerOption {
 func FlagsToFrontendInfo(ctx *cli.Context) *FrontendInfo {
 	return &FrontendInfo{
 		Title:                ctx.App.Name,
+		Port:                 ctx.Int("port"),
 		Self:                 ctx.String("self"),
-		AllowUnauthenticated: ctx.Bool("allow-unauthenticated"),
 		OIDCIssuer:           ctx.String("oidc-issuer"),
 		OIDCClientID:         ctx.String("oidc-client-id"),
 		OIDCClientSecret:     ctx.String("oidc-client-secret"),
 		OIDCGroup:            ctx.String("required-oidc-group"),
 		OIDCUserInfoOverride: ctx.String("oidc-userinfo-override"),
+	}
+}
+
+// FlagsToOidcInterceptorDetails converts the cli flags to oidc interceptor details.
+func FlagsToOidcInterceptorDetails(ctx *cli.Context) *OidcInterceptorDetails {
+	return &OidcInterceptorDetails{
+		Issuer: ctx.String("oidc-issuer"),
+		Group:  ctx.String("required-oidc-group"),
 	}
 }
 
