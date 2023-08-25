@@ -47,5 +47,6 @@ go_library(
         "//vendor/go.temporal.io/server/environment",
         "//vendor/go.temporal.io/server/schema/cassandra",
         "//vendor/go.temporal.io/server/service/history/tasks",
+        "//vendor/go.temporal.io/server/tests/testhelper",
     ],
 )

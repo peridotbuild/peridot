@@ -266,6 +266,9 @@ func (r *TypeRegistry) Specs() []*TypeSpec {
 
 // Type converts a *schemahcl.Type into a schema.Type.
 func (r *TypeRegistry) Type(typ *Type, extra []*Attr) (schema.Type, error) {
+	if typ == nil {
+		return nil, errors.New("specutil: nil type")
+	}
 	typeSpec, ok := r.findT(typ.T)
 	if !ok {
 		return r.parser(typ.T)
@@ -340,6 +343,22 @@ func SizeTypeAttr(required bool) *TypeAttr {
 		Name:     "size",
 		Kind:     reflect.Int,
 		Required: required,
+	}
+}
+
+// PrecisionTypeAttr returns a TypeAttr for a precision attribute.
+func PrecisionTypeAttr() *TypeAttr {
+	return &TypeAttr{
+		Name: "precision",
+		Kind: reflect.Int,
+	}
+}
+
+// ScaleTypeAttr returns a TypeAttr for a scale attribute.
+func ScaleTypeAttr() *TypeAttr {
+	return &TypeAttr{
+		Name: "scale",
+		Kind: reflect.Int,
 	}
 }
 

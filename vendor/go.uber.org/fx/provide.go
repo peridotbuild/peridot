@@ -34,15 +34,15 @@ import (
 // function(s) may depend on other types available in the application, must
 // return one or more objects, and may return an error. For example:
 //
-//  // Constructs type *C, depends on *A and *B.
-//  func(*A, *B) *C
+//	// Constructs type *C, depends on *A and *B.
+//	func(*A, *B) *C
 //
-//  // Constructs type *C, depends on *A and *B, and indicates failure by
-//  // returning an error.
-//  func(*A, *B) (*C, error)
+//	// Constructs type *C, depends on *A and *B, and indicates failure by
+//	// returning an error.
+//	func(*A, *B) (*C, error)
 //
-//  // Constructs types *B and *C, depends on *A, and can fail.
-//  func(*A) (*B, *C, error)
+//	// Constructs types *B and *C, depends on *A, and can fail.
+//	func(*A) (*B, *C, error)
 //
 // The order in which constructors are provided doesn't matter, and passing
 // multiple Provide options appends to the application's collection of
@@ -54,6 +54,8 @@ import (
 //
 // See the documentation of the In and Out types for advanced features,
 // including optional parameters and named instances.
+//
+// See the documentation for [Private] for restricting access to constructors.
 //
 // Constructor functions should perform as little external interaction as
 // possible, and should avoid spawning goroutines. Things like server listen
@@ -72,13 +74,42 @@ type provideOption struct {
 }
 
 func (o provideOption) apply(mod *module) {
+	var private bool
+
+	targets := make([]interface{}, 0, len(o.Targets))
 	for _, target := range o.Targets {
+		if _, ok := target.(privateOption); ok {
+			private = true
+			continue
+		}
+		targets = append(targets, target)
+	}
+
+	for _, target := range targets {
 		mod.provides = append(mod.provides, provide{
-			Target: target,
-			Stack:  o.Stack,
+			Target:  target,
+			Stack:   o.Stack,
+			Private: private,
 		})
 	}
 }
+
+type privateOption struct{}
+
+// Private is an option that can be passed as an argument to [Provide] to
+// restrict access to the constructors being provided. Specifically,
+// corresponding constructors can only be used within the current module
+// or modules the current module contains. Other modules that contain this
+// module won't be able to use the constructor.
+//
+// For example, the following would fail because the app doesn't have access
+// to the inner module's constructor.
+//
+//	fx.New(
+//		fx.Module("SubModule", fx.Provide(func() int { return 0 }, fx.Private)),
+//		fx.Invoke(func(a int) {}),
+//	)
+var Private = privateOption{}
 
 func (o provideOption) String() string {
 	items := make([]string, len(o.Targets))

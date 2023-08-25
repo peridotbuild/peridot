@@ -11,5 +11,8 @@ go_library(
     importmap = "go.resf.org/peridot/vendor/go.uber.org/fx/fxevent",
     importpath = "go.uber.org/fx/fxevent",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/go.uber.org/zap"],
+    deps = [
+        "//vendor/go.uber.org/zap",
+        "//vendor/go.uber.org/zap/zapcore",
+    ],
 )

@@ -241,7 +241,7 @@ type (
 		ReplicateWorkflowExecutionTimedoutEvent(int64, *historypb.HistoryEvent) error
 		SetCurrentBranchToken(branchToken []byte) error
 		SetHistoryBuilder(hBuilder *HistoryBuilder)
-		SetHistoryTree(ctx context.Context, treeID string) error
+		SetHistoryTree(ctx context.Context, executionTimeout *time.Duration, runTimeout *time.Duration, treeID string) error
 		UpdateActivity(*persistencespb.ActivityInfo) error
 		UpdateActivityWithTimerHeartbeat(*persistencespb.ActivityInfo, time.Time) error
 		UpdateActivityProgress(ai *persistencespb.ActivityInfo, request *workflowservice.RecordActivityTaskHeartbeatRequest)
@@ -257,6 +257,12 @@ type (
 		StartTransaction(entry *namespace.Namespace) (bool, error)
 		CloseTransactionAsMutation(now time.Time, transactionPolicy TransactionPolicy) (*persistence.WorkflowMutation, []*persistence.WorkflowEvents, error)
 		CloseTransactionAsSnapshot(now time.Time, transactionPolicy TransactionPolicy) (*persistence.WorkflowSnapshot, []*persistence.WorkflowEvents, error)
-		GenerateMigrationTasks(now time.Time) (tasks.Task, error)
+		GenerateMigrationTasks() (tasks.Task, error)
+
+		// ContinueAsNewMinBackoff calculate minimal backoff for next ContinueAsNew run.
+		// Input backoffDuration is current backoff for next run.
+		// If current backoff comply with minimal ContinueAsNew interval requirement, current backoff will be returned.
+		// Current backoff could be nil which means it does not have a backoff.
+		ContinueAsNewMinBackoff(backoffDuration *time.Duration) *time.Duration
 	}
 )

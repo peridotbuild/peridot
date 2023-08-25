@@ -20,6 +20,7 @@ go_library(
         "//vendor/go.temporal.io/server/common",
         "//vendor/go.temporal.io/server/common/backoff",
         "//vendor/go.temporal.io/server/common/convert",
+        "//vendor/go.temporal.io/server/common/debug",
         "//vendor/go.temporal.io/server/common/headers",
         "//vendor/go.temporal.io/server/common/log",
         "//vendor/go.temporal.io/server/common/log/tag",

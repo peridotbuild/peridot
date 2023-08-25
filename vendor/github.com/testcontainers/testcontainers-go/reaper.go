@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
+	"github.com/testcontainers/testcontainers-go/internal"
 	"github.com/testcontainers/testcontainers-go/internal/testcontainersdocker"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -197,6 +198,8 @@ func (r *Reaper) Labels() map[string]string {
 	return map[string]string{
 		TestcontainerLabel:                  "true",
 		TestcontainerLabelSessionID:         r.SessionID,
+		testcontainersdocker.LabelLang:      "go",
+		testcontainersdocker.LabelVersion:   internal.Version,
 		testcontainersdocker.LabelSessionID: r.SessionID,
 	}
 }

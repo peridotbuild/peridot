@@ -50,7 +50,7 @@ go_library(
         "//vendor/go.temporal.io/server/common/persistence",
         "//vendor/go.temporal.io/server/common/persistence/serialization",
         "//vendor/go.temporal.io/server/common/primitives/timestamp",
-        "//vendor/go.temporal.io/server/common/resource",
+        "//vendor/go.temporal.io/server/common/resourcetest",
         "//vendor/go.temporal.io/server/common/rpc",
         "//vendor/go.temporal.io/server/common/searchattribute",
         "//vendor/go.temporal.io/server/common/serviceerror",

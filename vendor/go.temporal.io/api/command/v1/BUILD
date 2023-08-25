@@ -14,6 +14,7 @@ go_library(
         "//vendor/go.temporal.io/api/common/v1:common",
         "//vendor/go.temporal.io/api/enums/v1:enums",
         "//vendor/go.temporal.io/api/failure/v1:failure",
+        "//vendor/go.temporal.io/api/interaction/v1:interaction",
         "//vendor/go.temporal.io/api/taskqueue/v1:taskqueue",
     ],
 )

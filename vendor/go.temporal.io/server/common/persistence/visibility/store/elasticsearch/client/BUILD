@@ -14,7 +14,6 @@ go_library(
         "client_mock.go",
         "client_v7.go",
         "config.go",
-        "errors.go",
         "logger.go",
     ],
     importmap = "go.resf.org/peridot/vendor/go.temporal.io/server/common/persistence/visibility/store/elasticsearch/client",

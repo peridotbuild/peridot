@@ -6,11 +6,13 @@ go_library(
         "config.go",
         "doc.go",
         "meter.go",
+        "noop.go",
     ],
     importmap = "go.resf.org/peridot/vendor/go.opentelemetry.io/otel/metric",
     importpath = "go.opentelemetry.io/otel/metric",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/go.opentelemetry.io/otel/attribute",
         "//vendor/go.opentelemetry.io/otel/metric/instrument",
         "//vendor/go.opentelemetry.io/otel/metric/instrument/asyncfloat64",
         "//vendor/go.opentelemetry.io/otel/metric/instrument/asyncint64",

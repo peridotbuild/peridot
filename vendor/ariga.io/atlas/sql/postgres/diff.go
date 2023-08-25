@@ -13,6 +13,7 @@ import (
 	"strings"
 	"unicode"
 
+	"ariga.io/atlas/schemahcl"
 	"ariga.io/atlas/sql/internal/sqlx"
 	"ariga.io/atlas/sql/schema"
 )
@@ -23,12 +24,61 @@ import (
 var DefaultDiff schema.Differ = &sqlx.Diff{DiffDriver: &diff{}}
 
 // A diff provides a PostgreSQL implementation for sqlx.DiffDriver.
-type diff struct{ conn }
+type diff struct{ *conn }
 
 // SchemaAttrDiff returns a changeset for migrating schema attributes from one state to the other.
-func (d *diff) SchemaAttrDiff(_, _ *schema.Schema) []schema.Change {
-	// No special schema attribute diffing for PostgreSQL.
-	return nil
+func (*diff) SchemaAttrDiff(from, to *schema.Schema) []schema.Change {
+	var changes []schema.Change
+	if change := sqlx.CommentDiff(skipDefaultComment(from), skipDefaultComment(to)); change != nil {
+		changes = append(changes, change)
+	}
+	return changes
+}
+
+func skipDefaultComment(s *schema.Schema) []schema.Attr {
+	attrs := s.Attrs
+	if c := (schema.Comment{}); sqlx.Has(attrs, &c) && c.Text == "standard public schema" && (s.Name == "" || s.Name == "public") {
+		attrs = schema.RemoveAttr[*schema.Comment](attrs)
+	}
+	return attrs
+}
+
+// SchemaObjectDiff returns a changeset for migrating schema objects from
+// one state to the other.
+func (*diff) SchemaObjectDiff(from, to *schema.Schema) ([]schema.Change, error) {
+	var changes []schema.Change
+	// Drop or modify enums.
+	for _, o1 := range from.Objects {
+		e1, ok := o1.(*schema.EnumType)
+		if !ok {
+			return nil, fmt.Errorf("unsupported object type %T", o1)
+		}
+		o2, ok := to.Object(func(o schema.Object) bool {
+			e2, ok := o.(*schema.EnumType)
+			return ok && e1.T == e2.T
+		})
+		if !ok {
+			changes = append(changes, &schema.DropObject{O: o1})
+			continue
+		}
+		if e2 := o2.(*schema.EnumType); !sqlx.ValuesEqual(e1.Values, e2.Values) {
+			changes = append(changes, &schema.ModifyObject{From: e1, To: e2})
+		}
+	}
+	// Add new enums.
+	for _, o1 := range to.Objects {
+		e1, ok := o1.(*schema.EnumType)
+		if !ok {
+			return nil, fmt.Errorf("unsupported object type %T", o1)
+		}
+		if _, ok := from.Object(func(o schema.Object) bool {
+			e2, ok := o.(*schema.EnumType)
+			return ok && e1.T == e2.T
+		}); !ok {
+			changes = append(changes, &schema.AddObject{O: e1})
+		}
+	}
+	return changes, nil
 }
 
 // TableAttrDiff returns a changeset for migrating table attributes from one state to the other.
@@ -174,6 +224,9 @@ func (*diff) IndexAttrChanged(from, to []schema.Attr) bool {
 	if t1.T != t2.T {
 		return true
 	}
+	if indexNullsDistinct(to) != indexNullsDistinct(from) {
+		return true
+	}
 	var p1, p2 IndexPredicate
 	if sqlx.Has(from, &p1) != sqlx.Has(to, &p2) || (p1.P != p2.P && p1.P != sqlx.MayWrap(p2.P)) {
 		return true
@@ -226,6 +279,48 @@ func (*diff) ReferenceChanged(from, to schema.ReferenceOption) bool {
 	return from != to
 }
 
+// DiffOptions defines PostgreSQL specific schema diffing process.
+type DiffOptions struct {
+	ConcurrentIndex struct {
+		Add  bool `spec:"add"`
+		Drop bool `spec:"drop"`
+	} `spec:"concurrent_index"`
+}
+
+// AnnotateChanges implements the sqlx.ChangeAnnotator interface.
+func (*diff) AnnotateChanges(changes []schema.Change, opts *schema.DiffOptions) error {
+	var extra DiffOptions
+	switch ex := opts.Extra.(type) {
+	case nil:
+		return nil
+	case schemahcl.DefaultExtension:
+		if err := ex.Extra.As(&extra); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("postgres: unexpected DiffOptions.Extra type %T", opts.Extra)
+	}
+	for _, c := range changes {
+		m, ok := c.(*schema.ModifyTable)
+		if !ok {
+			continue
+		}
+		for i := range m.Changes {
+			switch c := m.Changes[i].(type) {
+			case *schema.AddIndex:
+				if extra.ConcurrentIndex.Add {
+					c.Extra = append(c.Extra, &Concurrently{})
+				}
+			case *schema.DropIndex:
+				if extra.ConcurrentIndex.Drop {
+					c.Extra = append(c.Extra, &Concurrently{})
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (d *diff) typeChanged(from, to *schema.Column) (bool, error) {
 	fromT, toT := from.Type.Type, to.Type.Type
 	if fromT == nil || toT == nil {
@@ -238,7 +333,7 @@ func (d *diff) typeChanged(from, to *schema.Column) (bool, error) {
 	switch fromT := fromT.(type) {
 	case *schema.BinaryType, *BitType, *schema.BoolType, *schema.DecimalType, *schema.FloatType, *IntervalType,
 		*schema.IntegerType, *schema.JSONType, *OIDType, *RangeType, *SerialType, *schema.SpatialType,
-		*schema.StringType, *schema.TimeType, *TextSearchType, *NetworkType, *UserDefinedType, *schema.UUIDType:
+		*schema.StringType, *schema.TimeType, *TextSearchType, *NetworkType, *schema.UUIDType:
 		t1, err := FormatType(toT)
 		if err != nil {
 			return false, err
@@ -248,11 +343,16 @@ func (d *diff) typeChanged(from, to *schema.Column) (bool, error) {
 			return false, err
 		}
 		changed = t1 != t2
+	case *UserDefinedType:
+		toT := toT.(*UserDefinedType)
+		changed = toT.T != fromT.T &&
+			// In case the type is defined with schema qualifier, but returned without
+			// (inspecting a schema scope), or vice versa, remove before comparing.
+			d.schema != "" && d.trimSchema(toT.T) != d.trimSchema(toT.T)
 	case *schema.EnumType:
 		toT := toT.(*schema.EnumType)
-		// Column type was changed if the underlying enum type was changed or values are not equal.
-		changed = !sqlx.ValuesEqual(fromT.Values, toT.Values) || fromT.T != toT.T ||
-			(toT.Schema != nil && fromT.Schema != nil && fromT.Schema.Name != toT.Schema.Name)
+		// Column type was changed if the underlying enum type was changed.
+		changed = fromT.T != toT.T || (toT.Schema != nil && fromT.Schema != nil && fromT.Schema.Name != toT.Schema.Name)
 	case *CurrencyType:
 		toT := toT.(*CurrencyType)
 		changed = fromT.T != toT.T
@@ -261,14 +361,6 @@ func (d *diff) typeChanged(from, to *schema.Column) (bool, error) {
 		changed = fromT.T != toT.T
 	case *ArrayType:
 		toT := toT.(*ArrayType)
-		// Same type.
-		if changed = fromT.T != toT.T; !changed {
-			// In case it is an enum type, compare its values.
-			fromE, ok1 := fromT.Type.(*schema.EnumType)
-			toE, ok2 := toT.Type.(*schema.EnumType)
-			changed = ok1 && ok2 && !sqlx.ValuesEqual(fromE.Values, toE.Values)
-			break
-		}
 		// In case the desired schema is not normalized, the string type can look different even
 		// if the two strings represent the same array type (varchar(1), character varying (1)).
 		// Therefore, we try by comparing the underlying types if they were defined.
@@ -288,6 +380,14 @@ func (d *diff) typeChanged(from, to *schema.Column) (bool, error) {
 		return false, &sqlx.UnsupportedTypeError{Type: fromT}
 	}
 	return changed, nil
+}
+
+// trimSchema returns the given type without the schema qualifier.
+func (d *diff) trimSchema(t string) string {
+	if strings.HasPrefix(t, `"`) {
+		return strings.TrimPrefix(t, fmt.Sprintf("%q.", d.schema))
+	}
+	return strings.TrimPrefix(t, fmt.Sprintf("%s.", d.schema))
 }
 
 // defaultEqual reports if the DEFAULT values x and y
@@ -362,7 +462,7 @@ func identity(attrs []schema.Attr) (*Identity, bool) {
 // formatPartition returns the string representation of the
 // partition key according to the PostgreSQL format/grammar.
 func formatPartition(p Partition) (string, error) {
-	b := &sqlx.Builder{QuoteChar: '"'}
+	b := &sqlx.Builder{QuoteOpening: '"', QuoteClosing: '"'}
 	b.P("PARTITION BY")
 	switch t := strings.ToUpper(p.T); t {
 	case PartitionTypeRange, PartitionTypeList, PartitionTypeHash:
@@ -411,6 +511,16 @@ func indexIncludeChanged(from, to []schema.Attr) bool {
 		}
 	}
 	return false
+}
+
+// indexNullsDistinct returns the NULLS [NOT] DISTINCT value from the index attributes.
+func indexNullsDistinct(attrs []schema.Attr) bool {
+	if i := (IndexNullsDistinct{}); sqlx.Has(attrs, &i) {
+		return i.V
+	}
+	// The default PostgreSQL behavior. The inverse of
+	// "indnullsnotdistinct" in pg_index which is false.
+	return true
 }
 
 func trimCast(s string) string {

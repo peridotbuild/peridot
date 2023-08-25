@@ -23,7 +23,7 @@ var DefaultDiff schema.Differ = &sqlx.Diff{DiffDriver: &diff{conn: noConn}}
 
 // A diff provides a MySQL implementation for sqlx.DiffDriver.
 type diff struct {
-	conn
+	*conn
 	// charset to collation mapping.
 	// See, internal directory.
 	ch2co, co2ch struct {
@@ -53,6 +53,12 @@ func (d *diff) SchemaAttrDiff(from, to *schema.Schema) []schema.Change {
 	return changes
 }
 
+// SchemaObjectDiff returns a changeset for migrating schema objects from
+// one state to the other.
+func (*diff) SchemaObjectDiff(_, _ *schema.Schema) ([]schema.Change, error) {
+	return nil, nil
+}
+
 // TableAttrDiff returns a changeset for migrating table attributes from one state to the other.
 func (d *diff) TableAttrDiff(from, to *schema.Table) ([]schema.Change, error) {
 	var changes []schema.Change
@@ -66,6 +72,9 @@ func (d *diff) TableAttrDiff(from, to *schema.Table) ([]schema.Change, error) {
 		changes = append(changes, change)
 	}
 	if change := d.collationChange(from.Attrs, from.Schema.Attrs, to.Attrs); change != noChange {
+		changes = append(changes, change)
+	}
+	if change := d.engineChange(from.Attrs, to.Attrs); change != noChange {
 		changes = append(changes, change)
 	}
 	if !d.SupportsCheck() && sqlx.Has(to.Attrs, &schema.Check{}) {
@@ -163,7 +172,14 @@ func (d *diff) IsGeneratedIndexName(_ *schema.Table, idx *schema.Index) bool {
 
 // IndexAttrChanged reports if the index attributes were changed.
 func (*diff) IndexAttrChanged(from, to []schema.Attr) bool {
-	return indexType(from).T != indexType(to).T
+	if indexType(from).T != indexType(to).T {
+		return true
+	}
+	var (
+		fromP, toP     IndexParser
+		fromHas, toHas = sqlx.Has(from, &fromP), sqlx.Has(to, &toP)
+	)
+	return fromHas != toHas || (fromHas && fromP.P != toP.P)
 }
 
 // IndexPartAttrChanged reports if the index-part attributes (collation or prefix) were changed.
@@ -270,6 +286,35 @@ func (*diff) collationChange(from, top, to []schema.Attr) schema.Change {
 		return &schema.ModifyAttr{
 			From: &fromC,
 			To:   &toC,
+		}
+	}
+	return noChange
+}
+
+// engineChange returns the schema change for migrating the table engine in case
+// it was changed.
+func (*diff) engineChange(from, to []schema.Attr) schema.Change {
+	var fromE, toE Engine
+	switch fromHas, toHas := sqlx.Has(from, &fromE), sqlx.Has(to, &toE); {
+	// Both engines are defined but different.
+	case fromHas && toHas && strings.ToLower(fromE.V) != strings.ToLower(toE.V):
+		return &schema.ModifyAttr{
+			From: &fromE,
+			To:   &toE,
+		}
+	// If the engine attribute has been removed from the desired state (e.g., HCL), and the current state
+	// is not the default, we change the engine to InnoDB (the default for MySQL, unless configured otherwise).
+	case fromHas && !toHas && !fromE.Default && strings.ToLower(fromE.V) != strings.ToLower(EngineInnoDB):
+		return &schema.ModifyAttr{
+			From: &fromE,
+			To:   &Engine{V: EngineInnoDB, Default: true},
+		}
+	// In case the engine attribute was added to the desired state (e.g., HCL)
+	// and it is not the default, we modify the engine to the desired value.
+	case !fromHas && toHas && !toE.Default && strings.ToLower(fromE.V) != strings.ToLower(EngineInnoDB):
+		return &schema.ModifyAttr{
+			From: &Engine{V: EngineInnoDB, Default: true},
+			To:   &toE,
 		}
 	}
 	return noChange
@@ -602,16 +647,15 @@ func (d *diff) defaultCollate(attrs *[]schema.Attr) error {
 		return nil
 	}
 	d.ch2co.Do(func() {
-		d.ch2co.v, d.ch2co.err = d.CharsetToCollate()
+		d.ch2co.v, d.ch2co.err = d.CharsetToCollate(d.ExecQuerier)
 	})
 	if d.ch2co.err != nil {
 		return d.ch2co.err
 	}
-	v, ok := d.ch2co.v[charset.V]
-	if !ok {
-		return fmt.Errorf("mysql: unknown character set: %q", charset.V)
+	if v, ok := d.ch2co.v[charset.V]; ok {
+		// If charset is known, use its default collation.
+		schema.ReplaceOrAppend(attrs, &schema.Collation{V: v})
 	}
-	schema.ReplaceOrAppend(attrs, &schema.Collation{V: v})
 	return nil
 }
 
@@ -623,15 +667,14 @@ func (d *diff) defaultCharset(attrs *[]schema.Attr) error {
 		return nil
 	}
 	d.co2ch.Do(func() {
-		d.co2ch.v, d.co2ch.err = d.CollateToCharset()
+		d.co2ch.v, d.co2ch.err = d.CollateToCharset(d.ExecQuerier)
 	})
 	if d.co2ch.err != nil {
 		return d.co2ch.err
 	}
-	v, ok := d.co2ch.v[collate.V]
-	if !ok {
-		return fmt.Errorf("mysql: unknown collation: %q", collate.V)
+	if v, ok := d.co2ch.v[collate.V]; ok {
+		// If collation is known, use its default charset.
+		schema.ReplaceOrAppend(attrs, &schema.Charset{V: v})
 	}
-	schema.ReplaceOrAppend(attrs, &schema.Charset{V: v})
 	return nil
 }

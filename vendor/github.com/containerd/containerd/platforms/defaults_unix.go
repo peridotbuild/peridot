@@ -1,4 +1,5 @@
 //go:build !windows && !darwin && !freebsd
+// +build !windows,!darwin,!freebsd
 
 /*
    Copyright The containerd Authors.

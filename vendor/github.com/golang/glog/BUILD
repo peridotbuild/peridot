@@ -5,6 +5,9 @@ go_library(
     srcs = [
         "glog.go",
         "glog_file.go",
+        "glog_file_linux.go",
+        "glog_file_other.go",
+        "glog_file_posix.go",
         "glog_flags.go",
     ],
     importmap = "go.resf.org/peridot/vendor/github.com/golang/glog",

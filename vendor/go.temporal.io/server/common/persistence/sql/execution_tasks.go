@@ -32,7 +32,6 @@ import (
 	"math"
 	"time"
 
-	commonpb "go.temporal.io/api/common/v1"
 	"go.temporal.io/api/serviceerror"
 
 	p "go.temporal.io/server/common/persistence"
@@ -62,17 +61,13 @@ func (m *sqlExecutionStore) GetHistoryTask(
 	ctx context.Context,
 	request *p.GetHistoryTaskRequest,
 ) (*p.InternalGetHistoryTaskResponse, error) {
-	switch request.TaskCategory.ID() {
-	case tasks.CategoryIDTransfer:
-		return m.getTransferTask(ctx, request)
-	case tasks.CategoryIDTimer:
-		return m.getTimerTask(ctx, request)
-	case tasks.CategoryIDVisibility:
-		return m.getVisibilityTask(ctx, request)
-	case tasks.CategoryIDReplication:
-		return m.getReplicationTask(ctx, request)
+	switch request.TaskCategory.Type() {
+	case tasks.CategoryTypeImmediate:
+		return m.getHistoryImmediateTask(ctx, request)
+	case tasks.CategoryTypeScheduled:
+		return m.getHistoryScheduledTask(ctx, request)
 	default:
-		return nil, serviceerror.NewInternal(fmt.Sprintf("unknown task category: %v", request.TaskCategory))
+		return nil, serviceerror.NewInternal(fmt.Sprintf("Unknown task category type: %v", request.TaskCategory))
 	}
 }
 
@@ -80,17 +75,13 @@ func (m *sqlExecutionStore) GetHistoryTasks(
 	ctx context.Context,
 	request *p.GetHistoryTasksRequest,
 ) (*p.InternalGetHistoryTasksResponse, error) {
-	switch request.TaskCategory.ID() {
-	case tasks.CategoryIDTransfer:
-		return m.getTransferTasks(ctx, request)
-	case tasks.CategoryIDTimer:
-		return m.getTimerTasks(ctx, request)
-	case tasks.CategoryIDVisibility:
-		return m.getVisibilityTasks(ctx, request)
-	case tasks.CategoryIDReplication:
-		return m.getReplicationTasks(ctx, request)
+	switch request.TaskCategory.Type() {
+	case tasks.CategoryTypeImmediate:
+		return m.getHistoryImmediateTasks(ctx, request)
+	case tasks.CategoryTypeScheduled:
+		return m.getHistoryScheduledTasks(ctx, request)
 	default:
-		return nil, serviceerror.NewInternal(fmt.Sprintf("unknown task category: %v", request.TaskCategory))
+		return nil, serviceerror.NewInternal(fmt.Sprintf("Unknown task category type: %v", request.TaskCategory))
 	}
 }
 
@@ -98,17 +89,13 @@ func (m *sqlExecutionStore) CompleteHistoryTask(
 	ctx context.Context,
 	request *p.CompleteHistoryTaskRequest,
 ) error {
-	switch request.TaskCategory.ID() {
-	case tasks.CategoryIDTransfer:
-		return m.completeTransferTask(ctx, request)
-	case tasks.CategoryIDTimer:
-		return m.completeTimerTask(ctx, request)
-	case tasks.CategoryIDVisibility:
-		return m.completeVisibilityTask(ctx, request)
-	case tasks.CategoryIDReplication:
-		return m.completeReplicationTask(ctx, request)
+	switch request.TaskCategory.Type() {
+	case tasks.CategoryTypeImmediate:
+		return m.completeHistoryImmediateTask(ctx, request)
+	case tasks.CategoryTypeScheduled:
+		return m.completeHistoryScheduledTask(ctx, request)
 	default:
-		return serviceerror.NewInternal(fmt.Sprintf("unknown task category: %v", request.TaskCategory))
+		return serviceerror.NewInternal(fmt.Sprintf("Unknown task category type: %v", request.TaskCategory))
 	}
 }
 
@@ -116,18 +103,333 @@ func (m *sqlExecutionStore) RangeCompleteHistoryTasks(
 	ctx context.Context,
 	request *p.RangeCompleteHistoryTasksRequest,
 ) error {
-	switch request.TaskCategory.ID() {
+	switch request.TaskCategory.Type() {
+	case tasks.CategoryTypeImmediate:
+		return m.rangeCompleteHistoryImmediateTasks(ctx, request)
+	case tasks.CategoryTypeScheduled:
+		return m.rangeCompleteHistoryScheduledTasks(ctx, request)
+	default:
+		return serviceerror.NewInternal(fmt.Sprintf("Unknown task category type: %v", request.TaskCategory))
+	}
+}
+
+func (m *sqlExecutionStore) getHistoryImmediateTask(
+	ctx context.Context,
+	request *p.GetHistoryTaskRequest,
+) (*p.InternalGetHistoryTaskResponse, error) {
+	// This is for backward compatiblity.
+	// These task categories exist before the general history_immediate_tasks table is created,
+	// so they have their own tables.
+	categoryID := request.TaskCategory.ID()
+	switch categoryID {
+	case tasks.CategoryIDTransfer:
+		return m.getTransferTask(ctx, request)
+	case tasks.CategoryIDVisibility:
+		return m.getVisibilityTask(ctx, request)
+	case tasks.CategoryIDReplication:
+		return m.getReplicationTask(ctx, request)
+	}
+
+	rows, err := m.Db.SelectFromHistoryImmediateTasks(ctx, sqlplugin.HistoryImmediateTasksFilter{
+		ShardID:    request.ShardID,
+		CategoryID: categoryID,
+		TaskID:     request.TaskKey.TaskID,
+	})
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, serviceerror.NewNotFound(
+				fmt.Sprintf("GetHistoryTask operation failed. CategoryID: %v. Task with ID %v not found. Error: %v", categoryID, request.TaskKey.TaskID, err),
+			)
+		}
+		return nil, serviceerror.NewUnavailable(
+			fmt.Sprintf("GetHistoryTask operation failed. Failed to get record. CategoryID: %v. TaskId: %v. Error: %v", categoryID, request.TaskKey.TaskID, err),
+		)
+	}
+
+	if len(rows) == 0 {
+		return nil, serviceerror.NewNotFound(
+			fmt.Sprintf("GetHistoryTask operation failed. Failed to get record. CategoryID: %v. TaskId: %v", categoryID, request.TaskKey.TaskID),
+		)
+	}
+
+	immedidateTaskRow := rows[0]
+	resp := &p.InternalGetHistoryTaskResponse{
+		InternalHistoryTask: p.InternalHistoryTask{
+			Key:  tasks.NewImmediateKey(immedidateTaskRow.TaskID),
+			Blob: *p.NewDataBlob(immedidateTaskRow.Data, immedidateTaskRow.DataEncoding),
+		},
+	}
+	return resp, nil
+}
+
+func (m *sqlExecutionStore) getHistoryImmediateTasks(
+	ctx context.Context,
+	request *p.GetHistoryTasksRequest,
+) (*p.InternalGetHistoryTasksResponse, error) {
+	// This is for backward compatiblity.
+	// These task categories exist before the general history_immediate_tasks table is created,
+	// so they have their own tables.
+	categoryID := request.TaskCategory.ID()
+	switch categoryID {
+	case tasks.CategoryIDTransfer:
+		return m.getTransferTasks(ctx, request)
+	case tasks.CategoryIDVisibility:
+		return m.getVisibilityTasks(ctx, request)
+	case tasks.CategoryIDReplication:
+		return m.getReplicationTasks(ctx, request)
+	}
+
+	inclusiveMinTaskID, exclusiveMaxTaskID, err := getImmediateTaskReadRange(request)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := m.Db.RangeSelectFromHistoryImmediateTasks(ctx, sqlplugin.HistoryImmediateTasksRangeFilter{
+		ShardID:            request.ShardID,
+		CategoryID:         categoryID,
+		InclusiveMinTaskID: inclusiveMinTaskID,
+		ExclusiveMaxTaskID: exclusiveMaxTaskID,
+		PageSize:           request.BatchSize,
+	})
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return nil, serviceerror.NewUnavailable(
+				fmt.Sprintf("GetHistoryTasks operation failed. Select failed. CategoryID: %v. Error: %v", categoryID, err),
+			)
+		}
+	}
+	resp := &p.InternalGetHistoryTasksResponse{
+		Tasks: make([]p.InternalHistoryTask, len(rows)),
+	}
+	if len(rows) == 0 {
+		return resp, nil
+	}
+
+	for i, row := range rows {
+		resp.Tasks[i] = p.InternalHistoryTask{
+			Key:  tasks.NewImmediateKey(row.TaskID),
+			Blob: *p.NewDataBlob(row.Data, row.DataEncoding),
+		}
+	}
+	if len(rows) == request.BatchSize {
+		resp.NextPageToken = getImmediateTaskNextPageToken(
+			rows[len(rows)-1].TaskID,
+			exclusiveMaxTaskID,
+		)
+	}
+
+	return resp, nil
+}
+
+func (m *sqlExecutionStore) completeHistoryImmediateTask(
+	ctx context.Context,
+	request *p.CompleteHistoryTaskRequest,
+) error {
+	// This is for backward compatiblity.
+	// These task categories exist before the general history_immediate_tasks table is created,
+	// so they have their own tables.
+	categoryID := request.TaskCategory.ID()
+	switch categoryID {
+	case tasks.CategoryIDTransfer:
+		return m.completeTransferTask(ctx, request)
+	case tasks.CategoryIDVisibility:
+		return m.completeVisibilityTask(ctx, request)
+	case tasks.CategoryIDReplication:
+		return m.completeReplicationTask(ctx, request)
+	}
+
+	if _, err := m.Db.DeleteFromHistoryImmediateTasks(ctx, sqlplugin.HistoryImmediateTasksFilter{
+		ShardID:    request.ShardID,
+		CategoryID: categoryID,
+		TaskID:     request.TaskKey.TaskID,
+	}); err != nil {
+		return serviceerror.NewUnavailable(
+			fmt.Sprintf("CompleteHistoryTask operation failed. CategoryID: %v. Error: %v", categoryID, err),
+		)
+	}
+	return nil
+}
+
+func (m *sqlExecutionStore) rangeCompleteHistoryImmediateTasks(
+	ctx context.Context,
+	request *p.RangeCompleteHistoryTasksRequest,
+) error {
+	// This is for backward compatiblity.
+	// These task categories exist before the general history_immediate_tasks table is created,
+	// so they have their own tables.
+	categoryID := request.TaskCategory.ID()
+	switch categoryID {
 	case tasks.CategoryIDTransfer:
 		return m.rangeCompleteTransferTasks(ctx, request)
-	case tasks.CategoryIDTimer:
-		return m.rangeCompleteTimerTasks(ctx, request)
 	case tasks.CategoryIDVisibility:
 		return m.rangeCompleteVisibilityTasks(ctx, request)
 	case tasks.CategoryIDReplication:
 		return m.rangeCompleteReplicationTasks(ctx, request)
-	default:
-		return serviceerror.NewInternal(fmt.Sprintf("unknown task category: %v", request.TaskCategory))
 	}
+
+	if _, err := m.Db.RangeDeleteFromHistoryImmediateTasks(ctx, sqlplugin.HistoryImmediateTasksRangeFilter{
+		ShardID:            request.ShardID,
+		CategoryID:         categoryID,
+		InclusiveMinTaskID: request.InclusiveMinTaskKey.TaskID,
+		ExclusiveMaxTaskID: request.ExclusiveMaxTaskKey.TaskID,
+	}); err != nil {
+		return serviceerror.NewUnavailable(
+			fmt.Sprintf("RangeCompleteTransferTask operation failed. CategoryID: %v. Error: %v", categoryID, err),
+		)
+	}
+	return nil
+}
+
+func (m *sqlExecutionStore) getHistoryScheduledTask(
+	ctx context.Context,
+	request *p.GetHistoryTaskRequest,
+) (*p.InternalGetHistoryTaskResponse, error) {
+	// This is for backward compatiblity.
+	// These task categories exist before the general history_scheduled_tasks table is created,
+	// so they have their own tables.
+	categoryID := request.TaskCategory.ID()
+	if categoryID == tasks.CategoryIDTimer {
+		return m.getTimerTask(ctx, request)
+	}
+
+	rows, err := m.Db.SelectFromHistoryScheduledTasks(ctx, sqlplugin.HistoryScheduledTasksFilter{
+		ShardID:             request.ShardID,
+		CategoryID:          categoryID,
+		TaskID:              request.TaskKey.TaskID,
+		VisibilityTimestamp: request.TaskKey.FireTime,
+	})
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, serviceerror.NewNotFound(
+				fmt.Sprintf("GetHistoryTask operation failed. CategoryID: %v. Task with ID %v not found. Error: %v", categoryID, request.TaskKey.TaskID, err),
+			)
+		}
+		return nil, serviceerror.NewUnavailable(
+			fmt.Sprintf("GetHistoryTask operation failed. Failed to get record. CategoryID: %v. TaskId: %v. Error: %v", categoryID, request.TaskKey.TaskID, err),
+		)
+	}
+
+	if len(rows) == 0 {
+		return nil, serviceerror.NewNotFound(
+			fmt.Sprintf("GetHistoryTask operation failed. Failed to get record. CategoryID: %v. TaskId: %v", categoryID, request.TaskKey.TaskID),
+		)
+	}
+
+	scheduledTaskRow := rows[0]
+	resp := &p.InternalGetHistoryTaskResponse{
+		InternalHistoryTask: p.InternalHistoryTask{
+			Key:  tasks.NewKey(scheduledTaskRow.VisibilityTimestamp, scheduledTaskRow.TaskID),
+			Blob: *p.NewDataBlob(scheduledTaskRow.Data, scheduledTaskRow.DataEncoding),
+		},
+	}
+	return resp, nil
+}
+
+func (m *sqlExecutionStore) getHistoryScheduledTasks(
+	ctx context.Context,
+	request *p.GetHistoryTasksRequest,
+) (*p.InternalGetHistoryTasksResponse, error) {
+	// This is for backward compatiblity.
+	// These task categories exist before the general history_scheduled_tasks table is created,
+	// so they have their own tables.
+	categoryID := request.TaskCategory.ID()
+	if categoryID == tasks.CategoryIDTimer {
+		return m.getTimerTasks(ctx, request)
+	}
+
+	pageToken := &scheduledTaskPageToken{TaskID: math.MinInt64, Timestamp: request.InclusiveMinTaskKey.FireTime}
+	if len(request.NextPageToken) > 0 {
+		if err := pageToken.deserialize(request.NextPageToken); err != nil {
+			return nil, serviceerror.NewInternal(
+				fmt.Sprintf("categoryID: %v. error deserializing scheduledTaskPageToken: %v", categoryID, err),
+			)
+		}
+	}
+
+	rows, err := m.Db.RangeSelectFromHistoryScheduledTasks(ctx, sqlplugin.HistoryScheduledTasksRangeFilter{
+		ShardID:                         request.ShardID,
+		CategoryID:                      categoryID,
+		InclusiveMinVisibilityTimestamp: pageToken.Timestamp,
+		InclusiveMinTaskID:              pageToken.TaskID,
+		ExclusiveMaxVisibilityTimestamp: request.ExclusiveMaxTaskKey.FireTime,
+		PageSize:                        request.BatchSize,
+	})
+
+	if err != nil && err != sql.ErrNoRows {
+		return nil, serviceerror.NewUnavailable(
+			fmt.Sprintf("GetHistoryTasks operation failed. Select failed. CategoryID: %v. Error: %v", categoryID, err),
+		)
+	}
+
+	resp := &p.InternalGetHistoryTasksResponse{Tasks: make([]p.InternalHistoryTask, 0, len(rows))}
+	for _, row := range rows {
+		resp.Tasks = append(resp.Tasks, p.InternalHistoryTask{
+			Key:  tasks.NewKey(row.VisibilityTimestamp, row.TaskID),
+			Blob: *p.NewDataBlob(row.Data, row.DataEncoding),
+		})
+	}
+
+	if len(resp.Tasks) == request.BatchSize {
+		pageToken = &scheduledTaskPageToken{
+			TaskID:    rows[request.BatchSize-1].TaskID + 1,
+			Timestamp: rows[request.BatchSize-1].VisibilityTimestamp,
+		}
+		nextToken, err := pageToken.serialize()
+		if err != nil {
+			return nil, serviceerror.NewInternal(fmt.Sprintf("GetHistoryTasks: error serializing page token: %v", err))
+		}
+		resp.NextPageToken = nextToken
+	}
+
+	return resp, nil
+}
+
+func (m *sqlExecutionStore) completeHistoryScheduledTask(
+	ctx context.Context,
+	request *p.CompleteHistoryTaskRequest,
+) error {
+	// This is for backward compatiblity.
+	// These task categories exist before the general history_scheduled_tasks table is created,
+	// so they have their own tables.
+	categoryID := request.TaskCategory.ID()
+	if categoryID == tasks.CategoryIDTimer {
+		return m.completeTimerTask(ctx, request)
+	}
+
+	if _, err := m.Db.DeleteFromHistoryScheduledTasks(ctx, sqlplugin.HistoryScheduledTasksFilter{
+		ShardID:             request.ShardID,
+		CategoryID:          categoryID,
+		VisibilityTimestamp: request.TaskKey.FireTime,
+		TaskID:              request.TaskKey.TaskID,
+	}); err != nil {
+		return serviceerror.NewUnavailable(fmt.Sprintf("CompleteHistoryTask operation failed. CategoryID: %v. Error: %v", categoryID, err))
+	}
+	return nil
+}
+
+func (m *sqlExecutionStore) rangeCompleteHistoryScheduledTasks(
+	ctx context.Context,
+	request *p.RangeCompleteHistoryTasksRequest,
+) error {
+	// This is for backward compatiblity.
+	// These task categories exist before the general history_scheduled_tasks table is created,
+	// so they have their own tables.
+	categoryID := request.TaskCategory.ID()
+	if categoryID == tasks.CategoryIDTimer {
+		return m.rangeCompleteTimerTasks(ctx, request)
+	}
+
+	start := request.InclusiveMinTaskKey.FireTime
+	end := request.ExclusiveMaxTaskKey.FireTime
+	if _, err := m.Db.RangeDeleteFromHistoryScheduledTasks(ctx, sqlplugin.HistoryScheduledTasksRangeFilter{
+		ShardID:                         request.ShardID,
+		CategoryID:                      categoryID,
+		InclusiveMinVisibilityTimestamp: start,
+		ExclusiveMaxVisibilityTimestamp: end,
+	}); err != nil {
+		return serviceerror.NewUnavailable(fmt.Sprintf("RangeCompleteHistoryTask operation failed. CategoryID: %v. Error: %v", categoryID, err))
+	}
+	return nil
 }
 
 func (m *sqlExecutionStore) getTransferTask(
@@ -151,8 +453,12 @@ func (m *sqlExecutionStore) getTransferTask(
 
 	transferRow := rows[0]
 	resp := &p.InternalGetHistoryTaskResponse{
-		Task: *p.NewDataBlob(transferRow.Data, transferRow.DataEncoding),
+		InternalHistoryTask: p.InternalHistoryTask{
+			Key:  tasks.NewImmediateKey(transferRow.TaskID),
+			Blob: *p.NewDataBlob(transferRow.Data, transferRow.DataEncoding),
+		},
 	}
+
 	return resp, nil
 }
 
@@ -177,14 +483,17 @@ func (m *sqlExecutionStore) getTransferTasks(
 		}
 	}
 	resp := &p.InternalGetHistoryTasksResponse{
-		Tasks: make([]commonpb.DataBlob, len(rows)),
+		Tasks: make([]p.InternalHistoryTask, len(rows)),
 	}
 	if len(rows) == 0 {
 		return resp, nil
 	}
 
 	for i, row := range rows {
-		resp.Tasks[i] = *p.NewDataBlob(row.Data, row.DataEncoding)
+		resp.Tasks[i] = p.InternalHistoryTask{
+			Key:  tasks.NewImmediateKey(row.TaskID),
+			Blob: *p.NewDataBlob(row.Data, row.DataEncoding),
+		}
 	}
 	if len(rows) == request.BatchSize {
 		resp.NextPageToken = getImmediateTaskNextPageToken(
@@ -245,8 +554,12 @@ func (m *sqlExecutionStore) getTimerTask(
 
 	timerRow := rows[0]
 	resp := &p.InternalGetHistoryTaskResponse{
-		Task: *p.NewDataBlob(timerRow.Data, timerRow.DataEncoding),
+		InternalHistoryTask: p.InternalHistoryTask{
+			Key:  tasks.NewKey(timerRow.VisibilityTimestamp, timerRow.TaskID),
+			Blob: *p.NewDataBlob(timerRow.Data, timerRow.DataEncoding),
+		},
 	}
+
 	return resp, nil
 }
 
@@ -254,7 +567,7 @@ func (m *sqlExecutionStore) getTimerTasks(
 	ctx context.Context,
 	request *p.GetHistoryTasksRequest,
 ) (*p.InternalGetHistoryTasksResponse, error) {
-	pageToken := &timerTaskPageToken{TaskID: math.MinInt64, Timestamp: request.InclusiveMinTaskKey.FireTime}
+	pageToken := &scheduledTaskPageToken{TaskID: math.MinInt64, Timestamp: request.InclusiveMinTaskKey.FireTime}
 	if len(request.NextPageToken) > 0 {
 		if err := pageToken.deserialize(request.NextPageToken); err != nil {
 			return nil, serviceerror.NewInternal(fmt.Sprintf("error deserializing timerTaskPageToken: %v", err))
@@ -273,13 +586,16 @@ func (m *sqlExecutionStore) getTimerTasks(
 		return nil, serviceerror.NewUnavailable(fmt.Sprintf("GetTimerTasks operation failed. Select failed. Error: %v", err))
 	}
 
-	resp := &p.InternalGetHistoryTasksResponse{Tasks: make([]commonpb.DataBlob, len(rows))}
-	for i, row := range rows {
-		resp.Tasks[i] = *p.NewDataBlob(row.Data, row.DataEncoding)
+	resp := &p.InternalGetHistoryTasksResponse{Tasks: make([]p.InternalHistoryTask, 0, len(rows))}
+	for _, row := range rows {
+		resp.Tasks = append(resp.Tasks, p.InternalHistoryTask{
+			Key:  tasks.NewKey(row.VisibilityTimestamp, row.TaskID),
+			Blob: *p.NewDataBlob(row.Data, row.DataEncoding),
+		})
 	}
 
 	if len(resp.Tasks) == request.BatchSize {
-		pageToken = &timerTaskPageToken{
+		pageToken = &scheduledTaskPageToken{
 			TaskID:    rows[request.BatchSize-1].TaskID + 1,
 			Timestamp: rows[request.BatchSize-1].VisibilityTimestamp,
 		}
@@ -318,7 +634,7 @@ func (m *sqlExecutionStore) rangeCompleteTimerTasks(
 		InclusiveMinVisibilityTimestamp: start,
 		ExclusiveMaxVisibilityTimestamp: end,
 	}); err != nil {
-		return serviceerror.NewUnavailable(fmt.Sprintf("CompleteTimerTask operation failed. Error: %v", err))
+		return serviceerror.NewUnavailable(fmt.Sprintf("RangeCompleteTimerTask operation failed. Error: %v", err))
 	}
 	return nil
 }
@@ -343,7 +659,12 @@ func (m *sqlExecutionStore) getReplicationTask(
 	}
 
 	replicationRow := rows[0]
-	resp := &p.InternalGetHistoryTaskResponse{Task: *p.NewDataBlob(replicationRow.Data, replicationRow.DataEncoding)}
+	resp := &p.InternalGetHistoryTaskResponse{
+		InternalHistoryTask: p.InternalHistoryTask{
+			Key:  tasks.NewImmediateKey(replicationRow.TaskID),
+			Blob: *p.NewDataBlob(replicationRow.Data, replicationRow.DataEncoding),
+		},
+	}
 	return resp, nil
 }
 
@@ -407,9 +728,12 @@ func (m *sqlExecutionStore) populateGetReplicationTasksResponse(
 		return &p.InternalGetHistoryTasksResponse{}, nil
 	}
 
-	var tasks = make([]commonpb.DataBlob, len(rows))
+	var replicationTasks = make([]p.InternalHistoryTask, len(rows))
 	for i, row := range rows {
-		tasks[i] = *p.NewDataBlob(row.Data, row.DataEncoding)
+		replicationTasks[i] = p.InternalHistoryTask{
+			Key:  tasks.NewImmediateKey(row.TaskID),
+			Blob: *p.NewDataBlob(row.Data, row.DataEncoding),
+		}
 	}
 	var nextPageToken []byte
 	if len(rows) == batchSize {
@@ -419,7 +743,7 @@ func (m *sqlExecutionStore) populateGetReplicationTasksResponse(
 		)
 	}
 	return &p.InternalGetHistoryTasksResponse{
-		Tasks:         tasks,
+		Tasks:         replicationTasks,
 		NextPageToken: nextPageToken,
 	}, nil
 }
@@ -433,9 +757,12 @@ func (m *sqlExecutionStore) populateGetReplicationDLQTasksResponse(
 		return &p.InternalGetHistoryTasksResponse{}, nil
 	}
 
-	var tasks = make([]commonpb.DataBlob, len(rows))
+	var dlqTasks = make([]p.InternalHistoryTask, len(rows))
 	for i, row := range rows {
-		tasks[i] = *p.NewDataBlob(row.Data, row.DataEncoding)
+		dlqTasks[i] = p.InternalHistoryTask{
+			Key:  tasks.NewImmediateKey(row.TaskID),
+			Blob: *p.NewDataBlob(row.Data, row.DataEncoding),
+		}
 	}
 	var nextPageToken []byte
 	if len(rows) == batchSize {
@@ -445,7 +772,7 @@ func (m *sqlExecutionStore) populateGetReplicationDLQTasksResponse(
 		)
 	}
 	return &p.InternalGetHistoryTasksResponse{
-		Tasks:         tasks,
+		Tasks:         dlqTasks,
 		NextPageToken: nextPageToken,
 	}, nil
 }
@@ -581,7 +908,12 @@ func (m *sqlExecutionStore) getVisibilityTask(
 	}
 
 	visibilityRow := rows[0]
-	resp := &p.InternalGetHistoryTaskResponse{Task: *p.NewDataBlob(visibilityRow.Data, visibilityRow.DataEncoding)}
+	resp := &p.InternalGetHistoryTaskResponse{
+		InternalHistoryTask: p.InternalHistoryTask{
+			Key:  tasks.NewImmediateKey(visibilityRow.TaskID),
+			Blob: *p.NewDataBlob(visibilityRow.Data, visibilityRow.DataEncoding),
+		},
+	}
 	return resp, nil
 }
 
@@ -606,14 +938,17 @@ func (m *sqlExecutionStore) getVisibilityTasks(
 		}
 	}
 	resp := &p.InternalGetHistoryTasksResponse{
-		Tasks: make([]commonpb.DataBlob, len(rows)),
+		Tasks: make([]p.InternalHistoryTask, len(rows)),
 	}
 	if len(rows) == 0 {
 		return resp, nil
 	}
 
 	for i, row := range rows {
-		resp.Tasks[i] = *p.NewDataBlob(row.Data, row.DataEncoding)
+		resp.Tasks[i] = p.InternalHistoryTask{
+			Key:  tasks.NewImmediateKey(row.TaskID),
+			Blob: *p.NewDataBlob(row.Data, row.DataEncoding),
+		}
 	}
 	if len(rows) == request.BatchSize {
 		resp.NextPageToken = getImmediateTaskNextPageToken(
@@ -652,15 +987,15 @@ func (m *sqlExecutionStore) rangeCompleteVisibilityTasks(
 	return nil
 }
 
-type timerTaskPageToken struct {
+type scheduledTaskPageToken struct {
 	TaskID    int64
 	Timestamp time.Time
 }
 
-func (t *timerTaskPageToken) serialize() ([]byte, error) {
+func (t *scheduledTaskPageToken) serialize() ([]byte, error) {
 	return json.Marshal(t)
 }
 
-func (t *timerTaskPageToken) deserialize(payload []byte) error {
+func (t *scheduledTaskPageToken) deserialize(payload []byte) error {
 	return json.Unmarshal(payload, t)
 }

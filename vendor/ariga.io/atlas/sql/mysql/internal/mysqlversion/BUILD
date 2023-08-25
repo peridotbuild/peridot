@@ -16,5 +16,9 @@ go_library(
         "//third_party:__subpackages__",
         "//vendor/ariga.io/atlas/sql/mysql:__subpackages__",
     ],
-    deps = ["//vendor/golang.org/x/mod/semver"],
+    deps = [
+        "//vendor/ariga.io/atlas/sql/internal/sqlx",
+        "//vendor/ariga.io/atlas/sql/schema",
+        "//vendor/golang.org/x/mod/semver",
+    ],
 )

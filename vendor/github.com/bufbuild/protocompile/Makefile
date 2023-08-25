@@ -7,7 +7,7 @@ MAKEFLAGS += --warn-undefined-variables
 MAKEFLAGS += --no-builtin-rules
 MAKEFLAGS += --no-print-directory
 BIN := $(abspath .tmp/bin)
-COPYRIGHT_YEARS := 2020-2022
+COPYRIGHT_YEARS := 2020-2023
 LICENSE_IGNORE := -e /testdata/
 # Set to use a different compiler. For example, `GO=go1.18rc1 make test`.
 GO ?= go
@@ -15,8 +15,7 @@ TOOLS_MOD_DIR := ./internal/tools
 UNAME_OS := $(shell uname -s)
 UNAME_ARCH := $(shell uname -m)
 
-# NB: this must be kept in sync with constant in internal/benchmarks.
-PROTOC_VERSION ?= 22.0
+PROTOC_VERSION := $(shell cat ./.protoc_version)
 PROTOC_DIR := $(abspath ./internal/testdata/protoc/$(PROTOC_VERSION))
 PROTOC := $(PROTOC_DIR)/bin/protoc
 
@@ -103,17 +102,17 @@ checkgenerate:
 $(BIN)/license-header: internal/tools/go.mod internal/tools/go.sum
 	@mkdir -p $(@D)
 	cd $(TOOLS_MOD_DIR) && \
-	$(GO) build -o $@ github.com/bufbuild/buf/private/pkg/licenseheader/cmd/license-header
+		GOWORK=off $(GO) build -o $@ github.com/bufbuild/buf/private/pkg/licenseheader/cmd/license-header
 
 $(BIN)/golangci-lint: internal/tools/go.mod internal/tools/go.sum
 	@mkdir -p $(@D)
 	cd $(TOOLS_MOD_DIR) && \
-	$(GO) build -o $@ github.com/golangci/golangci-lint/cmd/golangci-lint
+		GOWORK=off $(GO) build -o $@ github.com/golangci/golangci-lint/cmd/golangci-lint
 
 $(BIN)/goyacc: internal/tools/go.mod internal/tools/go.sum
 	@mkdir -p $(@D)
 	cd $(TOOLS_MOD_DIR) && \
-	$(GO) build -o $@ golang.org/x/tools/cmd/goyacc
+		GOWORK=off $(GO) build -o $@ golang.org/x/tools/cmd/goyacc
 
 internal/testdata/protoc/cache/protoc-$(PROTOC_VERSION).zip:
 	@mkdir -p $(@D)

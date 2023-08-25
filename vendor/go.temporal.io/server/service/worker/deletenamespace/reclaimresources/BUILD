@@ -20,6 +20,7 @@ go_library(
         "//vendor/go.temporal.io/server/common/namespace",
         "//vendor/go.temporal.io/server/common/persistence",
         "//vendor/go.temporal.io/server/common/persistence/visibility/manager",
+        "//vendor/go.temporal.io/server/common/persistence/visibility/store/elasticsearch",
         "//vendor/go.temporal.io/server/service/worker/deletenamespace/deleteexecutions",
         "//vendor/go.temporal.io/server/service/worker/deletenamespace/errors",
     ],

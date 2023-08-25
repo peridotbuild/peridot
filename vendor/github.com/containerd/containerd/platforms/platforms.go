@@ -114,17 +114,13 @@ import (
 	"strconv"
 	"strings"
 
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
-
 	"github.com/containerd/containerd/errdefs"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (
 	specifierRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 )
-
-// Platform is a type alias for convenience, so there is no need to import image-spec package everywhere.
-type Platform = specs.Platform
 
 // Matcher matches platforms specifications, provided by an image or runtime.
 type Matcher interface {

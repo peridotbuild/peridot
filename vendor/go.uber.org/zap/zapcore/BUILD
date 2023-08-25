@@ -28,11 +28,11 @@ go_library(
     importpath = "go.uber.org/zap/zapcore",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/go.uber.org/atomic",
         "//vendor/go.uber.org/multierr",
         "//vendor/go.uber.org/zap/buffer",
         "//vendor/go.uber.org/zap/internal/bufferpool",
         "//vendor/go.uber.org/zap/internal/color",
         "//vendor/go.uber.org/zap/internal/exit",
+        "//vendor/go.uber.org/zap/internal/pool",
     ],
 )

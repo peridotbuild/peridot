@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"ariga.io/atlas/sql/schema"
 )
@@ -113,11 +114,14 @@ func SchemaFKs(s *schema.Schema, rows *sql.Rows) error {
 				OnUpdate: schema.ReferenceOption(updateRule),
 			}
 			switch {
-			case refTable == table:
-			case tSchema == refSchema:
+			// Self reference.
+			case tSchema == refSchema && refTable == table:
+			// Reference to the same schema.
+			case tSchema == refSchema && refTable != table:
 				if fk.RefTable, ok = s.Table(refTable); !ok {
 					fk.RefTable = &schema.Table{Name: refTable, Schema: s}
 				}
+			// Reference to an external schema.
 			case tSchema != refSchema:
 				fk.RefTable = &schema.Table{Name: refTable, Schema: &schema.Schema{Name: refSchema}}
 			}
@@ -198,7 +202,7 @@ func ValuesEqual(v1, v2 []string) bool {
 // ModeInspectSchema returns the InspectMode or its default.
 func ModeInspectSchema(o *schema.InspectOptions) schema.InspectMode {
 	if o == nil || o.Mode == 0 {
-		return schema.InspectSchemas | schema.InspectTables
+		return schema.InspectSchemas | schema.InspectTables | schema.InspectViews
 	}
 	return o.Mode
 }
@@ -206,7 +210,7 @@ func ModeInspectSchema(o *schema.InspectOptions) schema.InspectMode {
 // ModeInspectRealm returns the InspectMode or its default.
 func ModeInspectRealm(o *schema.InspectRealmOption) schema.InspectMode {
 	if o == nil || o.Mode == 0 {
-		return schema.InspectSchemas | schema.InspectTables
+		return schema.InspectSchemas | schema.InspectTables | schema.InspectViews
 	}
 	return o.Mode
 }
@@ -214,10 +218,11 @@ func ModeInspectRealm(o *schema.InspectRealmOption) schema.InspectMode {
 // A Builder provides a syntactic sugar API for writing SQL statements.
 type Builder struct {
 	bytes.Buffer
-	QuoteChar byte    // quoting identifiers
-	Schema    *string // schema qualifier
-	Indent    string  // indentation string
-	level     int     // current indentation level
+	QuoteOpening byte    // quoting identifiers
+	QuoteClosing byte    // quoting identifiers
+	Schema       *string // schema qualifier
+	Indent       string  // indentation string
+	level        int     // current indentation level
 }
 
 // P writes a list of phrases to the builder separated and
@@ -241,17 +246,40 @@ func (b *Builder) P(phrases ...string) *Builder {
 // Ident writes the given string quoted as an SQL identifier.
 func (b *Builder) Ident(s string) *Builder {
 	if s != "" {
-		b.WriteByte(b.QuoteChar)
+		b.WriteByte(b.QuoteOpening)
 		b.WriteString(s)
-		b.WriteByte(b.QuoteChar)
+		b.WriteByte(b.QuoteClosing)
 		b.WriteByte(' ')
 	}
 	return b
 }
 
+// View writes the view identifier to the builder, prefixed
+// with the schema name if exists.
+func (b *Builder) View(v *schema.View) *Builder {
+	return b.mayQualify(v.Schema, v.Name)
+}
+
 // Table writes the table identifier to the builder, prefixed
 // with the schema name if exists.
 func (b *Builder) Table(t *schema.Table) *Builder {
+	return b.mayQualify(t.Schema, t.Name)
+}
+
+// TableResource writes the table's resource identifier to the builder, prefixed
+// with the schema name if exists.
+func (b *Builder) TableResource(t *schema.Table, r any) *Builder {
+	switch c := r.(type) {
+	case *schema.Column:
+		return b.mayQualify(t.Schema, t.Name, c.Name)
+	case *schema.Index:
+		return b.mayQualify(t.Schema, t.Name, c.Name)
+	default:
+		panic(fmt.Sprintf("unexpected table resource: %T", r))
+	}
+}
+
+func (b *Builder) mayQualify(s *schema.Schema, top string, children ...string) *Builder {
 	switch {
 	// Custom qualifier.
 	case b.Schema != nil:
@@ -261,11 +289,15 @@ func (b *Builder) Table(t *schema.Table) *Builder {
 			b.rewriteLastByte('.')
 		}
 	// Default schema qualifier.
-	case t.Schema != nil && t.Schema.Name != "":
-		b.Ident(t.Schema.Name)
+	case s != nil && s.Name != "":
+		b.Ident(s.Name)
 		b.rewriteLastByte('.')
 	}
-	b.Ident(t.Name)
+	b.Ident(top)
+	for _, ident := range children {
+		b.rewriteLastByte('.')
+		b.Ident(ident)
+	}
 	return b
 }
 
@@ -318,6 +350,19 @@ func (b *Builder) MapComma(x any, f func(i int, b *Builder)) *Builder {
 			b.Comma()
 		}
 		f(i, b)
+	}
+	return b
+}
+
+// Quote wraps the given function with a single quote and a prefix
+func (b *Builder) Quote(prefix string, fn func(b *Builder)) *Builder {
+	b.WriteString(prefix)
+	b.WriteByte('\'')
+	fn(b)
+	if b.lastByte() != ' ' {
+		b.WriteByte('\'')
+	} else {
+		b.rewriteLastByte('\'')
 	}
 	return b
 }
@@ -375,8 +420,9 @@ func (b *Builder) WrapIndent(f func(b *Builder)) *Builder {
 // Clone returns a duplicate of the builder.
 func (b *Builder) Clone() *Builder {
 	return &Builder{
-		QuoteChar: b.QuoteChar,
-		Buffer:    *bytes.NewBufferString(b.Buffer.String()),
+		QuoteOpening: b.QuoteOpening,
+		QuoteClosing: b.QuoteClosing,
+		Buffer:       *bytes.NewBufferString(b.Buffer.String()),
 	}
 }
 
@@ -447,7 +493,7 @@ func IsLiteralNumber(s string) bool {
 
 // DefaultValue returns the string represents the DEFAULT of a column.
 func DefaultValue(c *schema.Column) (string, bool) {
-	switch x := c.Default.(type) {
+	switch x := schema.UnderlyingExpr(c.Default).(type) {
 	case nil:
 		return "", false
 	case *schema.Literal:
@@ -527,4 +573,14 @@ func V[T any](p *T) (v T) {
 		v = *p
 	}
 	return
+}
+
+// IsUint reports whether the string represents an unsigned integer.
+func IsUint(s string) bool {
+	for _, r := range s {
+		if !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
 }

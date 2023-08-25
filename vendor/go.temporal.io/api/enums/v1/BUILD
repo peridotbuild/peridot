@@ -8,6 +8,7 @@ go_library(
         "common.pb.go",
         "event_type.pb.go",
         "failed_cause.pb.go",
+        "interaction_type.pb.go",
         "namespace.pb.go",
         "query.pb.go",
         "reset.pb.go",

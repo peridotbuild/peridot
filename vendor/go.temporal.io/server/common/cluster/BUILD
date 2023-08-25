@@ -19,6 +19,7 @@ go_library(
         "//vendor/go.temporal.io/server/common/headers",
         "//vendor/go.temporal.io/server/common/log",
         "//vendor/go.temporal.io/server/common/log/tag",
+        "//vendor/go.temporal.io/server/common/metrics",
         "//vendor/go.temporal.io/server/common/persistence",
         "//vendor/go.temporal.io/server/internal/goro",
         "//vendor/go.uber.org/fx",

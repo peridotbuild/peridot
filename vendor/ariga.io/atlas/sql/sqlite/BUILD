@@ -6,6 +6,7 @@ go_library(
         "convert.go",
         "diff.go",
         "driver.go",
+        "driver_oss.go",
         "inspect.go",
         "migrate.go",
         "sqlspec.go",

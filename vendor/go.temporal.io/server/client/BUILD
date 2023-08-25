@@ -29,5 +29,6 @@ go_library(
         "//vendor/go.temporal.io/server/common/membership",
         "//vendor/go.temporal.io/server/common/metrics",
         "//vendor/go.temporal.io/server/common/namespace",
+        "//vendor/go.temporal.io/server/common/primitives",
     ],
 )

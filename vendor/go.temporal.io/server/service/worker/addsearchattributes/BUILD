@@ -10,6 +10,7 @@ go_library(
     importpath = "go.temporal.io/server/service/worker/addsearchattributes",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/olivere/elastic/v7:elastic",
         "//vendor/go.temporal.io/api/enums/v1:enums",
         "//vendor/go.temporal.io/sdk/temporal",
         "//vendor/go.temporal.io/sdk/worker",
@@ -19,6 +20,7 @@ go_library(
         "//vendor/go.temporal.io/server/common/metrics",
         "//vendor/go.temporal.io/server/common/persistence/visibility/store/elasticsearch/client",
         "//vendor/go.temporal.io/server/common/searchattribute",
+        "//vendor/go.temporal.io/server/common/util",
         "//vendor/go.temporal.io/server/service/worker/common",
         "//vendor/go.uber.org/fx",
         "//vendor/golang.org/x/exp/maps",

@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "gcimporter",
     srcs = [
-        "bexport.go",
         "bimport.go",
         "exportdata.go",
         "gcimporter.go",
@@ -24,6 +23,7 @@ go_library(
         "//vendor/golang.org/x/tools:__subpackages__",
     ],
     deps = [
+        "//vendor/golang.org/x/tools/go/types/objectpath",
         "//vendor/golang.org/x/tools/internal/pkgbits",
         "//vendor/golang.org/x/tools/internal/tokeninternal",
         "//vendor/golang.org/x/tools/internal/typeparams",

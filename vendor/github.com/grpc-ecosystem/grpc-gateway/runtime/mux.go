@@ -13,6 +13,31 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// UnescapingMode defines the behavior of ServeMux when unescaping path parameters.
+type UnescapingMode int
+
+const (
+	// UnescapingModeLegacy is the default V2 behavior, which escapes the entire
+	// path string before doing any routing.
+	UnescapingModeLegacy UnescapingMode = iota
+
+	// UnescapingModeAllExceptReserved unescapes all path parameters except RFC 6570
+	// reserved characters.
+	UnescapingModeAllExceptReserved
+
+	// UnescapingModeAllExceptSlash unescapes URL path parameters except path
+	// separators, which will be left as "%2F".
+	UnescapingModeAllExceptSlash
+
+	// UnescapingModeAllCharacters unescapes all URL path parameters.
+	UnescapingModeAllCharacters
+
+	// UnescapingModeDefault is the default escaping type.
+	// TODO(v3): default this to UnescapingModeAllExceptReserved per grpc-httpjson-transcoding's
+	// reference implementation
+	UnescapingModeDefault = UnescapingModeLegacy
+)
+
 // A HandlerFunc handles a specific pair of path pattern and HTTP method.
 type HandlerFunc func(w http.ResponseWriter, r *http.Request, pathParams map[string]string)
 

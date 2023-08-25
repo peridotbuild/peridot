@@ -27,6 +27,7 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"math"
 
@@ -74,13 +75,19 @@ func (m *sqlExecutionStore) AppendHistoryNodes(
 
 	if !request.IsNewBranch {
 		_, err = m.Db.InsertIntoHistoryNode(ctx, nodeRow)
-		if err != nil {
+		switch err {
+		case nil:
+			return nil
+		case context.DeadlineExceeded, context.Canceled:
+			return &p.AppendHistoryTimeoutError{
+				Msg: err.Error(),
+			}
+		default:
 			if m.Db.IsDupEntryError(err) {
 				return &p.ConditionFailedError{Msg: fmt.Sprintf("AppendHistoryNodes: row already exist: %v", err)}
 			}
 			return serviceerror.NewUnavailable(fmt.Sprintf("AppendHistoryNodes: %v", err))
 		}
-		return nil
 	}
 
 	treeInfoBlob := request.TreeInfo
@@ -106,17 +113,23 @@ func (m *sqlExecutionStore) AppendHistoryNodes(
 		}
 
 		result, err = tx.InsertIntoHistoryTree(ctx, treeRow)
-		if err != nil {
-			return err
+		switch err {
+		case nil:
+			rowsAffected, err = result.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if !(rowsAffected == 1 || rowsAffected == 2) {
+				return fmt.Errorf("expected 1 or 2 rows to be affected for tree table as we allow upserts, got %v", rowsAffected)
+			}
+			return nil
+		case context.DeadlineExceeded, context.Canceled:
+			return &p.AppendHistoryTimeoutError{
+				Msg: err.Error(),
+			}
+		default:
+			return serviceerror.NewUnavailable(fmt.Sprintf("AppendHistoryNodes: %v", err))
 		}
-		rowsAffected, err = result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if !(rowsAffected == 1 || rowsAffected == 2) {
-			return fmt.Errorf("expected 1 or 2 rows to be affected for tree table as we allow upserts, got %v", rowsAffected)
-		}
-		return nil
 	})
 }
 
@@ -200,7 +213,7 @@ func (m *sqlExecutionStore) NewHistoryBranch(
 	} else {
 		branchID = *request.BranchID
 	}
-	branchToken, err := p.NewHistoryBranchToken(request.TreeID, branchID)
+	branchToken, err := p.NewHistoryBranchToken(request.TreeID, branchID, request.Ancestors)
 	if err != nil {
 		return nil, err
 	}
@@ -302,21 +315,23 @@ func (m *sqlExecutionStore) ReadHistoryBranch(
 // A valid forking nodeID can be an ancestor from the existing branch.
 // For example, we have branch B1 with three nodes(1[1,2], 3[3,4,5] and 6[6,7,8]. 1, 3 and 6 are nodeIDs (first eventID of the batch).
 // So B1 looks like this:
-//           1[1,2]
-//           /
-//         3[3,4,5]
-//        /
-//      6[6,7,8]
+//
+//	     1[1,2]
+//	     /
+//	   3[3,4,5]
+//	  /
+//	6[6,7,8]
 //
 // Assuming we have branch B2 which contains one ancestor B1 stopping at 6 (exclusive). So B2 inherit nodeID 1 and 3 from B1, and have its own nodeID 6 and 8.
 // Branch B2 looks like this:
-//           1[1,2]
-//           /
-//         3[3,4,5]
-//          \
-//           6[6,7]
-//           \
-//            8[8]
+//
+//	  1[1,2]
+//	  /
+//	3[3,4,5]
+//	 \
+//	  6[6,7]
+//	  \
+//	   8[8]
 //
 // Now we want to fork a new branch B3 from B2.
 // The only valid forking nodeIDs are 3,6 or 8.
@@ -325,22 +340,23 @@ func (m *sqlExecutionStore) ReadHistoryBranch(
 //
 // Case #1: If we fork from nodeID 6, then B3 will have an ancestor B1 which stops at 6(exclusive).
 // As we append a batch of events[6,7,8,9] to B3, it will look like :
-//           1[1,2]
-//           /
-//         3[3,4,5]
-//          \
-//         6[6,7,8,9]
+//
+//	  1[1,2]
+//	  /
+//	3[3,4,5]
+//	 \
+//	6[6,7,8,9]
 //
 // Case #2: If we fork from node 8, then B3 will have two ancestors: B1 stops at 6(exclusive) and ancestor B2 stops at 8(exclusive)
 // As we append a batch of events[8,9] to B3, it will look like:
-//           1[1,2]
-//           /
-//         3[3,4,5]
-//        /
-//      6[6,7]
-//       \
-//       8[8,9]
 //
+//	     1[1,2]
+//	     /
+//	   3[3,4,5]
+//	  /
+//	6[6,7]
+//	 \
+//	 8[8,9]
 func (m *sqlExecutionStore) ForkHistoryBranch(
 	ctx context.Context,
 	request *p.InternalForkHistoryBranchRequest,
@@ -425,14 +441,72 @@ func (m *sqlExecutionStore) DeleteHistoryBranch(
 	})
 }
 
+// getAllHistoryTreeBranchesPaginationToken represents the primary key of the latest row in the history_tree table that
+// we returned.
+type getAllHistoryTreeBranchesPaginationToken struct {
+	ShardID  int32
+	TreeID   primitives.UUID
+	BranchID primitives.UUID
+}
+
 func (m *sqlExecutionStore) GetAllHistoryTreeBranches(
-	_ context.Context,
+	ctx context.Context,
 	request *p.GetAllHistoryTreeBranchesRequest,
 ) (*p.InternalGetAllHistoryTreeBranchesResponse, error) {
+	pageSize := request.PageSize
+	if pageSize <= 0 {
+		return nil, fmt.Errorf("PageSize must be greater than 0, but was %d", pageSize)
+	}
 
-	// TODO https://github.com/uber/cadence/issues/2458
-	// Implement it when we need
-	panic("not implemented yet")
+	page := sqlplugin.HistoryTreeBranchPage{
+		Limit: pageSize,
+	}
+	if len(request.NextPageToken) != 0 {
+		var token getAllHistoryTreeBranchesPaginationToken
+		if err := json.Unmarshal(request.NextPageToken, &token); err != nil {
+			return nil, err
+		}
+		page.ShardID = token.ShardID
+		page.TreeID = token.TreeID
+		page.BranchID = token.BranchID
+	}
+
+	rows, err := m.Db.PaginateBranchesFromHistoryTree(ctx, page)
+	if err != nil {
+		return nil, err
+	}
+	branches := make([]p.InternalHistoryBranchDetail, 0, pageSize)
+	for _, row := range rows {
+		branch := p.InternalHistoryBranchDetail{
+			TreeID:   row.TreeID.String(),
+			BranchID: row.BranchID.String(),
+			Data:     row.Data,
+			Encoding: row.DataEncoding,
+		}
+		branches = append(branches, branch)
+	}
+
+	response := &p.InternalGetAllHistoryTreeBranchesResponse{
+		Branches: branches,
+	}
+	if len(branches) < pageSize {
+		// no next page token because there are no more results
+		return response, nil
+	}
+
+	// if we filled the page with rows, then set the next page token
+	lastRow := rows[len(rows)-1]
+	token := getAllHistoryTreeBranchesPaginationToken{
+		ShardID:  lastRow.ShardID,
+		TreeID:   lastRow.TreeID,
+		BranchID: lastRow.BranchID,
+	}
+	tokenBytes, err := json.Marshal(token)
+	if err != nil {
+		return nil, err
+	}
+	response.NextPageToken = tokenBytes
+	return response, nil
 }
 
 // GetHistoryTree returns all branch information of a tree

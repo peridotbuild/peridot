@@ -50,7 +50,6 @@ import (
 	"go.temporal.io/server/common/persistence/visibility/manager"
 	esclient "go.temporal.io/server/common/persistence/visibility/store/elasticsearch/client"
 	"go.temporal.io/server/common/primitives"
-	"go.temporal.io/server/common/resource"
 	"go.temporal.io/server/common/sdk"
 	"go.temporal.io/server/service/worker/archiver"
 	"go.temporal.io/server/service/worker/batcher"
@@ -67,7 +66,6 @@ type (
 		logger                 log.Logger
 		archivalMetadata       carchiver.ArchivalMetadata
 		clusterMetadata        cluster.Metadata
-		metricsClient          metrics.Client
 		clientBean             client.Bean
 		clusterMetadataManager persistence.ClusterMetadataManager
 		metadataManager        persistence.MetadataManager
@@ -97,6 +95,8 @@ type (
 
 		workerManager             *workerManager
 		perNamespaceWorkerManager *perNamespaceWorkerManager
+		scanner                   *scanner.Scanner
+		workerFactory             sdk.WorkerFactory
 	}
 
 	// Config contains all the service config for worker
@@ -126,13 +126,12 @@ type (
 )
 
 func NewService(
-	logger resource.SnTaggedLogger,
+	logger log.SnTaggedLogger,
 	serviceConfig *Config,
 	sdkClientFactory sdk.ClientFactory,
 	esClient esclient.Client,
 	archivalMetadata carchiver.ArchivalMetadata,
 	clusterMetadata cluster.Metadata,
-	metricsClient metrics.Client,
 	clientBean client.Bean,
 	clusterMetadataManager persistence.ClusterMetadataManager,
 	namespaceRegistry namespace.Registry,
@@ -148,13 +147,14 @@ func NewService(
 	workerManager *workerManager,
 	perNamespaceWorkerManager *perNamespaceWorkerManager,
 	visibilityManager manager.VisibilityManager,
+	workerFactory sdk.WorkerFactory,
 ) (*Service, error) {
-	workerServiceResolver, err := membershipMonitor.GetResolver(common.WorkerServiceName)
+	workerServiceResolver, err := membershipMonitor.GetResolver(primitives.WorkerService)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Service{
+	s := &Service{
 		status:                    common.DaemonStatusInitialized,
 		config:                    serviceConfig,
 		sdkClientFactory:          sdkClientFactory,
@@ -163,7 +163,6 @@ func NewService(
 		logger:                    logger,
 		archivalMetadata:          archivalMetadata,
 		clusterMetadata:           clusterMetadata,
-		metricsClient:             metricsClient,
 		clientBean:                clientBean,
 		clusterMetadataManager:    clusterMetadataManager,
 		namespaceRegistry:         namespaceRegistry,
@@ -181,7 +180,12 @@ func NewService(
 
 		workerManager:             workerManager,
 		perNamespaceWorkerManager: perNamespaceWorkerManager,
-	}, nil
+		workerFactory:             workerFactory,
+	}
+	if err := s.initScanner(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // NewConfig builds the new Config for worker service
@@ -279,6 +283,26 @@ func NewConfig(dc *dynamicconfig.Collection, persistenceConfig *config.Persisten
 			HistoryScannerDataMinAge: dc.GetDurationProperty(
 				dynamicconfig.HistoryScannerDataMinAge,
 				60*24*time.Hour,
+			),
+			HistoryScannerVerifyRetention: dc.GetBoolProperty(
+				dynamicconfig.HistoryScannerVerifyRetention,
+				true,
+			),
+			ExecutionScannerPerHostQPS: dc.GetIntProperty(
+				dynamicconfig.ExecutionScannerPerHostQPS,
+				10,
+			),
+			ExecutionScannerPerShardQPS: dc.GetIntProperty(
+				dynamicconfig.ExecutionScannerPerShardQPS,
+				1,
+			),
+			ExecutionDataDurationBuffer: dc.GetDurationProperty(
+				dynamicconfig.ExecutionDataDurationBuffer,
+				time.Hour*24*90,
+			),
+			ExecutionScannerWorkerCount: dc.GetIntProperty(
+				dynamicconfig.ExecutionScannerWorkerCount,
+				8,
 			),
 		},
 		EnableBatcher:      dc.GetBoolProperty(dynamicconfig.EnableBatcher, true),
@@ -401,6 +425,7 @@ func (s *Service) Stop() {
 
 	close(s.stopC)
 
+	s.scanner.Stop()
 	s.perNamespaceWorkerManager.Stop()
 	s.workerManager.Stop()
 	s.namespaceRegistry.Stop()
@@ -420,7 +445,7 @@ func (s *Service) startParentClosePolicyProcessor() {
 	params := &parentclosepolicy.BootstrapParams{
 		Config:           *s.config.ParentCloseCfg,
 		SdkClientFactory: s.sdkClientFactory,
-		MetricsClient:    s.metricsClient,
+		MetricsHandler:   s.metricsHandler,
 		Logger:           s.logger,
 		ClientBean:       s.clientBean,
 		CurrentCluster:   s.clusterMetadata.GetCurrentClusterName(),
@@ -436,7 +461,7 @@ func (s *Service) startParentClosePolicyProcessor() {
 
 func (s *Service) startBatcher() {
 	if err := batcher.New(
-		s.metricsClient,
+		s.metricsHandler,
 		s.logger,
 		s.sdkClientFactory,
 		s.config.BatcherRPS,
@@ -449,17 +474,29 @@ func (s *Service) startBatcher() {
 	}
 }
 
-func (s *Service) startScanner() {
-	sc := scanner.New(
+func (s *Service) initScanner() error {
+	currentCluster := s.clusterMetadata.GetCurrentClusterName()
+	adminClient, err := s.clientBean.GetRemoteAdminClient(currentCluster)
+	if err != nil {
+		return err
+	}
+	s.scanner = scanner.New(
 		s.logger,
 		s.config.ScannerCfg,
-		s.sdkClientFactory.GetSystemClient(),
-		s.metricsClient,
+		s.sdkClientFactory,
+		s.metricsHandler,
 		s.executionManager,
 		s.taskManager,
 		s.historyClient,
+		adminClient,
+		s.namespaceRegistry,
+		s.workerFactory,
 	)
-	if err := sc.Start(); err != nil {
+	return nil
+}
+
+func (s *Service) startScanner() {
+	if err := s.scanner.Start(); err != nil {
 		s.logger.Fatal(
 			"error starting scanner",
 			tag.Error(err),
@@ -477,7 +514,7 @@ func (s *Service) startReplicator() {
 		s.clusterMetadata,
 		s.clientBean,
 		s.logger,
-		s.metricsClient,
+		s.metricsHandler,
 		s.hostInfo,
 		s.workerServiceResolver,
 		s.namespaceReplicationQueue,
@@ -489,7 +526,7 @@ func (s *Service) startReplicator() {
 func (s *Service) startArchiver() {
 	historyClient := s.clientBean.GetHistoryClient()
 	bc := &archiver.BootstrapContainer{
-		MetricsClient:    s.metricsClient,
+		MetricsHandler:   s.metricsHandler,
 		Logger:           s.logger,
 		HistoryV2Manager: s.executionManager,
 		NamespaceCache:   s.namespaceRegistry,

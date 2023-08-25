@@ -9,6 +9,7 @@ go_library(
         "errors.go",
         "interfaces.go",
         "interfaces_mock.go",
+        "iter.go",
         "query.go",
         "session.go",
         "uuid.go",

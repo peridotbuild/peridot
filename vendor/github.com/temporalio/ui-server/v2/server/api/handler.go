@@ -32,9 +32,9 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"github.com/temporalio/ui-server/v2/api/workflowservice/v1"
 	"github.com/temporalio/ui-server/v2/server/auth"
 	"github.com/temporalio/ui-server/v2/server/config"
-	"github.com/temporalio/ui-server/v2/server/generated/api/workflowservice/v1"
 	"github.com/temporalio/ui-server/v2/server/rpc"
 	"github.com/temporalio/ui-server/v2/server/version"
 )
@@ -58,6 +58,11 @@ type SettingsResponse struct {
 	Codec                       *CodecResponse
 	Version                     string
 	DisableWriteActions         bool
+	WorkflowTerminateDisabled   bool
+	WorkflowCancelDisabled      bool
+	WorkflowSignalDisabled      bool
+	WorkflowResetDisabled       bool
+	BatchActionsDisabled        bool
 }
 
 func TemporalAPIHandler(cfgProvider *config.ConfigProviderWithRefresh, apiMiddleware []Middleware) echo.HandlerFunc {
@@ -117,8 +122,13 @@ func GetSettings(cfgProvier *config.ConfigProviderWithRefresh) func(echo.Context
 				Endpoint:        cfg.Codec.Endpoint,
 				PassAccessToken: cfg.Codec.PassAccessToken,
 			},
-			Version:             version.UIVersion,
-			DisableWriteActions: cfg.DisableWriteActions,
+			Version:                   version.UIVersion,
+			DisableWriteActions:       cfg.DisableWriteActions,
+			WorkflowTerminateDisabled: cfg.WorkflowTerminateDisabled,
+			WorkflowCancelDisabled:    cfg.WorkflowCancelDisabled,
+			WorkflowSignalDisabled:    cfg.WorkflowSignalDisabled,
+			WorkflowResetDisabled:     cfg.WorkflowResetDisabled,
+			BatchActionsDisabled:      cfg.BatchActionsDisabled,
 		}
 
 		return c.JSON(http.StatusOK, settings)

@@ -348,6 +348,9 @@ type (
 		// OperatorService creates a new operator service client with the same gRPC connection as this client.
 		OperatorService() operatorservice.OperatorServiceClient
 
+		// Schedule creates a new shedule client with the same gRPC connection as this client.
+		ScheduleClient() ScheduleClient
+
 		// Close client and clean up underlying resources.
 		Close()
 	}
@@ -393,6 +396,11 @@ type (
 		// Optional: Sets DataConverter to customize serialization/deserialization of arguments in Temporal
 		// default: defaultDataConverter, an combination of google protobuf converter, gogo protobuf converter and json converter
 		DataConverter converter.DataConverter
+
+		// Optional: Sets FailureConverter to customize serialization/deserialization of errors.
+		// default: temporal.DefaultFailureConverter, does not encode any fields of the error. Use temporal.NewDefaultFailureConverter
+		// options to configure or create a custom converter.
+		FailureConverter converter.FailureConverter
 
 		// Optional: Sets ContextPropagators that allows users to control the context information passed through a workflow
 		// default: nil
@@ -739,6 +747,10 @@ func NewServiceClient(workflowServiceClient workflowservice.WorkflowServiceClien
 		options.DataConverter = converter.GetDefaultDataConverter()
 	}
 
+	if options.FailureConverter == nil {
+		options.FailureConverter = GetDefaultFailureConverter()
+	}
+
 	if options.MetricsHandler == nil {
 		options.MetricsHandler = metrics.NopHandler
 	}
@@ -764,6 +776,7 @@ func NewServiceClient(workflowServiceClient workflowservice.WorkflowServiceClien
 		logger:                   options.Logger,
 		identity:                 options.Identity,
 		dataConverter:            options.DataConverter,
+		failureConverter:         options.FailureConverter,
 		contextPropagators:       options.ContextPropagators,
 		workerInterceptors:       workerInterceptors,
 		excludeInternalFromRetry: options.ConnectionOptions.excludeInternalFromRetry,

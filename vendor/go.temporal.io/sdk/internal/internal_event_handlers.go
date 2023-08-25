@@ -39,6 +39,7 @@ import (
 	enumspb "go.temporal.io/api/enums/v1"
 	failurepb "go.temporal.io/api/failure/v1"
 	historypb "go.temporal.io/api/history/v1"
+	interactionpb "go.temporal.io/api/interaction/v1"
 	taskqueuepb "go.temporal.io/api/taskqueue/v1"
 
 	"go.temporal.io/sdk/converter"
@@ -135,6 +136,7 @@ type (
 		metricsHandler           metrics.Handler
 		registry                 *registry
 		dataConverter            converter.DataConverter
+		failureConverter         converter.FailureConverter
 		contextPropagators       []ContextPropagator
 		deadlockDetectionTimeout time.Duration
 	}
@@ -143,8 +145,10 @@ type (
 	// interface that translates function calls on that interface into temporal
 	// server commands.
 	updateCommandCallbacks struct {
-		updateID string
+		meta     *interactionpb.Meta
+		in       *interactionpb.Input
 		dc       converter.DataConverter
+		fc       converter.FailureConverter
 		commands *commandsHelper
 	}
 
@@ -189,6 +193,7 @@ func newWorkflowExecutionEventHandler(
 	metricsHandler metrics.Handler,
 	registry *registry,
 	dataConverter converter.DataConverter,
+	failureConverter converter.FailureConverter,
 	contextPropagators []ContextPropagator,
 	deadlockDetectionTimeout time.Duration,
 ) workflowExecutionEventHandler {
@@ -205,6 +210,7 @@ func newWorkflowExecutionEventHandler(
 		enableLoggingInReplay:    enableLoggingInReplay,
 		registry:                 registry,
 		dataConverter:            dataConverter,
+		failureConverter:         failureConverter,
 		contextPropagators:       contextPropagators,
 		deadlockDetectionTimeout: deadlockDetectionTimeout,
 	}
@@ -513,6 +519,10 @@ func (wc *workflowEnvironmentImpl) GetMetricsHandler() metrics.Handler {
 
 func (wc *workflowEnvironmentImpl) GetDataConverter() converter.DataConverter {
 	return wc.dataConverter
+}
+
+func (wc *workflowEnvironmentImpl) GetFailureConverter() converter.FailureConverter {
+	return wc.failureConverter
 }
 
 func (wc *workflowEnvironmentImpl) GetContextPropagators() []ContextPropagator {
@@ -996,10 +1006,10 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 	case enumspb.EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES:
 		weh.handleUpsertWorkflowSearchAttributes(event)
 
-	case enumspb.EVENT_TYPE_WORKFLOW_UPDATE_REQUESTED:
-		weh.handleWorkflowUpdateRequested(event.GetWorkflowUpdateRequestedEventAttributes())
-
 	case enumspb.EVENT_TYPE_WORKFLOW_UPDATE_ACCEPTED:
+		// No Operation
+
+	case enumspb.EVENT_TYPE_WORKFLOW_UPDATE_REJECTED:
 		// No Operation
 
 	case enumspb.EVENT_TYPE_WORKFLOW_UPDATE_COMPLETED:
@@ -1026,6 +1036,31 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessEvent(
 		weh.workflowDefinition.OnWorkflowTaskStarted(weh.deadlockDetectionTimeout)
 	}
 
+	return nil
+}
+
+func (weh *workflowExecutionEventHandlerImpl) ProcessInteraction(
+	meta *interactionpb.Meta,
+	input *interactionpb.Input,
+	isReplay bool,
+	isLast bool,
+) error {
+	if meta.GetInteractionType() != enumspb.INTERACTION_TYPE_WORKFLOW_UPDATE {
+		return fmt.Errorf("unsupported interaction type %q", meta.GetInteractionType())
+	}
+	weh.updateHandler(
+		input.GetName(),
+		input.GetArgs(),
+		input.GetHeader(),
+		&updateCommandCallbacks{
+			meta:     meta,
+			in:       input,
+			dc:       weh.dataConverter,
+			fc:       weh.failureConverter,
+			commands: weh.commandsHelper,
+		},
+	)
+	weh.workflowDefinition.OnWorkflowTaskStarted(weh.deadlockDetectionTimeout)
 	return nil
 }
 
@@ -1109,7 +1144,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskFailed(event *hi
 		&commonpb.ActivityType{Name: activity.activityType.Name},
 		activityID,
 		attributes.GetRetryState(),
-		ConvertFailureToError(attributes.GetFailure(), weh.GetDataConverter()),
+		weh.GetFailureConverter().FailureToError(attributes.GetFailure()),
 	)
 
 	activity.handle(nil, activityTaskErr)
@@ -1125,7 +1160,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleActivityTaskTimedOut(event *
 	}
 
 	attributes := event.GetActivityTaskTimedOutEventAttributes()
-	timeoutError := ConvertFailureToError(attributes.GetFailure(), weh.GetDataConverter())
+	timeoutError := weh.GetFailureConverter().FailureToError(attributes.GetFailure())
 
 	activityTaskErr := NewActivityError(
 		attributes.GetScheduledEventId(),
@@ -1291,7 +1326,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleLocalActivityMarker(details 
 		if failure != nil {
 			lar.Attempt = lamd.Attempt
 			lar.Backoff = lamd.Backoff
-			lar.Err = ConvertFailureToError(failure, weh.GetDataConverter())
+			lar.Err = weh.GetFailureConverter().FailureToError(failure)
 		} else {
 			// Result might not be there if local activity doesn't have return value.
 			lar.Result = details[localActivityResultName]
@@ -1336,7 +1371,7 @@ func (weh *workflowExecutionEventHandlerImpl) ProcessLocalActivityResult(lar *lo
 		EventType: enumspb.EVENT_TYPE_MARKER_RECORDED,
 		Attributes: &historypb.HistoryEvent_MarkerRecordedEventAttributes{MarkerRecordedEventAttributes: &historypb.MarkerRecordedEventAttributes{
 			MarkerName: localActivityMarkerName,
-			Failure:    ConvertErrorToFailure(lar.err, weh.GetDataConverter()),
+			Failure:    weh.GetFailureConverter().ErrorToFailure(lar.err),
 			Details:    details,
 		}},
 	}
@@ -1432,7 +1467,7 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionFailed
 		attributes.GetInitiatedEventId(),
 		attributes.GetStartedEventId(),
 		attributes.GetRetryState(),
-		ConvertFailureToError(attributes.GetFailure(), weh.GetDataConverter()),
+		weh.GetFailureConverter().FailureToError(attributes.GetFailure()),
 	)
 	childWorkflow.handle(nil, childWorkflowExecutionError)
 	return nil
@@ -1508,41 +1543,23 @@ func (weh *workflowExecutionEventHandlerImpl) handleChildWorkflowExecutionTermin
 	return nil
 }
 
-func (weh *workflowExecutionEventHandlerImpl) handleWorkflowUpdateRequested(
-	attributes *historypb.WorkflowUpdateRequestedEventAttributes,
-) {
-	weh.updateHandler(
-		attributes.GetUpdate().GetName(),
-		attributes.GetUpdate().GetArgs(),
-		attributes.GetUpdate().GetHeader(),
-		&updateCommandCallbacks{
-			updateID: attributes.GetUpdateId(),
-			dc:       weh.dataConverter,
-			commands: weh.commandsHelper,
-		},
-	)
-}
-
 func (ucc *updateCommandCallbacks) Accept() {
-	ucc.commands.acceptWorkflowUpdate(ucc.updateID)
+	ucc.commands.acceptWorkflowUpdate(ucc.meta, ucc.in)
 }
 
 func (ucc *updateCommandCallbacks) Reject(err error) {
-	ucc.commands.completeWorkflowUpdate(
-		ucc.updateID,
-		nil,
-		ConvertErrorToFailure(err, ucc.dc),
-		enumspb.WORKFLOW_UPDATE_DURABILITY_PREFERENCE_BYPASS,
+	ucc.commands.rejectWorkflowUpdate(
+		ucc.meta,
+		ucc.fc.ErrorToFailure(err),
 	)
 }
 
 func (ucc *updateCommandCallbacks) Complete(success interface{}, err error) {
 	if err != nil {
 		ucc.commands.completeWorkflowUpdate(
-			ucc.updateID,
+			ucc.meta,
 			nil,
-			ConvertErrorToFailure(err, ucc.dc),
-			enumspb.WORKFLOW_UPDATE_DURABILITY_PREFERENCE_UNSPECIFIED,
+			ucc.fc.ErrorToFailure(err),
 		)
 		return
 	}
@@ -1552,18 +1569,16 @@ func (ucc *updateCommandCallbacks) Complete(success interface{}, err error) {
 		// Update ran to completion but result cannot be converted to a
 		// Payload
 		ucc.commands.completeWorkflowUpdate(
-			ucc.updateID,
+			ucc.meta,
 			nil,
-			ConvertErrorToFailure(err, ucc.dc),
-			enumspb.WORKFLOW_UPDATE_DURABILITY_PREFERENCE_UNSPECIFIED,
+			ucc.fc.ErrorToFailure(err),
 		)
 		return
 	}
 	ucc.commands.completeWorkflowUpdate(
-		ucc.updateID,
+		ucc.meta,
 		serializedResult,
 		nil,
-		enumspb.WORKFLOW_UPDATE_DURABILITY_PREFERENCE_UNSPECIFIED,
 	)
 }
 

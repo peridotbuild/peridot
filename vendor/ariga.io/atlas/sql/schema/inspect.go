@@ -43,6 +43,9 @@ const (
 	// InspectTables enables schema tables inspection including
 	// all its child resources (e.g. columns or indexes).
 	InspectTables
+
+	// InspectViews enables schema views inspection.
+	InspectViews
 )
 
 // Is reports whether the given mode is enabled.
@@ -83,7 +86,7 @@ type (
 		// Exclude defines a list of glob patterns used to filter resources from inspection.
 		// The syntax used by the different drivers is implemented as follows:
 		//
-		//	s     // exclude schema 't'.
+		//	s     // exclude schema 's'.
 		//	*     // exclude all schemas.
 		//	s.t   // exclude table 't' under schema 's'.
 		//	s.*   // the last item defines the filtering; all tables under 's' are excluded.

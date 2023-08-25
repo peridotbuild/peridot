@@ -13,4 +13,4 @@ linters-settings:
     - prefix(github.com/testcontainters)
 
 run:
-  timeout: 5m
+  timeout: 3m

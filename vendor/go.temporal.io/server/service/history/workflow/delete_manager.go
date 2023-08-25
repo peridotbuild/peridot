@@ -34,16 +34,14 @@ import (
 	enumspb "go.temporal.io/api/enums/v1"
 
 	enumsspb "go.temporal.io/server/api/enums/v1"
-	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/definition"
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/namespace"
 	"go.temporal.io/server/common/persistence"
+	"go.temporal.io/server/common/primitives"
 	"go.temporal.io/server/common/searchattribute"
 	"go.temporal.io/server/service/history/configs"
-	"go.temporal.io/server/service/history/consts"
-	"go.temporal.io/server/service/history/queues"
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
 	"go.temporal.io/server/service/worker/archiver"
@@ -65,6 +63,7 @@ type (
 			weCtx Context,
 			ms MutableState,
 			forceDeleteFromOpenVisibility bool,
+			stage *tasks.DeleteWorkflowExecutionStage,
 		) error
 		DeleteWorkflowExecutionByRetention(
 			ctx context.Context,
@@ -72,6 +71,8 @@ type (
 			we commonpb.WorkflowExecution,
 			weCtx Context,
 			ms MutableState,
+			archiveIfEnabled bool,
+			stage *tasks.DeleteWorkflowExecutionStage,
 		) error
 	}
 
@@ -79,7 +80,7 @@ type (
 		shard          shard.Context
 		historyCache   Cache
 		config         *configs.Config
-		metricsClient  metrics.Client
+		metricsHandler metrics.MetricsHandler
 		archivalClient archiver.Client
 		timeSource     clock.TimeSource
 	}
@@ -97,7 +98,7 @@ func NewDeleteManager(
 	deleteManager := &DeleteManagerImpl{
 		shard:          shard,
 		historyCache:   cache,
-		metricsClient:  shard.GetMetricsClient(),
+		metricsHandler: shard.GetMetricsHandler(),
 		config:         config,
 		archivalClient: archiverClient,
 		timeSource:     timeSource,
@@ -114,63 +115,11 @@ func (m *DeleteManagerImpl) AddDeleteWorkflowExecutionTask(
 	workflowClosedVersion int64,
 ) error {
 
-	// In active cluster, create `DeleteWorkflowExecutionTask` only if workflow is closed successfully
-	// and all pending transfer and visibility tasks are completed.
-	// This check is required to avoid race condition between close and delete tasks.
-	// Otherwise, mutable state might be deleted before close task is executed, and therefore close task will be dropped.
-	//
-	// In passive cluster, transfer task queue check can be ignored but not visibility task queue.
-	// If visibility close task is executed after visibility record is deleted then it will resurrect record in closed state.
-	//
-	// Unfortunately, queue states/ack levels are updated with delay (default 30s),
-	// therefore this API will return error if workflow is deleted within 30 seconds after close.
-	// The check is on API call side, not on task processor side, because delete visibility task doesn't have access to mutable state.
-
-	currentClusterName := m.shard.GetClusterMetadata().GetCurrentClusterName()
-	nsActive := ms.GetNamespaceEntry().ActiveInCluster(currentClusterName)
-	closeTransferTaskId := ms.GetExecutionInfo().CloseTransferTaskId
-	closeTransferTaskCheckPassed := true
-	if nsActive && closeTransferTaskId != 0 { // taskID == 0 if workflow still running in passive cluster or closed before this field was added (v1.17).
-		// check if close execution transfer task is completed
-		transferQueueState, ok := m.shard.GetQueueState(tasks.CategoryTransfer)
-		if !ok {
-			// Use cluster ack level for transfer queue ack level because it gets updated more often.
-			transferQueueAckLevel := m.shard.GetQueueClusterAckLevel(tasks.CategoryTransfer, currentClusterName).TaskID
-			closeTransferTaskCheckPassed = ms.GetExecutionInfo().CloseTransferTaskId <= transferQueueAckLevel
-		} else {
-			fakeCloseTransferTask := &tasks.CloseExecutionTask{
-				WorkflowKey: definition.NewWorkflowKey(nsID.String(), we.GetWorkflowId(), we.GetRunId()),
-				TaskID:      closeTransferTaskId,
-			}
-			closeTransferTaskCheckPassed = queues.IsTaskAcked(fakeCloseTransferTask, transferQueueState)
-		}
-	}
-
-	closeVisibilityTaskId := ms.GetExecutionInfo().CloseVisibilityTaskId
-	closeVisibilityTaskCheckPassed := true
-	if closeVisibilityTaskId != 0 { // taskID == 0 if workflow still running in passive cluster or closed before this field was added (v1.17).
-		// check if close execution visibility task is completed
-		visibilityQueueState, ok := m.shard.GetQueueState(tasks.CategoryVisibility)
-		if !ok {
-			// Use global ack level visibility queue ack level because cluster level is not updated.
-			visibilityQueueAckLevel := m.shard.GetQueueAckLevel(tasks.CategoryVisibility).TaskID
-			closeVisibilityTaskCheckPassed = ms.GetExecutionInfo().CloseVisibilityTaskId <= visibilityQueueAckLevel
-		} else {
-			fakeCloseVisibiltyTask := &tasks.CloseExecutionVisibilityTask{
-				WorkflowKey: definition.NewWorkflowKey(nsID.String(), we.GetWorkflowId(), we.GetRunId()),
-				TaskID:      closeVisibilityTaskId,
-			}
-			closeVisibilityTaskCheckPassed = queues.IsTaskAcked(fakeCloseVisibiltyTask, visibilityQueueState)
-		}
-	}
-
-	if !closeTransferTaskCheckPassed || !closeVisibilityTaskCheckPassed {
-		return consts.ErrWorkflowNotReady
-	}
-
 	taskGenerator := taskGeneratorProvider.NewTaskGenerator(m.shard, ms)
 
-	deleteTask, err := taskGenerator.GenerateDeleteExecutionTask(m.timeSource.Now())
+	// We can make this task immediately because the task itself will keep rescheduling itself until the workflow is
+	// closed before actually deleting the workflow.
+	deleteTask, err := taskGenerator.GenerateDeleteExecutionTask()
 	if err != nil {
 		return err
 	}
@@ -195,6 +144,7 @@ func (m *DeleteManagerImpl) DeleteWorkflowExecution(
 	weCtx Context,
 	ms MutableState,
 	forceDeleteFromOpenVisibility bool,
+	stage *tasks.DeleteWorkflowExecutionStage,
 ) error {
 
 	return m.deleteWorkflowExecutionInternal(
@@ -205,7 +155,8 @@ func (m *DeleteManagerImpl) DeleteWorkflowExecution(
 		ms,
 		false,
 		forceDeleteFromOpenVisibility,
-		m.metricsClient.Scope(metrics.HistoryDeleteWorkflowExecutionScope),
+		stage,
+		m.metricsHandler.WithTags(metrics.OperationTag(metrics.HistoryDeleteWorkflowExecutionScope)),
 	)
 }
 
@@ -215,6 +166,8 @@ func (m *DeleteManagerImpl) DeleteWorkflowExecutionByRetention(
 	we commonpb.WorkflowExecution,
 	weCtx Context,
 	ms MutableState,
+	archiveIfEnabled bool,
+	stage *tasks.DeleteWorkflowExecutionStage,
 ) error {
 
 	return m.deleteWorkflowExecutionInternal(
@@ -223,9 +176,10 @@ func (m *DeleteManagerImpl) DeleteWorkflowExecutionByRetention(
 		we,
 		weCtx,
 		ms,
-		true,  // When retention is fired, archive workflow execution.
+		archiveIfEnabled,
 		false, // When retention is fired, workflow execution is always closed.
-		m.metricsClient.Scope(metrics.HistoryProcessDeleteHistoryEventScope),
+		stage,
+		m.metricsHandler.WithTags(metrics.OperationTag(metrics.HistoryProcessDeleteHistoryEventScope)),
 	)
 }
 
@@ -237,7 +191,8 @@ func (m *DeleteManagerImpl) deleteWorkflowExecutionInternal(
 	ms MutableState,
 	archiveIfEnabled bool,
 	forceDeleteFromOpenVisibility bool,
-	scope metrics.Scope,
+	stage *tasks.DeleteWorkflowExecutionStage,
+	metricsHandler metrics.MetricsHandler,
 ) error {
 
 	currentBranchToken, err := ms.GetCurrentBranchToken()
@@ -265,7 +220,7 @@ func (m *DeleteManagerImpl) deleteWorkflowExecutionInternal(
 	// after archiving history. But getting workflow close time requires workflow close event (for workflows closed by
 	// server version before 1.17), so this step needs to be done after getting workflow close time.
 	if archiveIfEnabled {
-		deletionPromised, err := m.archiveWorkflowIfEnabled(ctx, namespaceID, we, currentBranchToken, weCtx, ms, scope)
+		deletionPromised, err := m.archiveWorkflowIfEnabled(ctx, namespaceID, we, currentBranchToken, weCtx, ms, metricsHandler)
 		if err != nil {
 			return err
 		}
@@ -291,6 +246,8 @@ func (m *DeleteManagerImpl) deleteWorkflowExecutionInternal(
 		currentBranchToken,
 		startTime,
 		closeTime,
+		ms.GetExecutionInfo().GetCloseVisibilityTaskId(),
+		stage,
 	); err != nil {
 		return err
 	}
@@ -298,7 +255,7 @@ func (m *DeleteManagerImpl) deleteWorkflowExecutionInternal(
 	// Clear workflow execution context here to prevent further readers to get stale copy of non-exiting workflow execution.
 	weCtx.Clear()
 
-	scope.IncCounter(metrics.WorkflowCleanupDeleteCount)
+	metricsHandler.Counter(metrics.WorkflowCleanupDeleteCount.GetMetricName()).Record(1)
 	return nil
 }
 
@@ -309,7 +266,7 @@ func (m *DeleteManagerImpl) archiveWorkflowIfEnabled(
 	currentBranchToken []byte,
 	weCtx Context,
 	ms MutableState,
-	scope metrics.Scope,
+	metricsHandler metrics.MetricsHandler,
 ) (deletionPromised bool, err error) {
 
 	namespaceRegistryEntry := ms.GetNamespaceEntry()
@@ -341,7 +298,7 @@ func (m *DeleteManagerImpl) archiveWorkflowIfEnabled(
 			BranchToken:          currentBranchToken,
 			CloseFailoverVersion: closeFailoverVersion,
 		},
-		CallerService:        common.HistoryServiceName,
+		CallerService:        primitives.HistoryService,
 		AttemptArchiveInline: false, // archive in workflow by default
 	}
 	executionStats, err := weCtx.LoadExecutionStats(ctx)
@@ -364,9 +321,9 @@ func (m *DeleteManagerImpl) archiveWorkflowIfEnabled(
 		return false, err
 	}
 	if resp.HistoryArchivedInline {
-		scope.IncCounter(metrics.WorkflowCleanupDeleteHistoryInlineCount)
+		metricsHandler.Counter(metrics.WorkflowCleanupDeleteHistoryInlineCount.GetMetricName()).Record(1)
 	} else {
-		scope.IncCounter(metrics.WorkflowCleanupArchiveCount)
+		metricsHandler.Counter(metrics.WorkflowCleanupArchiveCount.GetMetricName()).Record(1)
 	}
 
 	// inline archival don't perform deletion

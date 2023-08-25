@@ -6,6 +6,7 @@ package mysql
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/url"
 	"strings"
@@ -22,7 +23,7 @@ type (
 	// Driver represents a MySQL driver for introspecting database schemas,
 	// generating diff between schema elements and apply migrations changes.
 	Driver struct {
-		conn
+		*conn
 		schema.Differ
 		schema.Inspector
 		migrate.PlanApplier
@@ -31,6 +32,8 @@ type (
 	// database connection and its information.
 	conn struct {
 		schema.ExecQuerier
+		// The schema was set in the path (schema connection).
+		schema string
 		// System variables that are set on `Open`.
 		mysqlversion.V
 		collate string
@@ -45,7 +48,8 @@ const DriverName = "mysql"
 func init() {
 	sqlclient.Register(
 		DriverName,
-		sqlclient.DriverOpener(Open),
+		sqlclient.OpenerFunc(opener),
+		sqlclient.RegisterDriverOpener(Open),
 		sqlclient.RegisterCodec(MarshalHCL, EvalHCL),
 		sqlclient.RegisterFlavours("mysql+unix", "maria", "maria+unix", "mariadb", "mariadb+unix"),
 		sqlclient.RegisterURLParser(parser{}),
@@ -54,7 +58,7 @@ func init() {
 
 // Open opens a new MySQL driver.
 func Open(db schema.ExecQuerier) (migrate.Driver, error) {
-	c := conn{ExecQuerier: db}
+	c := &conn{ExecQuerier: db}
 	rows, err := db.QueryContext(context.Background(), variablesQuery)
 	if err != nil {
 		return nil, fmt.Errorf("mysql: query system variables: %w", err)
@@ -78,18 +82,36 @@ func Open(db schema.ExecQuerier) (migrate.Driver, error) {
 	}, nil
 }
 
-func (d *Driver) dev() *sqlx.DevDriver {
-	return &sqlx.DevDriver{Driver: d, MaxNameLen: 64}
+func opener(_ context.Context, u *url.URL) (*sqlclient.Client, error) {
+	ur := parser{}.ParseURL(u)
+	db, err := sql.Open(DriverName, ur.DSN)
+	if err != nil {
+		return nil, err
+	}
+	drv, err := Open(db)
+	if err != nil {
+		if cerr := db.Close(); cerr != nil {
+			err = fmt.Errorf("%w: %v", err, cerr)
+		}
+		return nil, err
+	}
+	drv.(*Driver).schema = ur.Schema
+	return &sqlclient.Client{
+		Name:   DriverName,
+		DB:     db,
+		URL:    ur,
+		Driver: drv,
+	}, nil
 }
 
 // NormalizeRealm returns the normal representation of the given database.
 func (d *Driver) NormalizeRealm(ctx context.Context, r *schema.Realm) (*schema.Realm, error) {
-	return d.dev().NormalizeRealm(ctx, r)
+	return (&sqlx.DevDriver{Driver: d}).NormalizeRealm(ctx, r)
 }
 
 // NormalizeSchema returns the normal representation of the given database.
 func (d *Driver) NormalizeSchema(ctx context.Context, s *schema.Schema) (*schema.Schema, error) {
-	return d.dev().NormalizeSchema(ctx, s)
+	return (&sqlx.DevDriver{Driver: d}).NormalizeSchema(ctx, s)
 }
 
 // Lock implements the schema.Locker interface.
@@ -362,6 +384,15 @@ const (
 	IndexTypeHash     = "HASH"
 	IndexTypeFullText = "FULLTEXT"
 	IndexTypeSpatial  = "SPATIAL"
+
+	IndexParserNGram = "ngram"
+	IndexParserMeCab = "mecab"
+
+	EngineInnoDB = "InnoDB"
+	EngineMyISAM = "MyISAM"
+	EngineMemory = "Memory"
+	EngineCSV    = "CSV"
+	EngineNDB    = "NDB" // NDBCLUSTER
 
 	currentTS     = "current_timestamp"
 	defaultGen    = "default_generated"

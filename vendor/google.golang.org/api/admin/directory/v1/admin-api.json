@@ -2376,11 +2376,13 @@
               "description": "Whether to return all sub-organizations or just immediate children.",
               "enum": [
                 "all",
-                "children"
+                "children",
+                "allIncludingParent"
               ],
               "enumDescriptions": [
                 "All sub-organizational units.",
-                "Immediate children only (default)."
+                "Immediate children only (default).",
+                "All sub-organizational units and the specified organizational unit (root if not specified)."
               ],
               "location": "query",
               "type": "string"
@@ -3906,7 +3908,13 @@
           "httpMethod": "POST",
           "id": "directory.users.insert",
           "parameterOrder": [],
-          "parameters": {},
+          "parameters": {
+            "resolveConflictAccount": {
+              "description": "Optional. If set to `true`, the option selected for [handling unmanaged user accounts](https://support.google.com/a/answer/11112794) will apply. Default: `false`",
+              "location": "query",
+              "type": "boolean"
+            }
+          },
           "path": "admin/directory/v1/users",
           "request": {
             "$ref": "User"
@@ -4635,7 +4643,7 @@
       }
     }
   },
-  "revision": "20230724",
+  "revision": "20230814",
   "rootUrl": "https://admin.googleapis.com/",
   "schemas": {
     "Alias": {

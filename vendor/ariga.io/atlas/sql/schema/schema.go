@@ -14,10 +14,19 @@ type (
 
 	// A Schema describes a database schema (i.e. named database).
 	Schema struct {
-		Name   string
-		Realm  *Realm
-		Tables []*Table
-		Attrs  []Attr // Attrs and options.
+		Name    string
+		Realm   *Realm
+		Tables  []*Table
+		Views   []*View
+		Attrs   []Attr   // Attrs and options.
+		Objects []Object // Driver specific objects.
+	}
+
+	// An Object represents a generic database object.
+	// Note that this interface is implemented by some top-level types
+	// to describe their relationship, and by driver specific types.
+	Object interface {
+		obj()
 	}
 
 	// A Table represents a table definition.
@@ -29,6 +38,16 @@ type (
 		PrimaryKey  *Index
 		ForeignKeys []*ForeignKey
 		Attrs       []Attr // Attrs, constraints and options.
+	}
+
+	// A View represents a view definition.
+	View struct {
+		Name    string
+		Def     string
+		Schema  *Schema
+		Columns []*Column
+		Attrs   []Attr   // Attrs and options.
+		Deps    []Object // Tables and views used in view definition.
 	}
 
 	// A Column represents a column definition.
@@ -105,6 +124,26 @@ func (s *Schema) Table(name string) (*Table, bool) {
 	return nil, false
 }
 
+// View returns the first view that matched the given name.
+func (s *Schema) View(name string) (*View, bool) {
+	for _, t := range s.Views {
+		if t.Name == name {
+			return t, true
+		}
+	}
+	return nil, false
+}
+
+// Object returns the first object that matched the given predicate.
+func (s *Schema) Object(f func(Object) bool) (Object, bool) {
+	for _, o := range s.Objects {
+		if f(o) {
+			return o, true
+		}
+	}
+	return nil, false
+}
+
 // Column returns the first column that matched the given name.
 func (t *Table) Column(name string) (*Column, bool) {
 	for _, c := range t.Columns {
@@ -130,6 +169,16 @@ func (t *Table) ForeignKey(symbol string) (*ForeignKey, bool) {
 	for _, f := range t.ForeignKeys {
 		if f.Symbol == symbol {
 			return f, true
+		}
+	}
+	return nil, false
+}
+
+// Column returns the first column that matched the given name.
+func (v *View) Column(name string) (*Column, bool) {
+	for _, c := range v.Columns {
+		if c.Name == name {
+			return c, true
 		}
 	}
 	return nil, false
@@ -235,6 +284,7 @@ type (
 	TimeType struct {
 		T         string
 		Precision *int
+		Scale     *int
 	}
 
 	// JSONType represents a JSON type.
@@ -260,6 +310,17 @@ type (
 
 type (
 	// Expr defines an SQL expression in schema DDL.
+	//
+	// The Expr interface can also be implemented outside this package as follows:
+	//
+	// 	type NamedDefault struct {
+	// 		schema.Expr
+	// 		Name string
+	// 	}
+	// 	// Underlying returns the underlying expression.
+	// 	func (e *NamedDefault) Underlying() schema.Expr { return e.Expr }
+	//
+	//  var e schema.Expr = &NamedDefault{Expr: &schema.Literal{V: "bar"}, Name: "foo"}
 	Expr interface {
 		expr()
 	}
@@ -311,7 +372,24 @@ type (
 		Expr string
 		Type string // Optional type. e.g. STORED or VIRTUAL.
 	}
+
+	// ViewCheckOption describes the standard 'WITH CHECK OPTION clause' of a view.
+	ViewCheckOption struct {
+		V string // LOCAL, CASCADED, NONE, or driver specific.
+	}
 )
+
+// A list of known view check options.
+const (
+	ViewCheckOptionNone     = "NONE"
+	ViewCheckOptionLocal    = "LOCAL"
+	ViewCheckOptionCascaded = "CASCADED"
+)
+
+// objects.
+func (*Table) obj()    {}
+func (*View) obj()     {}
+func (*EnumType) obj() {}
 
 // expressions.
 func (*Literal) expr() {}
@@ -332,8 +410,17 @@ func (*DecimalType) typ()     {}
 func (*UnsupportedType) typ() {}
 
 // attributes.
-func (*Check) attr()         {}
-func (*Comment) attr()       {}
-func (*Charset) attr()       {}
-func (*Collation) attr()     {}
-func (*GeneratedExpr) attr() {}
+func (*Check) attr()           {}
+func (*Comment) attr()         {}
+func (*Charset) attr()         {}
+func (*Collation) attr()       {}
+func (*GeneratedExpr) attr()   {}
+func (*ViewCheckOption) attr() {}
+
+// UnderlyingExpr returns the underlying expression of x.
+func UnderlyingExpr(x Expr) Expr {
+	if w, ok := x.(interface{ Underlying() Expr }); ok {
+		return UnderlyingExpr(w.Underlying())
+	}
+	return x
+}

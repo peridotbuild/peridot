@@ -26,6 +26,7 @@ package queues
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -95,6 +96,7 @@ type (
 
 		exclusiveDeletionHighWatermark tasks.Key
 		nonReadableScope               Scope
+		readerRateLimiter              quotas.RequestRateLimiter
 		readerGroup                    *ReaderGroup
 		nextForceNewSliceTime          time.Time
 
@@ -169,6 +171,7 @@ func newQueueBase(
 			priorityAssigner,
 			timeSource,
 			shard.GetNamespaceRegistry(),
+			shard.GetClusterMetadata(),
 			logger,
 			metricsHandler,
 			options.TaskMaxRetryCount,
@@ -176,6 +179,11 @@ func newQueueBase(
 		)
 	}
 
+	readerRateLimiter := newShardReaderRateLimiter(
+		options.MaxPollRPS,
+		hostReaderRateLimiter,
+		options.MaxReaderCount(),
+	)
 	readerInitializer := func(readerID int32, slices []Slice) Reader {
 		readerOptions := options.ReaderOptions // make a copy
 		if readerID != DefaultReaderId {
@@ -194,11 +202,7 @@ func newQueueBase(
 			scheduler,
 			rescheduler,
 			timeSource,
-			newShardReaderRateLimiter(
-				options.MaxPollRPS,
-				hostReaderRateLimiter,
-				options.MaxReaderCount(),
-			),
+			readerRateLimiter,
 			monitor,
 			logger,
 			metricsHandler,
@@ -245,7 +249,8 @@ func newQueueBase(
 			NewRange(exclusiveReaderHighWatermark, tasks.MaximumKey),
 			predicates.Universal[tasks.Task](),
 		),
-		readerGroup: readerGroup,
+		readerRateLimiter: readerRateLimiter,
+		readerGroup:       readerGroup,
 
 		// pollTimer and checkpointTimer are initialized on Start()
 		checkpointRetrier: backoff.NewRetrier(
@@ -292,14 +297,25 @@ func (p *queueBase) UnlockTaskProcessing() {
 	// no-op
 }
 
-func (p *queueBase) processNewRange() {
-	newMaxKey := p.shard.GetQueueExclusiveHighReadWatermark(
-		p.category,
-		p.shard.GetClusterMetadata().GetCurrentClusterName(),
-	)
+func (p *queueBase) processNewRange() error {
+	var newMaxKey tasks.Key
+	switch categoryType := p.category.Type(); categoryType {
+	case tasks.CategoryTypeImmediate:
+		newMaxKey = p.shard.GetImmediateQueueExclusiveHighReadWatermark()
+	case tasks.CategoryTypeScheduled:
+		var err error
+		if newMaxKey, err = p.shard.UpdateScheduledQueueExclusiveHighReadWatermark(
+			p.shard.GetClusterMetadata().GetCurrentClusterName(),
+			true,
+		); err != nil {
+			return err
+		}
+	default:
+		panic(fmt.Sprintf("Unknown task category type: %v", categoryType.String()))
+	}
 
 	if !p.nonReadableScope.CanSplitByRange(newMaxKey) {
-		return
+		return nil
 	}
 
 	var newReadScope Scope
@@ -314,7 +330,7 @@ func (p *queueBase) processNewRange() {
 	reader, ok := p.readerGroup.ReaderByID(DefaultReaderId)
 	if !ok {
 		p.readerGroup.NewReader(DefaultReaderId, newSlice)
-		return
+		return nil
 	}
 
 	if now := p.timeSource.Now(); now.After(p.nextForceNewSliceTime) {
@@ -323,6 +339,7 @@ func (p *queueBase) processNewRange() {
 	} else {
 		reader.MergeSlices(newSlice)
 	}
+	return nil
 }
 
 func (p *queueBase) checkpoint() {
@@ -340,7 +357,9 @@ func (p *queueBase) checkpoint() {
 		scopes := reader.Scopes()
 
 		if len(scopes) == 0 {
-			p.readerGroup.RemoveReader(readerID)
+			if readerID != DefaultReaderId {
+				p.readerGroup.RemoveReader(readerID)
+			}
 			continue
 		}
 
@@ -349,9 +368,12 @@ func (p *queueBase) checkpoint() {
 			newExclusiveDeletionHighWatermark = tasks.MinKey(newExclusiveDeletionHighWatermark, scope.Range.InclusiveMin)
 		}
 	}
-	p.metricsHandler.Histogram(QueueReaderCountHistogram, metrics.Dimensionless).Record(int64(len(readerScopes)))
-	p.metricsHandler.Histogram(QueueSliceCountHistogram, metrics.Dimensionless).Record(int64(p.monitor.GetTotalSliceCount()))
-	p.metricsHandler.Histogram(PendingTasksCounter, metrics.Dimensionless).Record(int64(p.monitor.GetTotalPendingTaskCount()))
+	p.metricsHandler.Histogram(metrics.QueueReaderCountHistogram.GetMetricName(), metrics.QueueReaderCountHistogram.GetMetricUnit()).
+		Record(int64(len(readerScopes)))
+	p.metricsHandler.Histogram(metrics.QueueSliceCountHistogram.GetMetricName(), metrics.QueueSliceCountHistogram.GetMetricUnit()).
+		Record(int64(p.monitor.GetTotalSliceCount()))
+	p.metricsHandler.Histogram(metrics.PendingTasksCounter.GetMetricName(), metrics.PendingTasksCounter.GetMetricUnit()).
+		Record(int64(p.monitor.GetTotalPendingTaskCount()))
 
 	// NOTE: Must range complete task first.
 	// Otherwise, if state is updated first, later deletion fails and shard get reloaded
@@ -359,7 +381,7 @@ func (p *queueBase) checkpoint() {
 	//
 	// Emit metric before the deletion watermark comparsion so we have the emit even if there's no task
 	// for the queue
-	p.metricsHandler.Counter(TaskBatchCompleteCounter).Record(1)
+	p.metricsHandler.Counter(metrics.TaskBatchCompleteCounter.GetMetricName()).Record(1)
 	if newExclusiveDeletionHighWatermark.CompareTo(p.exclusiveDeletionHighWatermark) > 0 {
 		err := p.rangeCompleteTasks(p.exclusiveDeletionHighWatermark, newExclusiveDeletionHighWatermark)
 		if err != nil {
@@ -401,13 +423,13 @@ func (p *queueBase) rangeCompleteTasks(
 func (p *queueBase) updateQueueState(
 	readerScopes map[int32][]Scope,
 ) error {
-	p.metricsHandler.Counter(AckLevelUpdateCounter).Record(1)
+	p.metricsHandler.Counter(metrics.AckLevelUpdateCounter.GetMetricName()).Record(1)
 	err := p.shard.UpdateQueueState(p.category, ToPersistenceQueueState(&queueState{
 		readerScopes:                 readerScopes,
 		exclusiveReaderHighWatermark: p.nonReadableScope.Range.InclusiveMin,
 	}))
 	if err != nil {
-		p.metricsHandler.Counter(AckLevelUpdateFailedCounter).Record(1)
+		p.metricsHandler.Counter(metrics.AckLevelUpdateFailedCounter.GetMetricName()).Record(1)
 		p.logger.Error("Error updating queue state", tag.Error(err), tag.OperationFailed)
 	}
 	return err

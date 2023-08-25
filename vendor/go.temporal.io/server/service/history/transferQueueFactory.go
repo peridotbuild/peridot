@@ -27,6 +27,8 @@ package history
 import (
 	"context"
 
+	"go.uber.org/fx"
+
 	"go.temporal.io/server/api/historyservice/v1"
 	"go.temporal.io/server/client"
 	"go.temporal.io/server/common/log"
@@ -40,7 +42,6 @@ import (
 	"go.temporal.io/server/service/history/tasks"
 	"go.temporal.io/server/service/history/workflow"
 	"go.temporal.io/server/service/worker/archiver"
-	"go.uber.org/fx"
 )
 
 const (
@@ -74,13 +75,16 @@ func NewTransferQueueFactory(
 		hostScheduler = queues.NewNamespacePriorityScheduler(
 			params.ClusterMetadata.GetCurrentClusterName(),
 			queues.NamespacePrioritySchedulerOptions{
-				WorkerCount:             params.Config.TransferProcessorSchedulerWorkerCount,
-				ActiveNamespaceWeights:  params.Config.TransferProcessorSchedulerActiveRoundRobinWeights,
-				StandbyNamespaceWeights: params.Config.TransferProcessorSchedulerStandbyRoundRobinWeights,
+				WorkerCount:                 params.Config.TransferProcessorSchedulerWorkerCount,
+				ActiveNamespaceWeights:      params.Config.TransferProcessorSchedulerActiveRoundRobinWeights,
+				StandbyNamespaceWeights:     params.Config.TransferProcessorSchedulerStandbyRoundRobinWeights,
+				EnableRateLimiter:           params.Config.TaskSchedulerEnableRateLimiter,
+				MaxDispatchThrottleDuration: HostSchedulerMaxDispatchThrottleDuration,
 			},
 			params.NamespaceRegistry,
+			params.SchedulerRateLimiter,
 			params.TimeSource,
-			params.MetricsHandler.WithTags(metrics.OperationTag(queues.OperationTransferQueueProcessor)),
+			params.MetricsHandler.WithTags(metrics.OperationTag(metrics.OperationTransferQueueProcessorScope)),
 			params.Logger,
 		)
 	}
@@ -108,7 +112,6 @@ func NewTransferQueueFactory(
 
 func (f *transferQueueFactory) CreateQueue(
 	shard shard.Context,
-	engine shard.Engine,
 	workflowCache workflow.Cache,
 ) queues.Queue {
 	if f.HostScheduler != nil && f.Config.TransferProcessorEnableMultiCursor() {
@@ -185,7 +188,7 @@ func (f *transferQueueFactory) CreateQueue(
 			},
 			f.HostReaderRateLimiter,
 			logger,
-			f.MetricsHandler.WithTags(metrics.OperationTag(queues.OperationTransferQueueProcessor)),
+			f.MetricsHandler.WithTags(metrics.OperationTag(metrics.OperationTransferQueueProcessorScope)),
 		)
 	}
 
@@ -201,5 +204,6 @@ func (f *transferQueueFactory) CreateQueue(
 		f.HistoryClient,
 		f.MetricsHandler,
 		f.HostRateLimiter,
+		f.SchedulerRateLimiter,
 	)
 }

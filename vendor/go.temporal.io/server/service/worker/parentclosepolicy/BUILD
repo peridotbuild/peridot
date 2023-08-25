@@ -27,7 +27,6 @@ go_library(
         "//vendor/go.temporal.io/sdk/workflow",
         "//vendor/go.temporal.io/server/api/historyservice/v1:historyservice",
         "//vendor/go.temporal.io/server/client",
-        "//vendor/go.temporal.io/server/common",
         "//vendor/go.temporal.io/server/common/dynamicconfig",
         "//vendor/go.temporal.io/server/common/headers",
         "//vendor/go.temporal.io/server/common/log",

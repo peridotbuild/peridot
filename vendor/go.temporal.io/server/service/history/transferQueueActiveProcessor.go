@@ -70,6 +70,7 @@ func newTransferQueueActiveProcessor(
 	taskAllocator taskAllocator,
 	clientBean client.Bean,
 	rateLimiter quotas.RateLimiter,
+	schedulerRateLimiter queues.SchedulerRateLimiter,
 	logger log.Logger,
 	metricProvider metrics.MetricsHandler,
 	singleProcessor bool,
@@ -83,13 +84,13 @@ func newTransferQueueActiveProcessor(
 		UpdateAckIntervalJitterCoefficient: config.TransferProcessorUpdateAckIntervalJitterCoefficient,
 		MaxReschdulerSize:                  config.TransferProcessorMaxReschedulerSize,
 		PollBackoffInterval:                config.TransferProcessorPollBackoffInterval,
-		MetricScope:                        metrics.TransferActiveQueueProcessorScope,
+		Operation:                          metrics.TransferActiveQueueProcessorScope,
 	}
 	currentClusterName := shard.GetClusterMetadata().GetCurrentClusterName()
 	logger = log.With(logger, tag.ClusterName(currentClusterName))
 
 	maxReadLevel := func() int64 {
-		return shard.GetQueueExclusiveHighReadWatermark(tasks.CategoryTransfer, currentClusterName).TaskID
+		return shard.GetImmediateQueueExclusiveHighReadWatermark().TaskID
 	}
 	updateTransferAckLevel := func(ackLevel int64) error {
 		// in single cursor mode, continue to update cluster ack level
@@ -119,7 +120,7 @@ func newTransferQueueActiveProcessor(
 	}
 
 	if scheduler == nil {
-		scheduler = newTransferTaskShardScheduler(shard, logger)
+		scheduler = newTransferTaskShardScheduler(shard, schedulerRateLimiter, logger)
 		processor.ownedScheduler = scheduler
 	}
 
@@ -127,7 +128,7 @@ func newTransferQueueActiveProcessor(
 		scheduler,
 		shard.GetTimeSource(),
 		logger,
-		metricProvider.WithTags(metrics.OperationTag(queues.OperationTransferActiveQueueProcessor)),
+		metricProvider.WithTags(metrics.OperationTag(metrics.OperationTransferActiveQueueProcessorScope)),
 	)
 
 	transferTaskFilter := func(task tasks.Task) bool {
@@ -203,6 +204,7 @@ func newTransferQueueActiveProcessor(
 				priorityAssigner,
 				shard.GetTimeSource(),
 				shard.GetNamespaceRegistry(),
+				shard.GetClusterMetadata(),
 				logger,
 				metricProvider,
 				config.TransferTaskMaxRetryCount,
@@ -244,6 +246,7 @@ func newTransferQueueFailoverProcessor(
 	maxLevel int64,
 	taskAllocator taskAllocator,
 	rateLimiter quotas.RateLimiter,
+	schedulerRateLimiter queues.SchedulerRateLimiter,
 	logger log.Logger,
 	metricProvider metrics.MetricsHandler,
 ) (func(ackLevel int64) error, *transferQueueActiveProcessorImpl) {
@@ -256,7 +259,7 @@ func newTransferQueueFailoverProcessor(
 		UpdateAckIntervalJitterCoefficient: config.TransferProcessorUpdateAckIntervalJitterCoefficient,
 		MaxReschdulerSize:                  config.TransferProcessorMaxReschedulerSize,
 		PollBackoffInterval:                config.TransferProcessorPollBackoffInterval,
-		MetricScope:                        metrics.TransferActiveQueueProcessorScope,
+		Operation:                          metrics.TransferActiveQueueProcessorScope,
 	}
 	currentClusterName := shard.GetClusterMetadata().GetCurrentClusterName()
 	failoverUUID := uuid.New()
@@ -314,7 +317,7 @@ func newTransferQueueFailoverProcessor(
 	)
 
 	if scheduler == nil {
-		scheduler = newTransferTaskShardScheduler(shard, logger)
+		scheduler = newTransferTaskShardScheduler(shard, schedulerRateLimiter, logger)
 		processor.ownedScheduler = scheduler
 	}
 
@@ -322,7 +325,7 @@ func newTransferQueueFailoverProcessor(
 		scheduler,
 		shard.GetTimeSource(),
 		logger,
-		metricProvider.WithTags(metrics.OperationTag(queues.OperationTransferActiveQueueProcessor)),
+		metricProvider.WithTags(metrics.OperationTag(metrics.OperationTransferActiveQueueProcessorScope)),
 	)
 
 	queueAckMgr := newQueueFailoverAckMgr(
@@ -342,6 +345,7 @@ func newTransferQueueFailoverProcessor(
 				priorityAssigner,
 				shard.GetTimeSource(),
 				shard.GetNamespaceRegistry(),
+				shard.GetClusterMetadata(),
 				logger,
 				metricProvider,
 				shard.GetConfig().TransferTaskMaxRetryCount,

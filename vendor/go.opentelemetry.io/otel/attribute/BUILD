@@ -15,8 +15,5 @@ go_library(
     importmap = "go.resf.org/peridot/vendor/go.opentelemetry.io/otel/attribute",
     importpath = "go.opentelemetry.io/otel/attribute",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/go.opentelemetry.io/otel/internal",
-        "//vendor/go.opentelemetry.io/otel/internal/attribute",
-    ],
+    deps = ["//vendor/go.opentelemetry.io/otel/internal"],
 )

@@ -63,14 +63,14 @@ type (
 		shard                      shard.Context
 		taskAllocator              taskAllocator
 		config                     *configs.Config
-		metricProvider             metrics.MetricsHandler
-		metricsClient              metrics.Client
+		metricHandler              metrics.MetricsHandler
 		workflowCache              workflow.Cache
 		scheduler                  queues.Scheduler
 		priorityAssigner           queues.PriorityAssigner
 		workflowDeleteManager      workflow.DeleteManager
 		ackLevel                   tasks.Key
 		hostRateLimiter            quotas.RateLimiter
+		schedulerRateLimiter       queues.SchedulerRateLimiter
 		logger                     log.Logger
 		clientBean                 client.Bean
 		matchingClient             matchingservice.MatchingServiceClient
@@ -91,8 +91,9 @@ func newTimerQueueProcessor(
 	clientBean client.Bean,
 	archivalClient archiver.Client,
 	matchingClient matchingservice.MatchingServiceClient,
-	metricProvider metrics.MetricsHandler,
+	metricHandler metrics.MetricsHandler,
 	hostRateLimiter quotas.RateLimiter,
+	schedulerRateLimiter queues.SchedulerRateLimiter,
 ) queues.Queue {
 
 	singleProcessor := !shard.GetClusterMetadata().IsGlobalNamespaceEnabled() ||
@@ -116,14 +117,14 @@ func newTimerQueueProcessor(
 		shard:                 shard,
 		taskAllocator:         taskAllocator,
 		config:                config,
-		metricProvider:        metricProvider,
-		metricsClient:         shard.GetMetricsClient(),
+		metricHandler:         metricHandler,
 		workflowCache:         workflowCache,
 		scheduler:             scheduler,
 		priorityAssigner:      priorityAssigner,
 		workflowDeleteManager: workflowDeleteManager,
 		ackLevel:              shard.GetQueueAckLevel(tasks.CategoryTimer),
 		hostRateLimiter:       hostRateLimiter,
+		schedulerRateLimiter:  schedulerRateLimiter,
 		logger:                logger,
 		clientBean:            clientBean,
 		matchingClient:        matchingClient,
@@ -142,8 +143,9 @@ func newTimerQueueProcessor(
 				hostRateLimiter,
 				config.TimerProcessorMaxPollRPS,
 			),
+			schedulerRateLimiter,
 			logger,
-			metricProvider,
+			metricHandler,
 			singleProcessor,
 		),
 		standbyTimerProcessors: make(map[string]*timerQueueStandbyProcessorImpl),
@@ -195,7 +197,8 @@ func (t *timerQueueProcessorImpl) NotifyNewTasks(
 	standbyTimerProcessor, ok := t.standbyTimerProcessors[clusterName]
 	t.standbyTimerProcessorsLock.RUnlock()
 	if !ok {
-		panic(fmt.Sprintf("Cannot find timer processor for %s.", clusterName))
+		t.logger.Warn(fmt.Sprintf("Cannot find timer processor for %s.", clusterName))
+		return
 	}
 	standbyTimerProcessor.setCurrentTime(t.shard.GetCurrentTime(clusterName))
 	standbyTimerProcessor.notifyNewTimers(timerTasks)
@@ -253,8 +256,9 @@ func (t *timerQueueProcessorImpl) FailoverNamespace(
 			t.hostRateLimiter,
 			t.config.TimerProcessorFailoverMaxPollRPS,
 		),
+		t.schedulerRateLimiter,
 		t.logger,
-		t.metricProvider,
+		t.metricHandler,
 	)
 
 	// NOTE: READ REF BEFORE MODIFICATION
@@ -303,7 +307,8 @@ func (t *timerQueueProcessorImpl) completeTimersLoop() {
 			}
 			return
 		case <-timer.C:
-			if err := backoff.ThrottleRetry(func() error {
+			// TODO: We should have a better approach to handle shard and its component lifecycle
+			_ = backoff.ThrottleRetry(func() error {
 				err := t.completeTimers()
 				if err != nil {
 					t.logger.Info("Failed to complete timer task", tag.Error(err))
@@ -316,11 +321,7 @@ func (t *timerQueueProcessorImpl) completeTimersLoop() {
 				default:
 				}
 				return !shard.IsShardOwnershipLostError(err)
-			}); shard.IsShardOwnershipLostError(err) {
-				// shard is unloaded, timer processor should quit as well
-				go t.Stop()
-				return
-			}
+			})
 
 			timer.Reset(t.config.TimerProcessorCompleteTimerInterval())
 		}
@@ -353,7 +354,9 @@ func (t *timerQueueProcessorImpl) completeTimers() error {
 		return nil
 	}
 
-	t.metricsClient.IncCounter(metrics.TimerQueueProcessorScope, metrics.TaskBatchCompleteCounter)
+	t.metricHandler.Counter(metrics.TaskBatchCompleteCounter.GetMetricName()).Record(
+		1,
+		metrics.OperationTag(metrics.TimerQueueProcessorScope))
 
 	if lowerAckLevel.FireTime.Before(upperAckLevel.FireTime) {
 		ctx, cancel := newQueueIOContext()
@@ -416,8 +419,9 @@ func (t *timerQueueProcessorImpl) handleClusterMetadataUpdate(
 					t.hostRateLimiter,
 					t.config.TimerProcessorMaxPollRPS,
 				),
+				t.schedulerRateLimiter,
 				t.logger,
-				t.metricProvider,
+				t.metricHandler,
 			)
 			processor.Start()
 			t.standbyTimerProcessors[clusterName] = processor

@@ -30,6 +30,7 @@ go_library(
         "token.go",
         "topology.go",
         "uuid.go",
+        "version.go",
     ],
     importmap = "go.resf.org/peridot/vendor/github.com/gocql/gocql",
     importpath = "github.com/gocql/gocql",

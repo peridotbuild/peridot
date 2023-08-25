@@ -54,6 +54,6 @@ var (
 )
 
 // NewServer returns a new instance of server that serves one or many services.
-func NewServer(opts ...ServerOption) Server {
+func NewServer(opts ...ServerOption) (Server, error) {
 	return NewServerFx(opts...)
 }

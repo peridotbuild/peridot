@@ -33,20 +33,24 @@ import (
 	"go.temporal.io/api/serviceerror"
 	taskqueuepb "go.temporal.io/api/taskqueue/v1"
 
-	"go.temporal.io/server/api/historyservice/v1"
-	"go.temporal.io/server/api/matchingservice/v1"
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/namespace"
+	"go.temporal.io/server/common/primitives"
 	"go.temporal.io/server/common/searchattribute"
 	"go.temporal.io/server/service/history/configs"
+	"go.temporal.io/server/service/history/consts"
+	"go.temporal.io/server/service/history/queues"
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
 	"go.temporal.io/server/service/history/vclock"
 	"go.temporal.io/server/service/history/workflow"
 	"go.temporal.io/server/service/worker/archiver"
+
+	"go.temporal.io/server/api/historyservice/v1"
+	"go.temporal.io/server/api/matchingservice/v1"
 )
 
 const (
@@ -63,8 +67,7 @@ type (
 		cache                    workflow.Cache
 		archivalClient           archiver.Client
 		logger                   log.Logger
-		metricProvider           metrics.MetricsHandler
-		metricsClient            metrics.Client
+		metricHandler            metrics.MetricsHandler
 		historyClient            historyservice.HistoryServiceClient
 		matchingClient           matchingservice.MatchingServiceClient
 		config                   *configs.Config
@@ -78,7 +81,7 @@ func newTransferQueueTaskExecutorBase(
 	workflowCache workflow.Cache,
 	archivalClient archiver.Client,
 	logger log.Logger,
-	metricProvider metrics.MetricsHandler,
+	metricHandler metrics.MetricsHandler,
 	matchingClient matchingservice.MatchingServiceClient,
 ) *transferQueueTaskExecutorBase {
 	return &transferQueueTaskExecutorBase{
@@ -88,8 +91,7 @@ func newTransferQueueTaskExecutorBase(
 		cache:                    workflowCache,
 		archivalClient:           archivalClient,
 		logger:                   logger,
-		metricProvider:           metricProvider,
-		metricsClient:            shard.GetMetricsClient(),
+		metricHandler:            metricHandler,
 		historyClient:            shard.GetHistoryClient(),
 		matchingClient:           matchingClient,
 		config:                   shard.GetConfig(),
@@ -216,7 +218,7 @@ func (t *transferQueueTaskExecutorBase) archiveVisibility(
 			HistoryURI:       namespaceEntry.HistoryArchivalState().URI,
 			Targets:          []archiver.ArchivalTarget{archiver.ArchiveTargetVisibility},
 		},
-		CallerService:        common.HistoryServiceName,
+		CallerService:        primitives.HistoryService,
 		AttemptArchiveInline: true, // archive visibility inline by default
 	})
 
@@ -226,14 +228,17 @@ func (t *transferQueueTaskExecutorBase) archiveVisibility(
 func (t *transferQueueTaskExecutorBase) processDeleteExecutionTask(
 	ctx context.Context,
 	task *tasks.DeleteExecutionTask,
+	ensureNoPendingCloseTask bool,
 ) error {
-	return t.deleteExecution(ctx, task, false)
+	return t.deleteExecution(ctx, task, false, ensureNoPendingCloseTask, &task.ProcessStage)
 }
 
 func (t *transferQueueTaskExecutorBase) deleteExecution(
 	ctx context.Context,
 	task tasks.Task,
 	forceDeleteFromOpenVisibility bool,
+	ensureNoPendingCloseTask bool,
+	stage *tasks.DeleteWorkflowExecutionStage,
 ) (retError error) {
 	ctx, cancel := context.WithTimeout(ctx, taskTimeout)
 	defer cancel()
@@ -254,9 +259,25 @@ func (t *transferQueueTaskExecutorBase) deleteExecution(
 	}
 	defer func() { release(retError) }()
 
-	mutableState, err := loadMutableStateForTransferTask(ctx, weCtx, task, t.metricsClient, t.logger)
+	mutableState, err := loadMutableStateForTransferTask(ctx, weCtx, task, t.metricHandler, t.logger)
 	if err != nil {
 		return err
+	}
+
+	// Here, we ensure that the workflow is closed successfully before deleting it. Otherwise, the mutable state
+	// might be deleted before the close task is executed, and so the close task will be dropped. In passive cluster,
+	// this check can be ignored.
+	//
+	// Additionally, this function itself could be called from within the close execution task, so we need to skip
+	// the check in that case because the close execution task would be waiting for itself to finish forever. So, the
+	// ensureNoPendingCloseTask flag is set iff we're running in the active cluster, and we aren't processing the
+	// CloseExecutionTask from within this same goroutine.
+	if ensureNoPendingCloseTask {
+		// Unfortunately, queue states/ack levels are updated with delay (default 30s), therefore this could fail if the
+		// workflow was closed before the queue state/ack levels were updated, so we return a retryable error.
+		if t.isCloseExecutionTaskPending(mutableState, weCtx) {
+			return consts.ErrDependencyTaskNotCompleted
+		}
 	}
 
 	// If task version is EmptyVersion it means "don't check task version".
@@ -267,9 +288,9 @@ func (t *transferQueueTaskExecutorBase) deleteExecution(
 		if err != nil {
 			return err
 		}
-		ok := VerifyTaskVersion(t.shard, t.logger, mutableState.GetNamespaceEntry(), lastWriteVersion, task.GetVersion(), task)
-		if !ok {
-			return nil
+		err = CheckTaskVersion(t.shard, t.logger, mutableState.GetNamespaceEntry(), lastWriteVersion, task.GetVersion(), task)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -280,5 +301,27 @@ func (t *transferQueueTaskExecutorBase) deleteExecution(
 		weCtx,
 		mutableState,
 		forceDeleteFromOpenVisibility,
+		stage,
 	)
+}
+
+func (t *transferQueueTaskExecutorBase) isCloseExecutionTaskPending(ms workflow.MutableState, weCtx workflow.Context) bool {
+	closeTransferTaskId := ms.GetExecutionInfo().CloseTransferTaskId
+	// taskID == 0 if workflow closed before this field was added (v1.17).
+	if closeTransferTaskId == 0 {
+		return false
+	}
+	currentClusterName := t.shard.GetClusterMetadata().GetCurrentClusterName()
+	// check if close execution transfer task is completed
+	transferQueueState, ok := t.shard.GetQueueState(tasks.CategoryTransfer)
+	if !ok {
+		// Use cluster ack level for transfer queue ack level because it gets updated more often.
+		transferQueueAckLevel := t.shard.GetQueueClusterAckLevel(tasks.CategoryTransfer, currentClusterName).TaskID
+		return closeTransferTaskId > transferQueueAckLevel
+	}
+	fakeCloseTransferTask := &tasks.CloseExecutionTask{
+		WorkflowKey: weCtx.GetWorkflowKey(),
+		TaskID:      closeTransferTaskId,
+	}
+	return !queues.IsTaskAcked(fakeCloseTransferTask, transferQueueState)
 }

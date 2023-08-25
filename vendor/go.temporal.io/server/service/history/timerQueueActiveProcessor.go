@@ -66,6 +66,7 @@ func newTimerQueueActiveProcessor(
 	taskAllocator taskAllocator,
 	clientBean client.Bean,
 	rateLimiter quotas.RateLimiter,
+	schedulerRateLimiter queues.SchedulerRateLimiter,
 	logger log.Logger,
 	metricProvider metrics.MetricsHandler,
 	singleProcessor bool,
@@ -91,7 +92,7 @@ func newTimerQueueActiveProcessor(
 	processor := &timerQueueActiveProcessorImpl{}
 
 	if scheduler == nil {
-		scheduler = newTimerTaskShardScheduler(shard, logger)
+		scheduler = newTimerTaskShardScheduler(shard, schedulerRateLimiter, logger)
 		processor.ownedScheduler = scheduler
 	}
 
@@ -99,7 +100,7 @@ func newTimerQueueActiveProcessor(
 		scheduler,
 		shard.GetTimeSource(),
 		logger,
-		metricProvider.WithTags(metrics.OperationTag(queues.OperationTimerActiveQueueProcessor)),
+		metricProvider.WithTags(metrics.OperationTag(metrics.OperationTimerActiveQueueProcessorScope)),
 	)
 
 	timerTaskFilter := func(task tasks.Task) bool {
@@ -177,12 +178,14 @@ func newTimerQueueActiveProcessor(
 				priorityAssigner,
 				shard.GetTimeSource(),
 				shard.GetNamespaceRegistry(),
+				shard.GetClusterMetadata(),
 				logger,
 				metricProvider,
 				config.TimerTaskMaxRetryCount,
 				config.NamespaceCacheRefreshInterval,
 			)
 		},
+		singleProcessor,
 	)
 
 	processor.timerQueueProcessorBase = newTimerQueueProcessorBase(
@@ -214,6 +217,7 @@ func newTimerQueueFailoverProcessor(
 	matchingClient matchingservice.MatchingServiceClient,
 	taskAllocator taskAllocator,
 	rateLimiter quotas.RateLimiter,
+	schedulerRateLimiter queues.SchedulerRateLimiter,
 	logger log.Logger,
 	metricProvider metrics.MetricsHandler,
 ) (func(ackLevel tasks.Key) error, *timerQueueActiveProcessorImpl) {
@@ -266,7 +270,7 @@ func newTimerQueueFailoverProcessor(
 	)
 
 	if scheduler == nil {
-		scheduler = newTimerTaskShardScheduler(shard, logger)
+		scheduler = newTimerTaskShardScheduler(shard, schedulerRateLimiter, logger)
 		processor.ownedScheduler = scheduler
 	}
 
@@ -274,7 +278,7 @@ func newTimerQueueFailoverProcessor(
 		scheduler,
 		shard.GetTimeSource(),
 		logger,
-		metricProvider.WithTags(metrics.OperationTag(queues.OperationTimerActiveQueueProcessor)),
+		metricProvider.WithTags(metrics.OperationTag(metrics.OperationTimerActiveQueueProcessorScope)),
 	)
 
 	timerQueueAckMgr := newTimerQueueFailoverAckMgr(
@@ -296,6 +300,7 @@ func newTimerQueueFailoverProcessor(
 				priorityAssigner,
 				shard.GetTimeSource(),
 				shard.GetNamespaceRegistry(),
+				shard.GetClusterMetadata(),
 				logger,
 				metricProvider,
 				shard.GetConfig().TimerTaskMaxRetryCount,

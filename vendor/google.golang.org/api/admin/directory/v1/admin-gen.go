@@ -16115,6 +16115,9 @@ func (c *OrgunitsListCall) OrgUnitPath(orgUnitPath string) *OrgunitsListCall {
 //
 //	"all" - All sub-organizational units.
 //	"children" - Immediate children only (default).
+//	"allIncludingParent" - All sub-organizational units and the
+//
+// specified organizational unit (root if not specified).
 func (c *OrgunitsListCall) Type(type_ string) *OrgunitsListCall {
 	c.urlParams_.Set("type", type_)
 	return c
@@ -16243,11 +16246,13 @@ func (c *OrgunitsListCall) Do(opts ...googleapi.CallOption) (*OrgUnits, error) {
 	//       "description": "Whether to return all sub-organizations or just immediate children.",
 	//       "enum": [
 	//         "all",
-	//         "children"
+	//         "children",
+	//         "allIncludingParent"
 	//       ],
 	//       "enumDescriptions": [
 	//         "All sub-organizational units.",
-	//         "Immediate children only (default)."
+	//         "Immediate children only (default).",
+	//         "All sub-organizational units and the specified organizational unit (root if not specified)."
 	//       ],
 	//       "location": "query",
 	//       "type": "string"
@@ -23122,6 +23127,16 @@ func (r *UsersService) Insert(user *User) *UsersInsertCall {
 	return c
 }
 
+// ResolveConflictAccount sets the optional parameter
+// "resolveConflictAccount": If set to `true`, the option selected for
+// handling unmanaged user accounts
+// (https://support.google.com/a/answer/11112794) will apply. Default:
+// `false`
+func (c *UsersInsertCall) ResolveConflictAccount(resolveConflictAccount bool) *UsersInsertCall {
+	c.urlParams_.Set("resolveConflictAccount", fmt.Sprint(resolveConflictAccount))
+	return c
+}
+
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -23215,7 +23230,13 @@ func (c *UsersInsertCall) Do(opts ...googleapi.CallOption) (*User, error) {
 	//   "httpMethod": "POST",
 	//   "id": "directory.users.insert",
 	//   "parameterOrder": [],
-	//   "parameters": {},
+	//   "parameters": {
+	//     "resolveConflictAccount": {
+	//       "description": "Optional. If set to `true`, the option selected for [handling unmanaged user accounts](https://support.google.com/a/answer/11112794) will apply. Default: `false`",
+	//       "location": "query",
+	//       "type": "boolean"
+	//     }
+	//   },
 	//   "path": "admin/directory/v1/users",
 	//   "request": {
 	//     "$ref": "User"

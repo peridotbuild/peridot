@@ -23,9 +23,10 @@
 package server
 
 import (
-	"embed"
 	"fmt"
+	"io/fs"
 	"net/http"
+	"os"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -37,19 +38,10 @@ import (
 	"github.com/temporalio/ui-server/v2/server/headers"
 	"github.com/temporalio/ui-server/v2/server/route"
 	"github.com/temporalio/ui-server/v2/server/server_options"
+
+	"github.com/temporalio/ui-server/v2/openapi"
+	"github.com/temporalio/ui-server/v2/ui"
 )
-
-//go:embed generated/ui/index.html
-var uiHTML []byte
-
-//go:embed all:generated/ui
-var uiAssets embed.FS
-
-//go:embed generated/openapi/index.html
-var swaggeruiHTML []byte
-
-//go:embed all:generated/openapi
-var swaggeruiAssets embed.FS
 
 type (
 	// Server ui server.
@@ -100,7 +92,7 @@ func NewServer(opts ...server_options.ServerOption) *Server {
 		CookiePath:     "/",
 		CookieHTTPOnly: false,
 		CookieSameSite: http.SameSiteStrictMode,
-		CookieSecure:   true,
+		CookieSecure:   !cfg.CORS.CookieInsecure,
 		Skipper:        csrf.SkipOnAuthorizationHeader,
 	}))
 
@@ -109,10 +101,23 @@ func NewServer(opts ...server_options.ServerOption) *Server {
 	route.SetAPIRoutes(e, cfgProvider, serverOpts.APIMiddleware)
 	route.SetAuthRoutes(e, cfgProvider)
 	if cfg.EnableOpenAPI {
-		route.SetSwaggerUIRoutes(e, swaggeruiHTML, swaggeruiAssets)
+		assets, err := openapi.Assets()
+		if err != nil {
+			panic(err)
+		}
+		route.SetOpenAPIUIRoutes(e, assets)
 	}
 	if cfg.EnableUI {
-		route.SetUIRoutes(e, uiHTML, uiAssets)
+		var assets fs.FS
+		if cfg.UIAssetPath != "" {
+			assets = os.DirFS(cfg.UIAssetPath)
+		} else {
+			assets, err = ui.Assets()
+			if err != nil {
+				panic(err)
+			}
+		}
+		route.SetUIRoutes(e, assets)
 	}
 
 	s := &Server{

@@ -6,6 +6,7 @@ go_library(
         "call.go",
         "callset.go",
         "controller.go",
+        "doc.go",
         "matchers.go",
     ],
     importmap = "go.resf.org/peridot/vendor/github.com/golang/mock/gomock",

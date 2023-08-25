@@ -17,6 +17,7 @@ go_library(
         "//vendor/go.temporal.io/api/serviceerror",
         "//vendor/go.temporal.io/server/api/adminservice/v1:adminservice",
         "//vendor/go.temporal.io/server/common/backoff",
+        "//vendor/go.temporal.io/server/common/debug",
         "//vendor/go.temporal.io/server/common/headers",
         "//vendor/go.temporal.io/server/common/log",
         "//vendor/go.temporal.io/server/common/log/tag",

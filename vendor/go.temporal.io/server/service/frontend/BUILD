@@ -12,6 +12,7 @@ go_library(
         "interface.go",
         "interface_mock.go",
         "operator_handler.go",
+        "overrides.go",
         "service.go",
         "token.go",
         "validators.go",
@@ -22,6 +23,7 @@ go_library(
     importpath = "go.temporal.io/server/service/frontend",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/blang/semver/v4:semver",
         "//vendor/github.com/golang/mock/gomock",
         "//vendor/github.com/pborman/uuid",
         "//vendor/go.temporal.io/api/batch/v1:batch",

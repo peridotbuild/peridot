@@ -21,7 +21,7 @@ import (
 )
 
 // A diff provides a PostgreSQL implementation for schema.Inspector.
-type inspect struct{ conn }
+type inspect struct{ *conn }
 
 var _ schema.Inspector = (*inspect)(nil)
 
@@ -36,13 +36,23 @@ func (i *inspect) InspectRealm(ctx context.Context, opts *schema.InspectRealmOpt
 	}
 	r := schema.NewRealm(schemas...).SetCollation(i.collate)
 	r.Attrs = append(r.Attrs, &CType{V: i.ctype})
-	if len(schemas) == 0 || !sqlx.ModeInspectRealm(opts).Is(schema.InspectTables) {
-		return sqlx.ExcludeRealm(r, opts.Exclude)
+	if len(schemas) > 0 {
+		mode := sqlx.ModeInspectRealm(opts)
+		if mode.Is(schema.InspectTables) {
+			if err := i.inspectTables(ctx, r, nil); err != nil {
+				return nil, err
+			}
+			sqlx.LinkSchemaTables(schemas)
+		}
+		if mode.Is(schema.InspectViews) {
+			if err := i.inspectViews(ctx, r, nil); err != nil {
+				return nil, err
+			}
+		}
+		if err := i.inspectEnums(ctx, r); err != nil {
+			return nil, err
+		}
 	}
-	if err := i.inspectTables(ctx, r, nil); err != nil {
-		return nil, err
-	}
-	sqlx.LinkSchemaTables(schemas)
 	return sqlx.ExcludeRealm(r, opts.Exclude)
 }
 
@@ -70,6 +80,14 @@ func (i *inspect) InspectSchema(ctx context.Context, name string, opts *schema.I
 		}
 		sqlx.LinkSchemaTables(schemas)
 	}
+	if sqlx.ModeInspectSchema(opts).Is(schema.InspectViews) {
+		if err := i.inspectViews(ctx, r, opts); err != nil {
+			return nil, err
+		}
+	}
+	if err := i.inspectEnums(ctx, r); err != nil {
+		return nil, err
+	}
 	return sqlx.ExcludeSchema(r.Schemas[0], opts.Exclude)
 }
 
@@ -81,7 +99,17 @@ func (i *inspect) inspectTables(ctx context.Context, r *schema.Realm, opts *sche
 		if len(s.Tables) == 0 {
 			continue
 		}
-		if err := i.columns(ctx, s); err != nil {
+		if err := i.columns(ctx, s, queryScope{
+			exec: i.querySchema,
+			append: func(s *schema.Schema, table string, column *schema.Column) error {
+				t, ok := s.Table(table)
+				if !ok {
+					return fmt.Errorf("table %q was not found in schema", table)
+				}
+				t.AddColumns(column)
+				return nil
+			},
+		}); err != nil {
 			return err
 		}
 		if err := i.indexes(ctx, s); err != nil {
@@ -132,7 +160,7 @@ func (i *inspect) tables(ctx context.Context, realm *schema.Realm, opts *schema.
 		if !ok {
 			return fmt.Errorf("schema %q was not found in realm", tSchema.String)
 		}
-		t := &schema.Table{Name: name.String}
+		t := schema.NewTable(name.String)
 		s.AddTables(t)
 		if sqlx.ValidString(comment) {
 			t.SetComment(comment.String)
@@ -148,30 +176,32 @@ func (i *inspect) tables(ctx context.Context, realm *schema.Realm, opts *schema.
 	return rows.Close()
 }
 
+type queryScope struct {
+	exec   func(context.Context, string, *schema.Schema) (*sql.Rows, error)
+	append func(*schema.Schema, string, *schema.Column) error
+}
+
 // columns queries and appends the columns of the given table.
-func (i *inspect) columns(ctx context.Context, s *schema.Schema) error {
+func (i *inspect) columns(ctx context.Context, s *schema.Schema, scope queryScope) error {
 	query := columnsQuery
 	if i.crdb {
 		query = crdbColumnsQuery
 	}
-	rows, err := i.querySchema(ctx, query, s)
+	rows, err := scope.exec(ctx, query, s)
 	if err != nil {
 		return fmt.Errorf("postgres: querying schema %q columns: %w", s.Name, err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		if err := i.addColumn(s, rows); err != nil {
+		if err := i.addColumn(s, rows, scope); err != nil {
 			return fmt.Errorf("postgres: %w", err)
 		}
 	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-	return i.enumValues(ctx, s)
+	return rows.Close()
 }
 
-// addColumn scans the current row and adds a new column from it to the table.
-func (i *inspect) addColumn(s *schema.Schema, rows *sql.Rows) (err error) {
+// addColumn scans the current row and adds a new column from it to the scope (table or view).
+func (i *inspect) addColumn(s *schema.Schema, rows *sql.Rows, scope queryScope) (err error) {
 	var (
 		typid, typelem, maxlen, precision, timeprecision, scale, seqstart, seqinc, seqlast                                                  sql.NullInt64
 		table, name, typ, fmtype, nullable, defaults, identity, genidentity, genexpr, charset, collate, comment, typtype, elemtyp, interval sql.NullString
@@ -181,10 +211,6 @@ func (i *inspect) addColumn(s *schema.Schema, rows *sql.Rows) (err error) {
 		&collate, &identity, &seqstart, &seqinc, &seqlast, &genidentity, &genexpr, &comment, &typtype, &typelem, &elemtyp, &typid,
 	); err != nil {
 		return err
-	}
-	t, ok := s.Table(table.String)
-	if !ok {
-		return fmt.Errorf("table %q was not found in schema", table.String)
 	}
 	c := &schema.Column{
 		Name: name.String,
@@ -233,75 +259,93 @@ func (i *inspect) addColumn(s *schema.Schema, rows *sql.Rows) (err error) {
 	if sqlx.ValidString(collate) {
 		c.SetCollation(collate.String)
 	}
-	t.Columns = append(t.Columns, c)
-	return nil
+	return scope.append(s, table.String, c)
 }
 
 // enumValues fills enum columns with their values from the database.
-func (i *inspect) enumValues(ctx context.Context, s *schema.Schema) error {
+func (i *inspect) inspectEnums(ctx context.Context, r *schema.Realm) error {
 	var (
-		args  []any
-		ids   = make(map[int64][]*schema.EnumType)
-		query = "SELECT enumtypid, enumlabel FROM pg_enum WHERE enumtypid IN (%s)"
-		newE  = func(e1 *enumType) *schema.EnumType {
-			if _, ok := ids[e1.ID]; !ok {
-				args = append(args, e1.ID)
+		ids  = make(map[int64]*schema.EnumType)
+		args = make([]any, 0, len(r.Schemas))
+		newE = func(e1 *enumType) *schema.EnumType {
+			e2, ok := ids[e1.ID]
+			if ok {
+				return e2
 			}
-			// Convert the intermediate type to
-			// the standard schema.EnumType.
-			e2 := &schema.EnumType{T: e1.T, Schema: s}
-			if e1.Schema != "" && e1.Schema != s.Name {
-				e2.Schema = schema.New(e1.Schema)
-			}
-			ids[e1.ID] = append(ids[e1.ID], e2)
+			e2 = &schema.EnumType{T: e1.T}
+			ids[e1.ID] = e2
 			return e2
 		}
-	)
-	for _, t := range s.Tables {
-		for _, c := range t.Columns {
-			switch t := c.Type.Type.(type) {
-			case *enumType:
-				e := newE(t)
-				c.Type.Type = e
-				c.Type.Raw = e.T
-			case *ArrayType:
-				if e, ok := t.Type.(*enumType); ok {
-					t.Type = newE(e)
+		scanC = func(cs []*schema.Column) {
+			for _, c := range cs {
+				switch t := c.Type.Type.(type) {
+				case *enumType:
+					e := newE(t)
+					c.Type.Type = e
+					c.Type.Raw = e.T
+				case *ArrayType:
+					if e, ok := t.Type.(*enumType); ok {
+						t.Type = newE(e)
+					}
 				}
 			}
 		}
+	)
+	for _, s := range r.Schemas {
+		args = append(args, s.Name)
+		for _, t := range s.Tables {
+			scanC(t.Columns)
+		}
+		for _, v := range s.Views {
+			scanC(v.Columns)
+		}
 	}
-	if len(ids) == 0 {
+	if len(args) == 0 {
 		return nil
 	}
-	rows, err := i.QueryContext(ctx, fmt.Sprintf(query, nArgs(0, len(args))), args...)
+	rows, err := i.QueryContext(ctx, fmt.Sprintf(enumsQuery, nArgs(0, len(args))), args...)
 	if err != nil {
 		return fmt.Errorf("postgres: querying enum values: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var (
-			id int64
-			v  string
+			id       int64
+			ns, n, v string
 		)
-		if err := rows.Scan(&id, &v); err != nil {
+		if err := rows.Scan(&ns, &id, &n, &v); err != nil {
 			return fmt.Errorf("postgres: scanning enum label: %w", err)
 		}
-		for _, enum := range ids[id] {
-			enum.Values = append(enum.Values, v)
+		e, ok := ids[id]
+		if !ok {
+			e = &schema.EnumType{T: n}
+			ids[id] = e
 		}
+		if e.Schema == nil {
+			s, ok := r.Schema(ns)
+			if !ok {
+				return fmt.Errorf("postgres: schema %q for enum %q was not found in inspection", ns, e.T)
+			}
+			e.Schema = s
+			s.Objects = append(s.Objects, e)
+		}
+		e.Values = append(e.Values, v)
 	}
 	return nil
 }
 
 // indexes queries and appends the indexes of the given table.
 func (i *inspect) indexes(ctx context.Context, s *schema.Schema) error {
-	query := indexesQuery
+	var query string
 	switch {
 	case i.conn.crdb:
 		return i.crdbIndexes(ctx, s)
-	case !i.conn.supportsIndexInclude():
-		query = indexesQueryNoInclude
+	case i.supportsIndexNullsDistinct():
+		query = indexesAbove15
+	case i.supportsIndexInclude():
+		query = indexesAbove11
+	default:
+		query = indexesBelow11
 	}
 	rows, err := i.querySchema(ctx, query, s)
 	if err != nil {
@@ -319,14 +363,14 @@ func (i *inspect) addIndexes(s *schema.Schema, rows *sql.Rows) error {
 	names := make(map[string]*schema.Index)
 	for rows.Next() {
 		var (
-			uniq, primary, included                                               bool
 			table, name, typ                                                      string
+			uniq, primary, included, nullsnotdistinct                             bool
 			desc, nullsfirst, nullslast, opcdefault                               sql.NullBool
 			column, constraints, pred, expr, comment, options, opcname, opcparams sql.NullString
 		)
 		if err := rows.Scan(
-			&table, &name, &typ, &column, &included, &primary, &uniq, &constraints, &pred, &expr,
-			&desc, &nullsfirst, &nullslast, &comment, &options, &opcname, &opcdefault, &opcparams,
+			&table, &name, &typ, &column, &included, &primary, &uniq, &constraints, &pred, &expr, &desc,
+			&nullsfirst, &nullslast, &comment, &options, &opcname, &opcdefault, &opcparams, &nullsnotdistinct,
 		); err != nil {
 			return fmt.Errorf("postgres: scanning indexes for schema %q: %w", s.Name, err)
 		}
@@ -353,18 +397,21 @@ func (i *inspect) addIndexes(s *schema.Schema, rows *sql.Rows) error {
 					return fmt.Errorf("postgres: unmarshaling index constraints: %w", err)
 				}
 				for n, t := range m {
-					idx.Attrs = append(idx.Attrs, &Constraint{N: n, T: t})
+					idx.AddAttrs(&Constraint{N: n, T: t})
 				}
 			}
 			if sqlx.ValidString(pred) {
-				idx.Attrs = append(idx.Attrs, &IndexPredicate{P: pred.String})
+				idx.AddAttrs(&IndexPredicate{P: pred.String})
 			}
 			if sqlx.ValidString(options) {
 				p, err := newIndexStorage(options.String)
 				if err != nil {
 					return err
 				}
-				idx.Attrs = append(idx.Attrs, p)
+				idx.AddAttrs(p)
+			}
+			if nullsnotdistinct {
+				idx.AddAttrs(&IndexNullsDistinct{V: false})
 			}
 			names[name] = idx
 			if primary {
@@ -561,13 +608,18 @@ func (i *inspect) schemas(ctx context.Context, opts *schema.InspectRealmOption) 
 	defer rows.Close()
 	var schemas []*schema.Schema
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var (
+			name    string
+			comment sql.NullString
+		)
+		if err := rows.Scan(&name, &comment); err != nil {
 			return nil, err
 		}
-		schemas = append(schemas, &schema.Schema{
-			Name: name,
-		})
+		s := schema.New(name)
+		if comment.Valid {
+			s.SetComment(comment.String)
+		}
+		schemas = append(schemas, s)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -595,7 +647,9 @@ func nArgs(start, n int) string {
 	return b.String()
 }
 
-var reNextval = regexp.MustCompile(`(?i) *nextval\('(?:")?(?:[\w$]+\.)*([\w$]+_[\w$]+_seq)(?:")?'(?:::regclass)*\) *$`)
+// A regexp to extracts the sequence name from a "nextval" expression.
+// nextval('<optional (quoted) schema>.<sequence name>'::regclass).
+var reNextval = regexp.MustCompile(`(?i) *nextval\('(?:"?[\w$]+"?\.)?"?([\w$]+_[\w$]+_seq)"?'(?:::regclass)*\) *$`)
 
 func defaultExpr(c *schema.Column, s string) {
 	switch m := reNextval.FindStringSubmatch(s); {
@@ -824,6 +878,12 @@ type (
 		Name    string                  // Name of the operator class.
 		Default bool                    // If it is the default operator class.
 		Params  []struct{ N, V string } // Optional parameters.
+	}
+
+	// IndexNullsDistinct describes the NULLS [NOT] DISTINCT clause.
+	IndexNullsDistinct struct {
+		schema.Attr
+		V bool // NULLS [NOT] DISTINCT. Defaults to true.
 	}
 
 	// Concurrently describes the CONCURRENTLY clause to instruct Postgres to
@@ -1073,10 +1133,29 @@ const (
 	paramsQuery = `SELECT setting FROM pg_settings WHERE name IN ('lc_collate', 'lc_ctype', 'server_version_num', 'crdb_version') ORDER BY name DESC`
 
 	// Query to list database schemas.
-	schemasQuery = "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast', 'crdb_internal', 'pg_extension') AND schema_name NOT LIKE 'pg_%temp_%' ORDER BY schema_name"
+	schemasQuery = `
+SELECT
+	nspname AS schema_name,
+	pg_catalog.obj_description(oid) AS comment
+FROM
+    pg_catalog.pg_namespace
+WHERE
+    nspname NOT IN ('information_schema', 'pg_catalog', 'pg_toast', 'crdb_internal', 'pg_extension')
+    AND nspname NOT LIKE 'pg_%temp_%'
+ORDER BY
+    nspname`
 
-	// Query to list specific database schemas.
-	schemasQueryArgs = "SELECT schema_name FROM information_schema.schemata WHERE schema_name %s ORDER BY schema_name"
+	// Query to list database schemas.
+	schemasQueryArgs = `
+SELECT
+	nspname AS schema_name,
+	pg_catalog.obj_description(oid) AS comment
+FROM
+    pg_catalog.pg_namespace
+WHERE
+    nspname %s
+ORDER BY
+    nspname`
 
 	// Query to list table information.
 	tablesQuery = `
@@ -1092,10 +1171,12 @@ FROM
 	JOIN pg_catalog.pg_namespace AS t2 ON t2.nspname = t1.table_schema
 	JOIN pg_catalog.pg_class AS t3 ON t3.relnamespace = t2.oid AND t3.relname = t1.table_name
 	LEFT JOIN pg_catalog.pg_partitioned_table AS t4 ON t4.partrelid = t3.oid
+	LEFT JOIN pg_depend AS t5 ON t5.objid = t3.oid AND t5.deptype = 'e'
 WHERE
 	t1.table_type = 'BASE TABLE'
 	AND NOT COALESCE(t3.relispartition, false)
 	AND t1.table_schema IN (%s)
+	AND t5.objid IS NULL
 ORDER BY
 	t1.table_schema, t1.table_name
 `
@@ -1112,11 +1193,13 @@ FROM
 	JOIN pg_catalog.pg_namespace AS t2 ON t2.nspname = t1.table_schema
 	JOIN pg_catalog.pg_class AS t3 ON t3.relnamespace = t2.oid AND t3.relname = t1.table_name
 	LEFT JOIN pg_catalog.pg_partitioned_table AS t4 ON t4.partrelid = t3.oid
+	LEFT JOIN pg_depend AS t5 ON t5.objid = t3.oid AND t5.deptype = 'e'
 WHERE
 	t1.table_type = 'BASE TABLE'
 	AND NOT COALESCE(t3.relispartition, false)
 	AND t1.table_schema IN (%s)
 	AND t1.table_name IN (%s)
+	AND t5.objid IS NULL
 ORDER BY
 	t1.table_schema, t1.table_name
 `
@@ -1158,7 +1241,23 @@ WHERE
 ORDER BY
 	t1.table_name, t1.ordinal_position
 `
-
+	// Query to list enum values.
+	enumsQuery = `
+SELECT
+	n.nspname AS schema_name,
+	e.enumtypid AS enum_id,
+	t.typname AS enum_name,
+	e.enumlabel AS enum_value
+FROM
+	pg_enum e
+	JOIN pg_type t ON e.enumtypid = t.oid
+	JOIN pg_namespace n ON t.typnamespace = n.oid
+WHERE
+    n.nspname IN (%s)
+ORDER BY
+    n.nspname, e.enumtypid, e.enumsortorder
+`
+	// Query to list foreign-keys.
 	fksQuery = `
 SELECT 
     fk.constraint_name,
@@ -1180,6 +1279,7 @@ SELECT
 	      		ns1.nspname AS schema_name,
       			t2.relname AS referenced_table_name,
 	      		ns2.nspname AS referenced_schema_name,
+	      		generate_series(1,array_length(con.conkey,1)) as ord,
 	      		unnest(con.conkey) AS conkey,
 	      		unnest(con.confkey) AS confkey
 	    	FROM pg_constraint con
@@ -1195,7 +1295,7 @@ SELECT
 	JOIN pg_attribute a2 ON a2.attnum = fk.confkey AND a2.attrelid = fk.confrelid
 	JOIN information_schema.referential_constraints rc ON rc.constraint_name = fk.constraint_name AND rc.constraint_schema = fk.schema_name
 	ORDER BY
-	    fk.conrelid, fk.constraint_name
+	    fk.conrelid, fk.constraint_name, fk.ord
 `
 
 	// Query to list table check constraints.
@@ -1226,9 +1326,10 @@ ORDER BY
 )
 
 var (
-	indexesQuery          = fmt.Sprintf(indexesQueryTmpl, "(a.attname <> '' AND idx.indnatts > idx.indnkeyatts AND idx.ord > idx.indnkeyatts)", "%s")
-	indexesQueryNoInclude = fmt.Sprintf(indexesQueryTmpl, "false", "%s")
-	indexesQueryTmpl      = `
+	indexesBelow11   = fmt.Sprintf(indexesQueryTmpl, "false", "false", "%s")
+	indexesAbove11   = fmt.Sprintf(indexesQueryTmpl, "(a.attname <> '' AND idx.indnatts > idx.indnkeyatts AND idx.ord > idx.indnkeyatts)", "false", "%s")
+	indexesAbove15   = fmt.Sprintf(indexesQueryTmpl, "(a.attname <> '' AND idx.indnatts > idx.indnkeyatts AND idx.ord > idx.indnkeyatts)", "idx.indnullsnotdistinct", "%s")
+	indexesQueryTmpl = `
 SELECT
 	t.relname AS table_name,
 	i.relname AS index_name,
@@ -1247,7 +1348,8 @@ SELECT
 	i.reloptions AS options,
 	op.opcname AS opclass_name,
 	op.opcdefault AS opclass_default,
-	a2.attoptions AS opclass_params
+	a2.attoptions AS opclass_params,
+    %s AS indnullsnotdistinct
 FROM
 	(
 		select

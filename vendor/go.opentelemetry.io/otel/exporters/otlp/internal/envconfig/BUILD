@@ -9,5 +9,4 @@ go_library(
         "//third_party:__subpackages__",
         "//vendor/go.opentelemetry.io/otel/exporters/otlp:__subpackages__",
     ],
-    deps = ["//vendor/go.opentelemetry.io/otel/internal/global"],
 )

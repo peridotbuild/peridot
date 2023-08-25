@@ -38,7 +38,6 @@ import (
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.uber.org/fx"
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
 	enumsspb "go.temporal.io/server/api/enums/v1"
 	"go.temporal.io/server/api/historyservice/v1"
@@ -60,9 +59,9 @@ import (
 	"go.temporal.io/server/common/persistence/visibility/manager"
 	"go.temporal.io/server/common/persistence/visibility/store/standard/cassandra"
 	"go.temporal.io/server/common/primitives/timestamp"
-	"go.temporal.io/server/common/resource"
 	"go.temporal.io/server/common/searchattribute"
 	serviceerrors "go.temporal.io/server/common/serviceerror"
+	"go.temporal.io/server/service/history/api"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/events"
 	"go.temporal.io/server/service/history/replication"
@@ -87,7 +86,7 @@ type (
 		persistenceShardManager       persistence.ShardManager
 		persistenceVisibilityManager  manager.VisibilityManager
 		historyServiceResolver        membership.ServiceResolver
-		metricsClient                 metrics.Client
+		metricsHandler                metrics.MetricsHandler
 		payloadSerializer             serialization.Serializer
 		timeSource                    clock.TimeSource
 		namespaceRegistry             namespace.Registry
@@ -104,13 +103,13 @@ type (
 		fx.In
 
 		Config                        *configs.Config
-		Logger                        resource.SnTaggedLogger
-		ThrottledLogger               resource.ThrottledLogger
+		Logger                        log.SnTaggedLogger
+		ThrottledLogger               log.ThrottledLogger
 		PersistenceExecutionManager   persistence.ExecutionManager
 		PersistenceShardManager       persistence.ShardManager
 		PersistenceVisibilityManager  manager.VisibilityManager
 		HistoryServiceResolver        membership.ServiceResolver
-		MetricsClient                 metrics.Client
+		MetricsHandler                metrics.MetricsHandler
 		PayloadSerializer             serialization.Serializer
 		TimeSource                    clock.TimeSource
 		NamespaceRegistry             namespace.Registry
@@ -183,27 +182,6 @@ func (h *Handler) Stop() {
 
 func (h *Handler) isStopped() bool {
 	return atomic.LoadInt32(&h.status) == common.DaemonStatusStopped
-}
-
-// Check is from: https://github.com/grpc/grpc/blob/master/doc/health-checking.md
-func (h *Handler) Check(_ context.Context, request *healthpb.HealthCheckRequest) (*healthpb.HealthCheckResponse, error) {
-	h.logger.Debug("History service health check endpoint (gRPC) reached.")
-
-	h.startWG.Wait()
-
-	if request.Service != serviceName {
-		return &healthpb.HealthCheckResponse{
-			Status: healthpb.HealthCheckResponse_SERVICE_UNKNOWN,
-		}, nil
-	}
-
-	hs := &healthpb.HealthCheckResponse{
-		Status: healthpb.HealthCheckResponse_SERVING,
-	}
-	return hs, nil
-}
-func (h *Handler) Watch(*healthpb.HealthCheckRequest, healthpb.Health_WatchServer) error {
-	return serviceerror.NewUnimplemented("Watch is not implemented.")
 }
 
 // RecordActivityTaskHeartbeat - Record Activity Task Heart beat.
@@ -542,6 +520,7 @@ func (h *Handler) StartWorkflowExecution(ctx context.Context, request *historyse
 	if err != nil {
 		return nil, h.convertError(err)
 	}
+
 	engine, err := shardContext.GetEngine(ctx)
 	if err != nil {
 		return nil, h.convertError(err)
@@ -956,12 +935,12 @@ func (h *Handler) RemoveSignalMutableState(ctx context.Context, request *history
 		return nil, h.convertError(err)
 	}
 
-	err2 := engine.RemoveSignalMutableState(ctx, request)
+	resp, err2 := engine.RemoveSignalMutableState(ctx, request)
 	if err2 != nil {
 		return nil, h.convertError(err2)
 	}
 
-	return &historyservice.RemoveSignalMutableStateResponse{}, nil
+	return resp, nil
 }
 
 // TerminateWorkflowExecution terminates an existing workflow execution by recording WorkflowExecutionTerminated event
@@ -1022,12 +1001,11 @@ func (h *Handler) DeleteWorkflowExecution(ctx context.Context, request *historys
 		return nil, h.convertError(err)
 	}
 
-	err2 := engine.DeleteWorkflowExecution(ctx, request)
-	if err2 != nil {
-		return nil, h.convertError(err2)
+	resp, err := engine.DeleteWorkflowExecution(ctx, request)
+	if err != nil {
+		return nil, h.convertError(err)
 	}
-
-	return &historyservice.DeleteWorkflowExecutionResponse{}, nil
+	return resp, nil
 }
 
 // ResetWorkflowExecution reset an existing workflow execution
@@ -1205,12 +1183,12 @@ func (h *Handler) RecordChildExecutionCompleted(ctx context.Context, request *hi
 		return nil, h.convertError(err)
 	}
 
-	err2 := engine.RecordChildExecutionCompleted(ctx, request)
+	resp, err2 := engine.RecordChildExecutionCompleted(ctx, request)
 	if err2 != nil {
 		return nil, h.convertError(err2)
 	}
 
-	return &historyservice.RecordChildExecutionCompletedResponse{}, nil
+	return resp, nil
 }
 
 func (h *Handler) VerifyChildExecutionCompletionRecorded(
@@ -1242,12 +1220,12 @@ func (h *Handler) VerifyChildExecutionCompletionRecorded(
 		return nil, h.convertError(err)
 	}
 
-	err2 := engine.VerifyChildExecutionCompletionRecorded(ctx, request)
+	resp, err2 := engine.VerifyChildExecutionCompletionRecorded(ctx, request)
 	if err2 != nil {
 		return nil, h.convertError(err2)
 	}
 
-	return &historyservice.VerifyChildExecutionCompletionRecordedResponse{}, nil
+	return resp, nil
 }
 
 // ResetStickyTaskQueue reset the volatile information in mutable state of a given workflow.
@@ -1295,7 +1273,7 @@ func (h *Handler) ReplicateEventsV2(ctx context.Context, request *historyservice
 		return nil, errShuttingDown
 	}
 
-	if err := h.validateReplicationConfig(); err != nil {
+	if err := api.ValidateReplicationConfig(h.clusterMetadata); err != nil {
 		return nil, err
 	}
 
@@ -1370,7 +1348,7 @@ func (h *Handler) SyncActivity(ctx context.Context, request *historyservice.Sync
 		return nil, errShuttingDown
 	}
 
-	if err := h.validateReplicationConfig(); err != nil {
+	if err := api.ValidateReplicationConfig(h.clusterMetadata); err != nil {
 		return nil, err
 	}
 
@@ -1413,7 +1391,7 @@ func (h *Handler) GetReplicationMessages(ctx context.Context, request *historyse
 	if h.isStopped() {
 		return nil, errShuttingDown
 	}
-	if err := h.validateReplicationConfig(); err != nil {
+	if err := api.ValidateReplicationConfig(h.clusterMetadata); err != nil {
 		return nil, err
 	}
 
@@ -1474,7 +1452,7 @@ func (h *Handler) GetDLQReplicationMessages(ctx context.Context, request *histor
 	if h.isStopped() {
 		return nil, errShuttingDown
 	}
-	if err := h.validateReplicationConfig(); err != nil {
+	if err := api.ValidateReplicationConfig(h.clusterMetadata); err != nil {
 		return nil, err
 	}
 
@@ -1628,12 +1606,11 @@ func (h *Handler) PurgeDLQMessages(ctx context.Context, request *historyservice.
 		return nil, h.convertError(err)
 	}
 
-	err = engine.PurgeDLQMessages(ctx, request)
+	resp, err := engine.PurgeDLQMessages(ctx, request)
 	if err != nil {
-		err = h.convertError(err)
-		return nil, err
+		return nil, h.convertError(err)
 	}
-	return &historyservice.PurgeDLQMessagesResponse{}, nil
+	return resp, nil
 }
 
 func (h *Handler) MergeDLQMessages(ctx context.Context, request *historyservice.MergeDLQMessagesRequest) (_ *historyservice.MergeDLQMessagesResponse, retError error) {
@@ -1741,7 +1718,7 @@ func (h *Handler) GetReplicationStatus(
 	if h.isStopped() {
 		return nil, errShuttingDown
 	}
-	if err := h.validateReplicationConfig(); err != nil {
+	if err := api.ValidateReplicationConfig(h.clusterMetadata); err != nil {
 		return nil, err
 	}
 
@@ -1852,6 +1829,8 @@ func (h *Handler) convertError(err error) error {
 			return serviceerrors.NewShardOwnershipLost(ownerInfo.GetAddress(), hostInfo.GetAddress())
 		}
 		return serviceerrors.NewShardOwnershipLost("", hostInfo.GetAddress())
+	case *persistence.AppendHistoryTimeoutError:
+		return serviceerror.NewUnavailable(err.Msg)
 	case *persistence.WorkflowConditionFailedError:
 		return serviceerror.NewUnavailable(err.Msg)
 	case *persistence.CurrentWorkflowConditionFailedError:
@@ -1861,13 +1840,6 @@ func (h *Handler) convertError(err error) error {
 	}
 
 	return err
-}
-
-func (h *Handler) validateReplicationConfig() error {
-	if !h.clusterMetadata.IsGlobalNamespaceEnabled() {
-		return serviceerror.NewUnavailable("The cluster has global namespace disabled. The operation is not supported.")
-	}
-	return nil
 }
 
 func validateTaskToken(taskToken *tokenspb.Task) error {

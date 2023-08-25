@@ -17,10 +17,10 @@ import (
 // DefaultPlan provides basic planning capabilities for SQLite dialects.
 // Note, it is recommended to call Open, create a new Driver and use its
 // migrate.PlanApplier when a database connection is available.
-var DefaultPlan migrate.PlanApplier = &planApply{conn: conn{ExecQuerier: sqlx.NoRows}}
+var DefaultPlan migrate.PlanApplier = &planApply{conn: &conn{ExecQuerier: sqlx.NoRows}}
 
 // A planApply provides migration capabilities for schema elements.
-type planApply struct{ conn }
+type planApply struct{ *conn }
 
 // PlanChanges returns a migration plan for the given schema changes.
 func (p *planApply) PlanChanges(ctx context.Context, name string, changes []schema.Change, opts ...migrate.PlanOption) (*migrate.Plan, error) {
@@ -67,7 +67,7 @@ func (p *planApply) ApplyChanges(ctx context.Context, changes []schema.Change, o
 // planApply so that multiple planning/applying can be called
 // in parallel.
 type state struct {
-	conn
+	*conn
 	migrate.Plan
 	migrate.PlanOptions
 	skipFKs bool
@@ -86,6 +86,14 @@ func (s *state) plan(ctx context.Context, changes []schema.Change) (err error) {
 			err = s.modifyTable(ctx, c)
 		case *schema.RenameTable:
 			s.renameTable(c)
+		case *schema.AddView:
+			err = s.addView(c)
+		case *schema.DropView:
+			err = s.dropView(c)
+		case *schema.ModifyView:
+			err = s.modifyView(c)
+		case *schema.RenameView:
+			err = s.renameView(c)
 		default:
 			err = fmt.Errorf("unsupported change %T", c)
 		}
@@ -130,9 +138,16 @@ func (s *state) addTable(ctx context.Context, add *schema.AddTable) error {
 	if len(errs) > 0 {
 		return fmt.Errorf("create table %q: %s", add.T.Name, strings.Join(errs, ", "))
 	}
-	if p := (WithoutRowID{}); sqlx.Has(add.T.Attrs, &p) {
-		b.P("WITHOUT ROWID")
+	var options []string
+	if sqlx.Has(add.T.Attrs, &WithoutRowID{}) {
+		options = append(options, "WITHOUT ROWID")
 	}
+	if sqlx.Has(add.T.Attrs, &Strict{}) {
+		options = append(options, "STRICT")
+	}
+	b.MapComma(options, func(i int, b *sqlx.Builder) {
+		b.P(options[i])
+	})
 	s.append(&migrate.Change{
 		Cmd:     b.String(),
 		Source:  add,
@@ -272,25 +287,8 @@ func (s *state) dropIndexes(t *schema.Table, indexes ...*schema.Index) error {
 
 func (s *state) addIndexes(t *schema.Table, indexes ...*schema.Index) error {
 	for _, idx := range indexes {
-		// PRIMARY KEY or UNIQUE columns automatically create indexes with the generated name.
-		// See: sqlite/build.c#sqlite3CreateIndex. Therefore, we ignore such PKs, but create
-		// the inlined UNIQUE constraints manually with custom name, because SQLite does not
-		// allow creating indexes with such names manually. Note, this case is possible if
-		// "apply" schema that was inspected from the database as-is.
-		if strings.HasPrefix(idx.Name, "sqlite_autoindex") {
-			if i := (IndexOrigin{}); sqlx.Has(idx.Attrs, &i) && i.O == "p" {
-				continue
-			}
-			// Use the following format: <Table>_<Columns>.
-			names := make([]string, len(idx.Parts)+1)
-			names[0] = t.Name
-			for i, p := range idx.Parts {
-				if p.C == nil {
-					return fmt.Errorf("unexpected index part %s (%d)", idx.Name, i)
-				}
-				names[i+1] = p.C.Name
-			}
-			idx.Name = strings.Join(names, "_")
+		if err := normalizeIdxName(idx, t); err != nil {
+			return err
 		}
 		b := s.Build("CREATE")
 		if idx.Unique {
@@ -311,6 +309,31 @@ func (s *state) addIndexes(t *schema.Table, indexes ...*schema.Index) error {
 			Reverse: s.Build("DROP INDEX").Ident(idx.Name).String(),
 			Comment: fmt.Sprintf("create index %q to table: %q", idx.Name, t.Name),
 		})
+	}
+	return nil
+}
+
+// normalizeIdxName normalizes the index name before generating the CREATE INDEX statement.
+func normalizeIdxName(idx *schema.Index, t *schema.Table) error {
+	// PRIMARY KEY or UNIQUE columns automatically create indexes with the generated name.
+	// See: sqlite/build.c#sqlite3CreateIndex. Therefore, we ignore such PKs, but create
+	// the inlined UNIQUE constraints manually with custom name, because SQLite does not
+	// allow creating indexes with such names manually. Note, this case is possible if
+	// "apply" schema that was inspected from the database as-is.
+	if strings.HasPrefix(idx.Name, "sqlite_autoindex") {
+		if i := (IndexOrigin{}); sqlx.Has(idx.Attrs, &i) && i.O == "p" {
+			return nil
+		}
+		// Use the following format: <Table>_<Columns>.
+		names := make([]string, len(idx.Parts)+1)
+		names[0] = t.Name
+		for i, p := range idx.Parts {
+			if p.C == nil {
+				return fmt.Errorf("unexpected index part %s (%d)", idx.Name, i)
+			}
+			names[i+1] = p.C.Name
+		}
+		idx.Name = strings.Join(names, "_")
 	}
 	return nil
 }
@@ -548,7 +571,7 @@ func autoincPK(pk *schema.Index) bool {
 
 // Build instantiates a new builder and writes the given phrase to it.
 func (s *state) Build(phrases ...string) *sqlx.Builder {
-	b := &sqlx.Builder{QuoteChar: '`', Schema: s.SchemaQualifier, Indent: s.Indent}
+	b := &sqlx.Builder{QuoteOpening: '`', QuoteClosing: '`', Schema: s.SchemaQualifier, Indent: s.Indent}
 	return b.P(phrases...)
 }
 
@@ -569,7 +592,7 @@ func defaultValue(c *schema.Column) (string, error) {
 }
 
 func identComma(c []string) string {
-	b := &sqlx.Builder{QuoteChar: '`'}
+	b := &sqlx.Builder{QuoteOpening: '`', QuoteClosing: '`'}
 	b.MapComma(c, func(i int, b *sqlx.Builder) {
 		if strings.ContainsRune(c[i], '`') {
 			b.WriteString(c[i])

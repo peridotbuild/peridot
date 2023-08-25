@@ -5,8 +5,6 @@ go_library(
     srcs = [
         "compare.go",
         "cpuinfo.go",
-        "cpuinfo_linux.go",
-        "cpuinfo_other.go",
         "database.go",
         "defaults.go",
         "defaults_darwin.go",
@@ -25,12 +23,6 @@ go_library(
         "//vendor/github.com/containerd/containerd/log",
         "//vendor/github.com/opencontainers/image-spec/specs-go/v1:specs-go",
     ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "//vendor/golang.org/x/sys/unix",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/golang.org/x/sys/unix",
-        ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/golang.org/x/sys/windows",
         ],

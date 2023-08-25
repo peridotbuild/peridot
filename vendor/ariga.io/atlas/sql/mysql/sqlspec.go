@@ -22,6 +22,7 @@ import (
 
 type doc struct {
 	Tables  []*sqlspec.Table  `spec:"table"`
+	Views   []*sqlspec.View   `spec:"view"`
 	Schemas []*sqlspec.Schema `spec:"schema"`
 }
 
@@ -33,8 +34,10 @@ func evalSpec(p *hclparse.Parser, v any, input map[string]cty.Value) error {
 		if err := hclState.Eval(p, &d, input); err != nil {
 			return err
 		}
-		err := specutil.Scan(v, d.Schemas, d.Tables, convertTable)
-		if err != nil {
+		if err := specutil.Scan(v,
+			&specutil.ScanDoc{Schemas: d.Schemas, Tables: d.Tables, Views: d.Views},
+			&specutil.ScanFuncs{Table: convertTable, View: convertView},
+		); err != nil {
 			return fmt.Errorf("mysql: failed converting to *schema.Realm: %w", err)
 		}
 		for _, spec := range d.Schemas {
@@ -54,14 +57,16 @@ func evalSpec(p *hclparse.Parser, v any, input map[string]cty.Value) error {
 		if len(d.Schemas) != 1 {
 			return fmt.Errorf("mysql: expecting document to contain a single schema, got %d", len(d.Schemas))
 		}
-		var r schema.Realm
-		if err := specutil.Scan(&r, d.Schemas, d.Tables, convertTable); err != nil {
+		r := &schema.Realm{}
+		if err := specutil.Scan(r,
+			&specutil.ScanDoc{Schemas: d.Schemas, Tables: d.Tables, Views: d.Views},
+			&specutil.ScanFuncs{Table: convertTable, View: convertView},
+		); err != nil {
 			return err
 		}
 		if err := convertCharset(d.Schemas[0], &r.Schemas[0].Attrs); err != nil {
 			return err
 		}
-		r.Schemas[0].Realm = nil
 		*v = *r.Schemas[0]
 	case schema.Schema, schema.Realm:
 		return fmt.Errorf("mysql: Eval expects a pointer: received %[1]T, expected *%[1]T", v)
@@ -78,12 +83,19 @@ func MarshalSpec(v any, marshaler schemahcl.Marshaler) ([]byte, error) {
 
 var (
 	hclState = schemahcl.New(
-		schemahcl.WithTypes("table.column.type", TypeRegistry.Specs()),
-		schemahcl.WithScopedEnums("table.index.type", IndexTypeBTree, IndexTypeHash, IndexTypeFullText, IndexTypeSpatial),
-		schemahcl.WithScopedEnums("table.primary_key.type", IndexTypeBTree, IndexTypeHash, IndexTypeFullText, IndexTypeSpatial),
-		schemahcl.WithScopedEnums("table.column.as.type", stored, persistent, virtual),
-		schemahcl.WithScopedEnums("table.foreign_key.on_update", specutil.ReferenceVars...),
-		schemahcl.WithScopedEnums("table.foreign_key.on_delete", specutil.ReferenceVars...),
+		append(
+			specOptions,
+			schemahcl.WithTypes("table.column.type", TypeRegistry.Specs()),
+			schemahcl.WithTypes("view.column.type", TypeRegistry.Specs()),
+			schemahcl.WithScopedEnums("view.check_option", schema.ViewCheckOptionLocal, schema.ViewCheckOptionCascaded),
+			schemahcl.WithScopedEnums("table.engine", EngineInnoDB, EngineMyISAM, EngineMemory, EngineCSV, EngineNDB),
+			schemahcl.WithScopedEnums("table.index.type", IndexTypeBTree, IndexTypeHash, IndexTypeFullText, IndexTypeSpatial),
+			schemahcl.WithScopedEnums("table.index.parser", IndexParserNGram, IndexParserMeCab),
+			schemahcl.WithScopedEnums("table.primary_key.type", IndexTypeBTree, IndexTypeHash, IndexTypeFullText, IndexTypeSpatial),
+			schemahcl.WithScopedEnums("table.column.as.type", stored, persistent, virtual),
+			schemahcl.WithScopedEnums("table.foreign_key.on_update", specutil.ReferenceVars...),
+			schemahcl.WithScopedEnums("table.foreign_key.on_delete", specutil.ReferenceVars...),
+		)...,
 	)
 	// MarshalHCL marshals v into an Atlas HCL DDL document.
 	MarshalHCL = schemahcl.MarshalerFunc(func(v any) ([]byte, error) {
@@ -117,7 +129,25 @@ func convertTable(spec *sqlspec.Table, parent *schema.Schema) (*schema.Table, er
 		}
 		t.AddAttrs(&AutoIncrement{V: v})
 	}
+	if attr, ok := spec.Attr("engine"); ok {
+		v, err := attr.String()
+		if err != nil {
+			return nil, err
+		}
+		t.AddAttrs(&Engine{V: v})
+	}
 	return t, err
+}
+
+// convertView converts a sqlspec.View to a schema.View.
+func convertView(spec *sqlspec.View, parent *schema.Schema) (*schema.View, error) {
+	v, err := specutil.View(spec, parent, func(c *sqlspec.Column, _ *schema.View) (*schema.Column, error) {
+		return specutil.Column(c, convertColumnType)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 // convertPK converts a sqlspec.PrimaryKey into a schema.Index.
@@ -127,6 +157,9 @@ func convertPK(spec *sqlspec.PrimaryKey, parent *schema.Table) (*schema.Index, e
 		return nil, err
 	}
 	if err := convertIndexType(spec, idx); err != nil {
+		return nil, err
+	}
+	if err := convertIndexParser(spec, idx); err != nil {
 		return nil, err
 	}
 	return idx, nil
@@ -141,6 +174,9 @@ func convertIndex(spec *sqlspec.Index, parent *schema.Table) (*schema.Index, err
 	if err := convertIndexType(spec, idx); err != nil {
 		return nil, err
 	}
+	if err := convertIndexParser(spec, idx); err != nil {
+		return nil, err
+	}
 	return idx, nil
 }
 
@@ -151,6 +187,17 @@ func convertIndexType(spec specutil.Attrer, idx *schema.Index) error {
 			return err
 		}
 		idx.AddAttrs(&IndexType{T: t})
+	}
+	return nil
+}
+
+func convertIndexParser(spec specutil.Attrer, idx *schema.Index) error {
+	if attr, ok := spec.Attr("parser"); ok {
+		p, err := attr.String()
+		if err != nil {
+			return err
+		}
+		idx.AddAttrs(&IndexParser{P: p})
 	}
 	return nil
 }
@@ -197,7 +244,7 @@ func convertColumn(spec *sqlspec.Column, _ *schema.Table) (*schema.Column, error
 	if attr, ok := spec.Attr("on_update"); ok {
 		x, err := attr.RawExpr()
 		if err != nil {
-			return nil, fmt.Errorf(`unexpected type %T for atrribute "on_update"`, attr.V.Type())
+			return nil, fmt.Errorf(`unexpected type %T for attribute "on_update"`, attr.V.Type())
 		}
 		c.AddAttrs(&OnUpdate{A: x.X})
 	}
@@ -222,18 +269,18 @@ func convertColumnType(spec *sqlspec.Column) (schema.Type, error) {
 }
 
 // schemaSpec converts from a concrete MySQL schema to Atlas specification.
-func schemaSpec(s *schema.Schema) (*sqlspec.Schema, []*sqlspec.Table, error) {
-	sc, t, err := specutil.FromSchema(s, tableSpec)
+func schemaSpec(s *schema.Schema) (*specutil.SchemaSpec, error) {
+	spec, err := specutil.FromSchema(s, tableSpec, viewSpec)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	if c, ok := hasCharset(s.Attrs, nil); ok {
-		sc.Extra.Attrs = append(sc.Extra.Attrs, schemahcl.StringAttr("charset", c))
+	if c, ok := sqlx.Charset(s.Attrs, nil); ok {
+		spec.Schema.Extra.Attrs = append(spec.Schema.Extra.Attrs, schemahcl.StringAttr("charset", c))
 	}
-	if c, ok := hasCollate(s.Attrs, nil); ok {
-		sc.Extra.Attrs = append(sc.Extra.Attrs, schemahcl.StringAttr("collate", c))
+	if c, ok := sqlx.Collate(s.Attrs, nil); ok {
+		spec.Schema.Extra.Attrs = append(spec.Schema.Extra.Attrs, schemahcl.StringAttr("collate", c))
 	}
-	return sc, t, nil
+	return spec, nil
 }
 
 // tableSpec converts from a concrete MySQL sqlspec.Table to a schema.Table.
@@ -249,13 +296,35 @@ func tableSpec(t *schema.Table) (*sqlspec.Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	if c, ok := hasCharset(t.Attrs, t.Schema.Attrs); ok {
+	if c, ok := sqlx.Charset(t.Attrs, t.Schema.Attrs); ok {
 		ts.Extra.Attrs = append(ts.Extra.Attrs, schemahcl.StringAttr("charset", c))
 	}
-	if c, ok := hasCollate(t.Attrs, t.Schema.Attrs); ok {
+	if c, ok := sqlx.Collate(t.Attrs, t.Schema.Attrs); ok {
 		ts.Extra.Attrs = append(ts.Extra.Attrs, schemahcl.StringAttr("collate", c))
 	}
+	// Marshal the engine attribute only if it is not InnoDB (default).
+	if e := (&Engine{}); sqlx.Has(t.Attrs, e) && e.V != "" && !e.Default {
+		attr := schemahcl.StringAttr("engine", e.V)
+		for _, e1 := range []string{EngineInnoDB, EngineMyISAM, EngineMemory, EngineCSV, EngineNDB} {
+			if strings.EqualFold(e.V, e1) {
+				attr = specutil.VarAttr("engine", e1)
+				break
+			}
+		}
+		ts.Extra.Attrs = append(ts.Extra.Attrs, attr)
+	}
 	return ts, nil
+}
+
+// viewSpec converts from a concrete MySQL schema.View to a sqlspec.View.
+func viewSpec(view *schema.View) (*sqlspec.View, error) {
+	spec, err := specutil.FromView(view, func(c *schema.Column, _ *schema.View) (*sqlspec.Column, error) {
+		return specutil.FromColumn(c, columnTypeSpec)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return spec, nil
 }
 
 func pkSpec(idx *schema.Index) (*sqlspec.PrimaryKey, error) {
@@ -281,6 +350,17 @@ func indexTypeSpec(idx *schema.Index, attrs []*schemahcl.Attr) []*schemahcl.Attr
 	if i := (IndexType{}); sqlx.Has(idx.Attrs, &i) && i.T != IndexTypeBTree {
 		attrs = append(attrs, specutil.VarAttr("type", strings.ToUpper(i.T)))
 	}
+	// Print fulltext index parser. Use the pre-defined parser variables if known.
+	if p := (IndexParser{}); sqlx.Has(idx.Attrs, &p) && p.P != "" {
+		attr := schemahcl.StringAttr("parser", p.P)
+		for _, p1 := range []string{IndexParserNGram, IndexParserMeCab} {
+			if strings.EqualFold(p.P, p1) {
+				attr = specutil.VarAttr("parser", p1)
+				break
+			}
+		}
+		attrs = append(attrs, attr)
+	}
 	return attrs
 }
 
@@ -297,10 +377,10 @@ func columnSpec(c *schema.Column, t *schema.Table) (*sqlspec.Column, error) {
 	if err != nil {
 		return nil, err
 	}
-	if c, ok := hasCharset(c.Attrs, t.Attrs); ok {
+	if c, ok := sqlx.Charset(c.Attrs, t.Attrs); ok {
 		spec.Extra.Attrs = append(spec.Extra.Attrs, schemahcl.StringAttr("charset", c))
 	}
-	if c, ok := hasCollate(c.Attrs, t.Attrs); ok {
+	if c, ok := sqlx.Collate(c.Attrs, t.Attrs); ok {
 		spec.Extra.Attrs = append(spec.Extra.Attrs, schemahcl.StringAttr("collate", c))
 	}
 	if o := (OnUpdate{}); sqlx.Has(c.Attrs, &o) {
@@ -379,28 +459,6 @@ func convertCharset(spec specutil.Attrer, attrs *[]schema.Attr) error {
 	return nil
 }
 
-// hasCharset reports if the attribute contains the "charset" attribute,
-// and it needs to be defined explicitly on the schema. This is true, in
-// case the element charset is different from its parent charset.
-func hasCharset(attr []schema.Attr, parent []schema.Attr) (string, bool) {
-	var c, p schema.Charset
-	if sqlx.Has(attr, &c) && (parent == nil || sqlx.Has(parent, &p) && c.V != p.V) {
-		return c.V, true
-	}
-	return "", false
-}
-
-// hasCollate reports if the attribute contains the "collation"/"collate" attribute,
-// and it needs to be defined explicitly on the schema. This is true, in
-// case the element collation is different from its parent collation.
-func hasCollate(attr []schema.Attr, parent []schema.Attr) (string, bool) {
-	var c, p schema.Collation
-	if sqlx.Has(attr, &c) && (parent == nil || sqlx.Has(parent, &p) && c.V != p.V) {
-		return c.V, true
-	}
-	return "", false
-}
-
 // TypeRegistry contains the supported TypeSpecs for the mysql driver.
 var TypeRegistry = schemahcl.NewRegistry(
 	schemahcl.WithFormatter(FormatType),
@@ -450,16 +508,16 @@ var TypeRegistry = schemahcl.NewRegistry(
 		schemahcl.NewTypeSpec(TypeSmallInt, schemahcl.WithAttributes(unsignedTypeAttr(), schemahcl.SizeTypeAttr(false))),
 		schemahcl.NewTypeSpec(TypeMediumInt, schemahcl.WithAttributes(unsignedTypeAttr(), schemahcl.SizeTypeAttr(false))),
 		schemahcl.NewTypeSpec(TypeBigInt, schemahcl.WithAttributes(unsignedTypeAttr(), schemahcl.SizeTypeAttr(false))),
-		schemahcl.NewTypeSpec(TypeDecimal, schemahcl.WithAttributes(unsignedTypeAttr(), &schemahcl.TypeAttr{Name: "precision", Kind: reflect.Int, Required: false}, &schemahcl.TypeAttr{Name: "scale", Kind: reflect.Int, Required: false})),
-		schemahcl.NewTypeSpec(TypeNumeric, schemahcl.WithAttributes(unsignedTypeAttr(), &schemahcl.TypeAttr{Name: "precision", Kind: reflect.Int, Required: false}, &schemahcl.TypeAttr{Name: "scale", Kind: reflect.Int, Required: false})),
-		schemahcl.NewTypeSpec(TypeFloat, schemahcl.WithAttributes(unsignedTypeAttr(), &schemahcl.TypeAttr{Name: "precision", Kind: reflect.Int, Required: false}, &schemahcl.TypeAttr{Name: "scale", Kind: reflect.Int, Required: false})),
-		schemahcl.NewTypeSpec(TypeDouble, schemahcl.WithAttributes(unsignedTypeAttr(), &schemahcl.TypeAttr{Name: "precision", Kind: reflect.Int, Required: false}, &schemahcl.TypeAttr{Name: "scale", Kind: reflect.Int, Required: false})),
-		schemahcl.NewTypeSpec(TypeReal, schemahcl.WithAttributes(unsignedTypeAttr(), &schemahcl.TypeAttr{Name: "precision", Kind: reflect.Int, Required: false}, &schemahcl.TypeAttr{Name: "scale", Kind: reflect.Int, Required: false})),
-		schemahcl.NewTypeSpec(TypeTimestamp, schemahcl.WithAttributes(&schemahcl.TypeAttr{Name: "precision", Kind: reflect.Int, Required: false})),
+		schemahcl.NewTypeSpec(TypeDecimal, schemahcl.WithAttributes(unsignedTypeAttr(), schemahcl.PrecisionTypeAttr(), schemahcl.ScaleTypeAttr())),
+		schemahcl.NewTypeSpec(TypeNumeric, schemahcl.WithAttributes(unsignedTypeAttr(), schemahcl.PrecisionTypeAttr(), schemahcl.ScaleTypeAttr())),
+		schemahcl.NewTypeSpec(TypeFloat, schemahcl.WithAttributes(unsignedTypeAttr(), schemahcl.PrecisionTypeAttr(), schemahcl.ScaleTypeAttr())),
+		schemahcl.NewTypeSpec(TypeDouble, schemahcl.WithAttributes(unsignedTypeAttr(), schemahcl.PrecisionTypeAttr(), schemahcl.ScaleTypeAttr())),
+		schemahcl.NewTypeSpec(TypeReal, schemahcl.WithAttributes(unsignedTypeAttr(), schemahcl.PrecisionTypeAttr(), schemahcl.ScaleTypeAttr())),
+		schemahcl.NewTypeSpec(TypeTimestamp, schemahcl.WithAttributes(schemahcl.PrecisionTypeAttr())),
 		schemahcl.NewTypeSpec(TypeDate),
-		schemahcl.NewTypeSpec(TypeTime, schemahcl.WithAttributes(&schemahcl.TypeAttr{Name: "precision", Kind: reflect.Int, Required: false})),
-		schemahcl.NewTypeSpec(TypeDateTime, schemahcl.WithAttributes(&schemahcl.TypeAttr{Name: "precision", Kind: reflect.Int, Required: false})),
-		schemahcl.NewTypeSpec(TypeYear, schemahcl.WithAttributes(&schemahcl.TypeAttr{Name: "precision", Kind: reflect.Int, Required: false})),
+		schemahcl.NewTypeSpec(TypeTime, schemahcl.WithAttributes(schemahcl.PrecisionTypeAttr())),
+		schemahcl.NewTypeSpec(TypeDateTime, schemahcl.WithAttributes(schemahcl.PrecisionTypeAttr())),
+		schemahcl.NewTypeSpec(TypeYear, schemahcl.WithAttributes(schemahcl.PrecisionTypeAttr())),
 		schemahcl.NewTypeSpec(TypeVarchar, schemahcl.WithAttributes(schemahcl.SizeTypeAttr(true))),
 		schemahcl.NewTypeSpec(TypeChar, schemahcl.WithAttributes(schemahcl.SizeTypeAttr(false))),
 		schemahcl.NewTypeSpec(TypeVarBinary, schemahcl.WithAttributes(schemahcl.SizeTypeAttr(true))),

@@ -72,7 +72,7 @@ func (s *State) setInputVals(ctx *hcl.EvalContext, body hcl.Body, input map[stri
 	return nil
 }
 
-// evalReferences evaluates data blocks.
+// evalReferences evaluates local and data blocks.
 func (s *State) evalReferences(ctx *hcl.EvalContext, body *hclsyntax.Body) error {
 	type node struct {
 		addr  [3]string
@@ -86,7 +86,7 @@ func (s *State) evalReferences(ctx *hcl.EvalContext, body *hclsyntax.Body) error
 	)
 	for _, b := range body.Blocks {
 		switch b := b; {
-		case b.Type == dataBlock:
+		case b.Type == BlockData:
 			if len(b.Labels) < 2 {
 				return fmt.Errorf("data block %q must have exactly 2 labels", b.Type)
 			}
@@ -96,18 +96,18 @@ func (s *State) evalReferences(ctx *hcl.EvalContext, body *hclsyntax.Body) error
 			}
 			// Data references are combined from
 			// "data", "source" and "name" labels.
-			addr := [3]string{dataBlock, b.Labels[0], b.Labels[1]}
+			addr := [3]string{RefData, b.Labels[0], b.Labels[1]}
 			nodes[addr] = &node{
 				addr:  addr,
 				value: func() (cty.Value, error) { return h(ctx, b) },
 				edges: func() []hcl.Traversal { return bodyVars(b.Body) },
 			}
-		case b.Type == localsBlock:
+		case b.Type == BlockLocals:
 			for k, v := range b.Body.Attributes {
 				k, v := k, v
 				// Local references are combined from
 				// "local" and "name" labels.
-				addr := [3]string{localRef, k, ""}
+				addr := [3]string{RefLocal, k, ""}
 				nodes[addr] = &node{
 					addr:  addr,
 					edges: func() []hcl.Traversal { return hclsyntax.Variables(v.Expr) },
@@ -141,7 +141,7 @@ func (s *State) evalReferences(ctx *hcl.EvalContext, body *hclsyntax.Body) error
 		}
 	}
 	var (
-		visit    func(n *node) error
+		visit    func(*node) error
 		visited  = make(map[*node]bool)
 		progress = make(map[*node]bool)
 	)
@@ -160,10 +160,10 @@ func (s *State) evalReferences(ctx *hcl.EvalContext, body *hclsyntax.Body) error
 		for _, e := range n.edges() {
 			var addr [3]string
 			switch root := e.RootName(); {
-			case root == localRef && len(e) == 2:
-				addr = [3]string{localRef, e[1].(hcl.TraverseAttr).Name, ""}
-			case root == dataBlock && len(e) > 2:
-				addr = [3]string{dataBlock, e[1].(hcl.TraverseAttr).Name, e[2].(hcl.TraverseAttr).Name}
+			case root == RefLocal && len(e) > 1:
+				addr = [3]string{RefLocal, e[1].(hcl.TraverseAttr).Name, ""}
+			case root == RefData && len(e) > 2:
+				addr = [3]string{RefData, e[1].(hcl.TraverseAttr).Name, e[2].(hcl.TraverseAttr).Name}
 			case s.config.initblk[root] != nil && len(e) == 1:
 				addr = [3]string{root, "", ""}
 			}
@@ -181,9 +181,9 @@ func (s *State) evalReferences(ctx *hcl.EvalContext, body *hclsyntax.Body) error
 			return err
 		}
 		switch n.addr[0] {
-		case dataBlock:
+		case RefData:
 			data := make(map[string]cty.Value)
-			if vv, ok := ctx.Variables[dataBlock]; ok {
+			if vv, ok := ctx.Variables[RefData]; ok {
 				data = vv.AsValueMap()
 			}
 			src := make(map[string]cty.Value)
@@ -192,14 +192,14 @@ func (s *State) evalReferences(ctx *hcl.EvalContext, body *hclsyntax.Body) error
 			}
 			src[n.addr[2]] = v
 			data[n.addr[1]] = cty.ObjectVal(src)
-			ctx.Variables[dataBlock] = cty.ObjectVal(data)
-		case localRef:
+			ctx.Variables[RefData] = cty.ObjectVal(data)
+		case RefLocal:
 			locals := make(map[string]cty.Value)
-			if vv, ok := ctx.Variables[localRef]; ok {
+			if vv, ok := ctx.Variables[RefLocal]; ok {
 				locals = vv.AsValueMap()
 			}
 			locals[n.addr[1]] = v
-			ctx.Variables[localRef] = cty.ObjectVal(locals)
+			ctx.Variables[RefLocal] = cty.ObjectVal(locals)
 		default:
 			ctx.Variables[n.addr[0]] = v
 		}
@@ -212,7 +212,25 @@ func (s *State) evalReferences(ctx *hcl.EvalContext, body *hclsyntax.Body) error
 			return err
 		}
 	}
+	dataref := dataRefs(body)
 	for _, n := range nodes {
+		// Evaluate data sources only if they were referenced by other top-level
+		// blocks/attributes or if they reference other evaluated data sources.
+		if n.addr[0] == BlockData {
+			exists := func() bool {
+				for _, r := range dataref {
+					t, ok1 := r[1].(hcl.TraverseAttr)
+					l, ok2 := r[2].(hcl.TraverseAttr)
+					if ok1 && ok2 && t.Name == n.addr[1] && l.Name == n.addr[2] {
+						return true
+					}
+				}
+				return false
+			}()
+			if !exists {
+				continue
+			}
+		}
 		if err := visit(n); err != nil {
 			return err
 		}
@@ -221,15 +239,15 @@ func (s *State) evalReferences(ctx *hcl.EvalContext, body *hclsyntax.Body) error
 	return nil
 }
 
-func mergeCtxVar(ctx *hcl.EvalContext, vals map[string]cty.Value) {
-	v, ok := ctx.Variables[varRef]
+func mergeCtxVar(ctx *hcl.EvalContext, values map[string]cty.Value) {
+	v, ok := ctx.Variables[RefVar]
 	if ok {
 		v.ForEachElement(func(key cty.Value, val cty.Value) (stop bool) {
-			vals[key.AsString()] = val
+			values[key.AsString()] = val
 			return false
 		})
 	}
-	ctx.Variables[varRef] = cty.ObjectVal(vals)
+	ctx.Variables[RefVar] = cty.ObjectVal(values)
 }
 
 func setBlockVars(ctx *hcl.EvalContext, b *hclsyntax.Body) (*hcl.EvalContext, error) {
@@ -273,6 +291,10 @@ func blockVars(blocks hclsyntax.Blocks, parentAddr string, defs *blockDef) (map[
 			}
 			self := addr(parentAddr, name, blkName, qualifier)
 			attrs["__ref"] = cty.StringVal(self)
+			// Skip naming blocks with "name" attribute.
+			if _, ok := blk.Body.Attributes["name"]; !ok {
+				attrs["name"] = cty.StringVal(blkName)
+			}
 			varMap, err := blockVars(blk.Body.Blocks, self, def)
 			if err != nil {
 				return nil, err
@@ -374,14 +396,22 @@ var (
 
 // Built-in blocks.
 const (
-	varBlock    = "variable"
-	dataBlock   = "data"
-	localsBlock = "locals"
-	forEachAttr = "for_each"
-	eachRef     = "each"
-	varRef      = "var"
-	localRef    = "local"
+	BlockData     = "data"
+	BlockLocals   = "locals"
+	BlockVariable = "variable"
+	RefData       = "data"
+	RefVar        = "var"
+	RefLocal      = "local"
+	AttrName      = "name"
+	forEachAttr   = "for_each"
+	eachRef       = "each"
 )
+
+// Variables represents the dynamic variables used in a body.
+type Variables struct {
+	Var, Local map[string]bool
+	Data       map[string]map[string]bool
+}
 
 // defRegistry returns a tree of blockDef structs representing the schema of the
 // blocks in the *hclsyntax.Body. The returned fields and children of each type
@@ -393,7 +423,7 @@ func defRegistry(b *hclsyntax.Body) *blockDef {
 	}
 	for _, blk := range b.Blocks {
 		// variable definition blocks are available in the HCL source but not reachable by reference.
-		if blk.Type == varBlock {
+		if blk.Type == BlockVariable {
 			continue
 		}
 		reg.child(extractDef(blk, reg))
@@ -430,6 +460,7 @@ func (t *blockDef) asCty() cty.Type {
 	for attr := range t.fields {
 		f[attr] = ctyNilType
 	}
+	f["name"] = cty.String
 	f["__ref"] = cty.String
 	for _, c := range t.children {
 		f[c.name] = c.asCty()
@@ -454,11 +485,28 @@ func extractDef(blk *hclsyntax.Block, parent *blockDef) *blockDef {
 }
 
 func bodyVars(b *hclsyntax.Body) (vars []hcl.Traversal) {
-	for _, attr := range b.Attributes {
-		vars = append(vars, hclsyntax.Variables(attr.Expr)...)
+	for _, a := range b.Attributes {
+		vars = append(vars, hclsyntax.Variables(a.Expr)...)
 	}
 	for _, b := range b.Blocks {
 		vars = append(vars, bodyVars(b.Body)...)
+	}
+	return
+}
+
+// dataRefs returns all data source referenced in the body.
+func dataRefs(b *hclsyntax.Body) (refs []hcl.Traversal) {
+	for _, a := range b.Attributes {
+		for _, v := range hclsyntax.Variables(a.Expr) {
+			if v.RootName() == RefData {
+				refs = append(refs, v)
+			}
+		}
+	}
+	for _, b := range b.Blocks {
+		if b.Type != BlockData {
+			refs = append(refs, dataRefs(b.Body)...)
+		}
 	}
 	return
 }

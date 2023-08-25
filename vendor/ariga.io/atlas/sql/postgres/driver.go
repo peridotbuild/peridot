@@ -24,7 +24,7 @@ type (
 	// Driver represents a PostgreSQL driver for introspecting database schemas,
 	// generating diff between schema elements and apply migrations changes.
 	Driver struct {
-		conn
+		*conn
 		schema.Differ
 		schema.Inspector
 		migrate.PlanApplier
@@ -86,7 +86,7 @@ func opener(_ context.Context, u *url.URL) (*sqlclient.Client, error) {
 
 // Open opens a new PostgreSQL driver.
 func Open(db schema.ExecQuerier) (migrate.Driver, error) {
-	c := conn{ExecQuerier: db}
+	c := &conn{ExecQuerier: db}
 	rows, err := db.QueryContext(context.Background(), paramsQuery)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: scanning system variables: %w", err)
@@ -126,10 +126,9 @@ func Open(db schema.ExecQuerier) (migrate.Driver, error) {
 
 func (d *Driver) dev() *sqlx.DevDriver {
 	return &sqlx.DevDriver{
-		Driver:     d,
-		MaxNameLen: 63,
-		PatchColumn: func(s *schema.Schema, c *schema.Column) {
-			if e, ok := hasEnumType(c); ok {
+		Driver: d,
+		PatchObject: func(s *schema.Schema, o schema.Object) {
+			if e, ok := o.(*schema.EnumType); ok {
 				e.Schema = s
 			}
 		},
@@ -233,6 +232,9 @@ func withCascade(changes schema.Changes) schema.Changes {
 		if d, ok := c.(*schema.DropTable); ok {
 			d.Extra = append(d.Extra, &Cascade{})
 		}
+		if d, ok := c.(*schema.DropView); ok {
+			d.Extra = append(d.Extra, &schema.IfExists{})
+		}
 	}
 	return changes
 }
@@ -313,6 +315,11 @@ func acquire(ctx context.Context, conn schema.ExecQuerier, id uint32, timeout ti
 // supportsIndexInclude reports if the server supports the INCLUDE clause.
 func (c *conn) supportsIndexInclude() bool {
 	return c.version >= 11_00_00
+}
+
+// supportsIndexNullsDistinct reports if the server supports the NULLS [NOT] DISTINCT clause.
+func (c *conn) supportsIndexNullsDistinct() bool {
+	return c.version >= 15_00_00
 }
 
 type parser struct{}

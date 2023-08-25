@@ -4,7 +4,6 @@ go_library(
     name = "apiv2",
     srcs = [
         "doc.go",
-        "metadata.go",
         "storage_client.go",
         "version.go",
     ],
@@ -17,14 +16,14 @@ go_library(
     deps = [
         "//vendor/cloud.google.com/go/iam/apiv1/iampb",
         "//vendor/cloud.google.com/go/storage/internal",
-        "//vendor/cloud.google.com/go/storage/internal/apiv2/stubs",
+        "//vendor/cloud.google.com/go/storage/internal/apiv2/storagepb",
         "@com_github_googleapis_gax_go_v2//:gax-go",
         "@org_golang_google_api//iterator",
         "@org_golang_google_api//option",
         "@org_golang_google_api//option/internaloption",
         "@org_golang_google_api//transport/grpc",
         "@org_golang_google_grpc//:go_default_library",
-        "@org_golang_google_grpc//metadata",
+        "@org_golang_google_grpc//codes",
         "@org_golang_google_protobuf//proto",
     ],
 )

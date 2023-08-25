@@ -10,6 +10,7 @@ go_library(
         "//vendor/github.com/gogo/protobuf/proto",
         "//vendor/go.temporal.io/api/common/v1:common",
         "//vendor/go.temporal.io/sdk/converter",
+        "//vendor/go.temporal.io/server/common/util",
         "//vendor/golang.org/x/exp/maps",
     ],
 )

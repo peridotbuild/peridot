@@ -80,6 +80,7 @@ go_library(
         "//vendor/go.uber.org/fx",
         "//vendor/golang.org/x/exp/maps",
         "@org_golang_google_grpc//:go_default_library",
+        "@org_golang_google_grpc//health",
         "@org_golang_google_grpc//health/grpc_health_v1",
     ],
 )

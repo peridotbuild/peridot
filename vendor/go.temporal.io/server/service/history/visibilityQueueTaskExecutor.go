@@ -33,11 +33,14 @@ import (
 	"go.temporal.io/api/serviceerror"
 
 	"go.temporal.io/server/common"
+	"go.temporal.io/server/common/definition"
+	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/namespace"
 	"go.temporal.io/server/common/persistence/visibility/manager"
 	"go.temporal.io/server/common/primitives/timestamp"
+	"go.temporal.io/server/service/history/consts"
 	"go.temporal.io/server/service/history/queues"
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
@@ -51,6 +54,9 @@ type (
 		logger         log.Logger
 		metricProvider metrics.MetricsHandler
 		visibilityMgr  manager.VisibilityManager
+
+		ensureCloseBeforeDelete    dynamicconfig.BoolPropertyFn
+		enableCloseWorkflowCleanup dynamicconfig.BoolPropertyFnWithNamespaceFilter
 	}
 )
 
@@ -62,6 +68,8 @@ func newVisibilityQueueTaskExecutor(
 	visibilityMgr manager.VisibilityManager,
 	logger log.Logger,
 	metricProvider metrics.MetricsHandler,
+	ensureCloseBeforeDelete dynamicconfig.BoolPropertyFn,
+	enableCloseWorkflowCleanup dynamicconfig.BoolPropertyFnWithNamespaceFilter,
 ) *visibilityQueueTaskExecutor {
 	return &visibilityQueueTaskExecutor{
 		shard:          shard,
@@ -69,6 +77,9 @@ func newVisibilityQueueTaskExecutor(
 		logger:         logger,
 		metricProvider: metricProvider,
 		visibilityMgr:  visibilityMgr,
+
+		ensureCloseBeforeDelete:    ensureCloseBeforeDelete,
+		enableCloseWorkflowCleanup: enableCloseWorkflowCleanup,
 	}
 }
 
@@ -128,9 +139,9 @@ func (t *visibilityQueueTaskExecutor) processStartExecution(
 	if err != nil {
 		return err
 	}
-	ok := VerifyTaskVersion(t.shard, t.logger, mutableState.GetNamespaceEntry(), startVersion, task.Version, task)
-	if !ok {
-		return nil
+	err = CheckTaskVersion(t.shard, t.logger, mutableState.GetNamespaceEntry(), startVersion, task.Version, task)
+	if err != nil {
+		return err
 	}
 
 	executionInfo := mutableState.GetExecutionInfo()
@@ -308,6 +319,189 @@ func (t *visibilityQueueTaskExecutor) upsertExecution(
 }
 
 func (t *visibilityQueueTaskExecutor) processCloseExecution(
+	parentCtx context.Context,
+	task *tasks.CloseExecutionVisibilityTask,
+) (retError error) {
+	ctx, cancel := context.WithTimeout(parentCtx, taskTimeout)
+	defer cancel()
+
+	namespaceEntry, err := t.shard.GetNamespaceRegistry().GetNamespaceByID(namespace.ID(task.GetNamespaceID()))
+	if err != nil {
+		return err
+	}
+
+	weContext, release, err := getWorkflowExecutionContextForTask(ctx, t.cache, task)
+	if err != nil {
+		return err
+	}
+	defer func() { release(retError) }()
+
+	mutableState, err := weContext.LoadMutableState(ctx)
+	if err != nil {
+		return err
+	}
+	if mutableState == nil || mutableState.IsWorkflowExecutionRunning() {
+		return nil
+	}
+
+	lastWriteVersion, err := mutableState.GetLastWriteVersion()
+	if err != nil {
+		return err
+	}
+	err = CheckTaskVersion(t.shard, t.logger, mutableState.GetNamespaceEntry(), lastWriteVersion, task.Version, task)
+	if err != nil {
+		return err
+	}
+
+	executionInfo := mutableState.GetExecutionInfo()
+	executionState := mutableState.GetExecutionState()
+	wfCloseTime, err := mutableState.GetWorkflowCloseTime(ctx)
+	if err != nil {
+		return err
+	}
+	workflowTypeName := executionInfo.WorkflowTypeName
+	workflowStatus := executionState.Status
+	workflowHistoryLength := mutableState.GetNextEventID() - 1
+	workflowStartTime := timestamp.TimeValue(mutableState.GetExecutionInfo().GetStartTime())
+	workflowExecutionTime := timestamp.TimeValue(mutableState.GetExecutionInfo().GetExecutionTime())
+	visibilityMemo := getWorkflowMemo(copyMemo(executionInfo.Memo))
+	searchAttr := getSearchAttributes(copySearchAttributes(executionInfo.SearchAttributes))
+	taskQueue := executionInfo.TaskQueue
+	stateTransitionCount := executionInfo.GetStateTransitionCount()
+	historySizeBytes := executionInfo.GetExecutionStats().GetHistorySize()
+
+	// NOTE: do not access anything related mutable state after this lock release
+	// release the context lock since we no longer need mutable state and
+	// the rest of logic is making RPC call, which takes time.
+	release(nil)
+	err = t.recordCloseExecution(
+		ctx,
+		namespaceEntry,
+		task.GetWorkflowID(),
+		task.GetRunID(),
+		workflowTypeName,
+		workflowStartTime,
+		workflowExecutionTime,
+		timestamp.TimeValue(wfCloseTime),
+		workflowStatus,
+		stateTransitionCount,
+		workflowHistoryLength,
+		task.GetTaskID(),
+		visibilityMemo,
+		taskQueue,
+		searchAttr,
+		historySizeBytes,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Elasticsearch bulk processor doesn't respect context timeout
+	// because under heavy load bulk flush might take longer than taskTimeout.
+	// Therefore, ctx timeout might be already expired
+	// and parentCtx (which doesn't have timeout) must be used everywhere bellow.
+
+	if t.enableCloseWorkflowCleanup(namespaceEntry.Name().String()) {
+		return t.cleanupExecutionInfo(parentCtx, task)
+	}
+	return nil
+}
+
+func (t *visibilityQueueTaskExecutor) recordCloseExecution(
+	ctx context.Context,
+	namespaceEntry *namespace.Namespace,
+	workflowID string,
+	runID string,
+	workflowTypeName string,
+	startTime time.Time,
+	executionTime time.Time,
+	endTime time.Time,
+	status enumspb.WorkflowExecutionStatus,
+	stateTransitionCount int64,
+	historyLength int64,
+	taskID int64,
+	visibilityMemo *commonpb.Memo,
+	taskQueue string,
+	searchAttributes *commonpb.SearchAttributes,
+	historySizeBytes int64,
+) error {
+	return t.visibilityMgr.RecordWorkflowExecutionClosed(ctx, &manager.RecordWorkflowExecutionClosedRequest{
+		VisibilityRequestBase: &manager.VisibilityRequestBase{
+			NamespaceID: namespaceEntry.ID(),
+			Namespace:   namespaceEntry.Name(),
+			Execution: commonpb.WorkflowExecution{
+				WorkflowId: workflowID,
+				RunId:      runID,
+			},
+			WorkflowTypeName:     workflowTypeName,
+			StartTime:            startTime,
+			ExecutionTime:        executionTime,
+			StateTransitionCount: stateTransitionCount,
+			Status:               status,
+			TaskID:               taskID,
+			ShardID:              t.shard.GetShardID(),
+			Memo:                 visibilityMemo,
+			TaskQueue:            taskQueue,
+			SearchAttributes:     searchAttributes,
+		},
+		CloseTime:        endTime,
+		HistoryLength:    historyLength,
+		HistorySizeBytes: historySizeBytes,
+	})
+}
+
+func (t *visibilityQueueTaskExecutor) processDeleteExecution(
+	ctx context.Context,
+	task *tasks.DeleteExecutionVisibilityTask,
+) (retError error) {
+	ctx, cancel := context.WithTimeout(ctx, taskTimeout)
+	defer cancel()
+
+	request := &manager.VisibilityDeleteWorkflowExecutionRequest{
+		NamespaceID: namespace.ID(task.NamespaceID),
+		WorkflowID:  task.WorkflowID,
+		RunID:       task.RunID,
+		TaskID:      task.TaskID,
+		StartTime:   task.StartTime,
+		CloseTime:   task.CloseTime,
+	}
+	if t.ensureCloseBeforeDelete() {
+		// If visibility delete task is executed before visibility close task then visibility close task
+		// (which change workflow execution status by uploading new visibility record) will resurrect visibility record.
+		//
+		// Queue states/ack levels are updated with delay (default 30s). Therefore, this check could return false
+		// if the workflow was closed and then deleted within this delay period.
+		if t.isCloseExecutionVisibilityTaskPending(task) {
+			// Return retryable error for task processor to retry the operation later.
+			return consts.ErrDependencyTaskNotCompleted
+		}
+	}
+	return t.visibilityMgr.DeleteWorkflowExecution(ctx, request)
+}
+
+func (t *visibilityQueueTaskExecutor) isCloseExecutionVisibilityTaskPending(task *tasks.DeleteExecutionVisibilityTask) bool {
+	CloseExecutionVisibilityTaskID := task.CloseExecutionVisibilityTaskID
+	// taskID == 0 if workflow still running in passive cluster or closed before this field was added (v1.17).
+	if CloseExecutionVisibilityTaskID == 0 {
+		return false
+	}
+	// check if close execution visibility task is completed
+	visibilityQueueState, ok := t.shard.GetQueueState(tasks.CategoryVisibility)
+	if !ok {
+		// !ok means multi-cursor is not available, so we have to revert to using acks
+		visibilityQueueAckLevel := t.shard.GetQueueAckLevel(tasks.CategoryVisibility).TaskID
+		return CloseExecutionVisibilityTaskID > visibilityQueueAckLevel
+	}
+	queryTask := &tasks.CloseExecutionVisibilityTask{
+		WorkflowKey: definition.NewWorkflowKey(task.GetNamespaceID(), task.GetWorkflowID(), task.GetRunID()),
+		TaskID:      CloseExecutionVisibilityTaskID,
+	}
+	return !queues.IsTaskAcked(queryTask, visibilityQueueState)
+}
+
+// cleanupExecutionInfo cleans up workflow execution info after visibility close
+// task has been processed and acked by visibility store.
+func (t *visibilityQueueTaskExecutor) cleanupExecutionInfo(
 	ctx context.Context,
 	task *tasks.CloseExecutionVisibilityTask,
 ) (retError error) {
@@ -332,111 +526,16 @@ func (t *visibilityQueueTaskExecutor) processCloseExecution(
 	if err != nil {
 		return err
 	}
-	ok := VerifyTaskVersion(t.shard, t.logger, mutableState.GetNamespaceEntry(), lastWriteVersion, task.Version, task)
-	if !ok {
-		return nil
+	err = CheckTaskVersion(t.shard, t.logger, mutableState.GetNamespaceEntry(), lastWriteVersion, task.Version, task)
+	if err != nil {
+		return err
 	}
 
 	executionInfo := mutableState.GetExecutionInfo()
-	executionState := mutableState.GetExecutionState()
-	wfCloseTime, err := mutableState.GetWorkflowCloseTime(ctx)
-	if err != nil {
-		return err
-	}
-	workflowTypeName := executionInfo.WorkflowTypeName
-	workflowStatus := executionState.Status
-	workflowHistoryLength := mutableState.GetNextEventID() - 1
-	workflowStartTime := timestamp.TimeValue(mutableState.GetExecutionInfo().GetStartTime())
-	workflowExecutionTime := timestamp.TimeValue(mutableState.GetExecutionInfo().GetExecutionTime())
-	visibilityMemo := getWorkflowMemo(copyMemo(executionInfo.Memo))
-	searchAttr := getSearchAttributes(copySearchAttributes(executionInfo.SearchAttributes))
-	taskQueue := executionInfo.TaskQueue
-	stateTransitionCount := executionInfo.GetStateTransitionCount()
-
-	// NOTE: do not access anything related mutable state after this lock release
-	// release the context lock since we no longer need mutable state and
-	// the rest of logic is making RPC call, which takes time.
-	release(nil)
-	return t.recordCloseExecution(
-		ctx,
-		namespace.ID(task.GetNamespaceID()),
-		task.GetWorkflowID(),
-		task.GetRunID(),
-		workflowTypeName,
-		workflowStartTime,
-		workflowExecutionTime,
-		timestamp.TimeValue(wfCloseTime),
-		workflowStatus,
-		stateTransitionCount,
-		workflowHistoryLength,
-		task.GetTaskID(),
-		visibilityMemo,
-		taskQueue,
-		searchAttr,
-	)
-}
-
-func (t *visibilityQueueTaskExecutor) recordCloseExecution(
-	ctx context.Context,
-	namespaceID namespace.ID,
-	workflowID string,
-	runID string,
-	workflowTypeName string,
-	startTime time.Time,
-	executionTime time.Time,
-	endTime time.Time,
-	status enumspb.WorkflowExecutionStatus,
-	stateTransitionCount int64,
-	historyLength int64,
-	taskID int64,
-	visibilityMemo *commonpb.Memo,
-	taskQueue string,
-	searchAttributes *commonpb.SearchAttributes,
-) error {
-	namespaceEntry, err := t.shard.GetNamespaceRegistry().GetNamespaceByID(namespaceID)
-	if err != nil {
-		return err
-	}
-
-	return t.visibilityMgr.RecordWorkflowExecutionClosed(ctx, &manager.RecordWorkflowExecutionClosedRequest{
-		VisibilityRequestBase: &manager.VisibilityRequestBase{
-			NamespaceID: namespaceID,
-			Namespace:   namespaceEntry.Name(),
-			Execution: commonpb.WorkflowExecution{
-				WorkflowId: workflowID,
-				RunId:      runID,
-			},
-			WorkflowTypeName:     workflowTypeName,
-			StartTime:            startTime,
-			ExecutionTime:        executionTime,
-			StateTransitionCount: stateTransitionCount, Status: status,
-			TaskID:           taskID,
-			ShardID:          t.shard.GetShardID(),
-			Memo:             visibilityMemo,
-			TaskQueue:        taskQueue,
-			SearchAttributes: searchAttributes,
-		},
-		CloseTime:     endTime,
-		HistoryLength: historyLength,
-	})
-}
-
-func (t *visibilityQueueTaskExecutor) processDeleteExecution(
-	ctx context.Context,
-	task *tasks.DeleteExecutionVisibilityTask,
-) (retError error) {
-	ctx, cancel := context.WithTimeout(ctx, taskTimeout)
-	defer cancel()
-
-	request := &manager.VisibilityDeleteWorkflowExecutionRequest{
-		NamespaceID: namespace.ID(task.NamespaceID),
-		WorkflowID:  task.WorkflowID,
-		RunID:       task.RunID,
-		TaskID:      task.TaskID,
-		StartTime:   task.StartTime,
-		CloseTime:   task.CloseTime,
-	}
-	return t.visibilityMgr.DeleteWorkflowExecution(ctx, request)
+	executionInfo.Memo = nil
+	executionInfo.SearchAttributes = nil
+	executionInfo.CloseVisibilityTaskCompleted = true
+	return weContext.SetWorkflowExecution(ctx, t.shard.GetTimeSource().Now())
 }
 
 func getWorkflowMemo(

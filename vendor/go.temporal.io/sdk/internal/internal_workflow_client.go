@@ -44,15 +44,14 @@ import (
 	"go.temporal.io/api/serviceerror"
 	taskqueuepb "go.temporal.io/api/taskqueue/v1"
 	"go.temporal.io/api/workflowservice/v1"
-	uberatomic "go.uber.org/atomic"
-	"google.golang.org/grpc"
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
-
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/internal/common/metrics"
 	"go.temporal.io/sdk/internal/common/serializer"
 	"go.temporal.io/sdk/internal/common/util"
 	"go.temporal.io/sdk/log"
+	uberatomic "go.uber.org/atomic"
+	"google.golang.org/grpc"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 // Assert that structs do indeed implement the interfaces
@@ -80,6 +79,7 @@ type (
 		metricsHandler           metrics.Handler
 		identity                 string
 		dataConverter            converter.DataConverter
+		failureConverter         converter.FailureConverter
 		contextPropagators       []ContextPropagator
 		workerInterceptors       []WorkerInterceptor
 		interceptor              ClientOutboundInterceptor
@@ -150,13 +150,14 @@ type (
 
 	// workflowRunImpl is an implementation of WorkflowRun
 	workflowRunImpl struct {
-		workflowType  string
-		workflowID    string
-		firstRunID    string
-		currentRunID  *util.OnceCell
-		iterFn        func(ctx context.Context, runID string) HistoryEventIterator
-		dataConverter converter.DataConverter
-		registry      *registry
+		workflowType     string
+		workflowID       string
+		firstRunID       string
+		currentRunID     *util.OnceCell
+		iterFn           func(ctx context.Context, runID string) HistoryEventIterator
+		dataConverter    converter.DataConverter
+		failureConverter converter.FailureConverter
+		registry         *registry
 	}
 
 	// HistoryEventIterator represents the interface for
@@ -193,9 +194,11 @@ type (
 // reaches the end state, such as workflow finished successfully or timeout.
 // The user can use this to start using a functor like below and get the workflow execution result, as EncodedValue
 // Either by
-//     ExecuteWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
-//     or
-//     ExecuteWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+//
+//	ExecuteWorkflow(options, "workflowTypeName", arg1, arg2, arg3)
+//	or
+//	ExecuteWorkflow(options, workflowExecuteFn, arg1, arg2, arg3)
+//
 // The current timeout resolution implementation is in seconds and uses math.Ceil(d.Seconds()) as the duration. But is
 // subjected to change in the future.
 // NOTE: the context.Context should have a fairly large timeout, since workflow execution may take a while to be finished
@@ -264,12 +267,13 @@ func (wc *WorkflowClient) GetWorkflow(ctx context.Context, workflowID string, ru
 	}
 
 	return &workflowRunImpl{
-		workflowID:    workflowID,
-		firstRunID:    runID,
-		currentRunID:  &runIDCell,
-		iterFn:        iterFn,
-		dataConverter: wc.dataConverter,
-		registry:      wc.registry,
+		workflowID:       workflowID,
+		firstRunID:       runID,
+		currentRunID:     &runIDCell,
+		iterFn:           iterFn,
+		dataConverter:    wc.dataConverter,
+		failureConverter: wc.failureConverter,
+		registry:         wc.registry,
 	}
 }
 
@@ -470,7 +474,7 @@ func (wc *WorkflowClient) CompleteActivity(ctx context.Context, taskToken []byte
 	// We do allow canceled error to be passed here
 	cancelAllowed := true
 	request := convertActivityResultToRespondRequest(wc.identity, taskToken,
-		data, err, wc.dataConverter, wc.namespace, cancelAllowed)
+		data, err, wc.dataConverter, wc.failureConverter, wc.namespace, cancelAllowed)
 	return reportActivityComplete(ctx, wc.workflowService, request, wc.metricsHandler)
 }
 
@@ -496,7 +500,7 @@ func (wc *WorkflowClient) CompleteActivityByID(ctx context.Context, namespace, w
 	// We do allow canceled error to be passed here
 	cancelAllowed := true
 	request := convertActivityResultToRespondRequestByID(wc.identity, namespace, workflowID, runID, activityID,
-		data, err, wc.dataConverter, cancelAllowed)
+		data, err, wc.dataConverter, wc.failureConverter, cancelAllowed)
 	return reportActivityCompleteByID(ctx, wc.workflowService, request, wc.metricsHandler)
 }
 
@@ -531,10 +535,10 @@ func (wc *WorkflowClient) RecordActivityHeartbeatByID(ctx context.Context,
 
 // ListClosedWorkflow gets closed workflow executions based on request filters
 // The errors it can throw:
-//  - serviceerror.InvalidArgument
-//  - serviceerror.Internal
-//  - serviceerror.Unavailable
-//  - serviceerror.NamespaceNotFound
+//   - serviceerror.InvalidArgument
+//   - serviceerror.Internal
+//   - serviceerror.Unavailable
+//   - serviceerror.NamespaceNotFound
 func (wc *WorkflowClient) ListClosedWorkflow(ctx context.Context, request *workflowservice.ListClosedWorkflowExecutionsRequest) (*workflowservice.ListClosedWorkflowExecutionsResponse, error) {
 	if err := wc.ensureInitialized(); err != nil {
 		return nil, err
@@ -554,10 +558,10 @@ func (wc *WorkflowClient) ListClosedWorkflow(ctx context.Context, request *workf
 
 // ListOpenWorkflow gets open workflow executions based on request filters
 // The errors it can throw:
-//  - serviceerror.InvalidArgument
-//  - serviceerror.Internal
-//  - serviceerror.Unavailable
-//  - serviceerror.NamespaceNotFound
+//   - serviceerror.InvalidArgument
+//   - serviceerror.Internal
+//   - serviceerror.Unavailable
+//   - serviceerror.NamespaceNotFound
 func (wc *WorkflowClient) ListOpenWorkflow(ctx context.Context, request *workflowservice.ListOpenWorkflowExecutionsRequest) (*workflowservice.ListOpenWorkflowExecutionsResponse, error) {
 	if err := wc.ensureInitialized(); err != nil {
 		return nil, err
@@ -676,10 +680,10 @@ func (wc *WorkflowClient) GetSearchAttributes(ctx context.Context) (*workflowser
 
 // DescribeWorkflowExecution returns information about the specified workflow execution.
 // The errors it can return:
-//  - serviceerror.InvalidArgument
-//  - serviceerror.Internal
-//  - serviceerror.Unavailable
-//  - serviceerror.NotFound
+//   - serviceerror.InvalidArgument
+//   - serviceerror.Internal
+//   - serviceerror.Unavailable
+//   - serviceerror.NotFound
 func (wc *WorkflowClient) DescribeWorkflowExecution(ctx context.Context, workflowID, runID string) (*workflowservice.DescribeWorkflowExecutionResponse, error) {
 	if err := wc.ensureInitialized(); err != nil {
 		return nil, err
@@ -709,11 +713,11 @@ func (wc *WorkflowClient) DescribeWorkflowExecution(ctx context.Context, workflo
 // - queryType is the type of the query.
 // - args... are the optional query parameters.
 // The errors it can return:
-//  - serviceerror.InvalidArgument
-//  - serviceerror.Internal
-//  - serviceerror.Unavailable
-//  - serviceerror.NotFound
-//  - serviceerror.QueryFailed
+//   - serviceerror.InvalidArgument
+//   - serviceerror.Internal
+//   - serviceerror.Unavailable
+//   - serviceerror.NotFound
+//   - serviceerror.QueryFailed
 func (wc *WorkflowClient) QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (converter.EncodedValue, error) {
 	if err := wc.ensureInitialized(); err != nil {
 		return nil, err
@@ -771,11 +775,11 @@ type QueryWorkflowWithOptionsResponse struct {
 // QueryWorkflowWithOptions queries a given workflow execution and returns the query result synchronously.
 // See QueryWorkflowWithOptionsRequest and QueryWorkflowWithOptionsResult for more information.
 // The errors it can return:
-//  - serviceerror.InvalidArgument
-//  - serviceerror.Internal
-//  - serviceerror.Unavailable
-//  - serviceerror.NotFound
-//  - serviceerror.QueryFailed
+//   - serviceerror.InvalidArgument
+//   - serviceerror.Internal
+//   - serviceerror.Unavailable
+//   - serviceerror.NotFound
+//   - serviceerror.QueryFailed
 func (wc *WorkflowClient) QueryWorkflowWithOptions(ctx context.Context, request *QueryWorkflowWithOptionsRequest) (*QueryWorkflowWithOptionsResponse, error) {
 	if err := wc.ensureInitialized(); err != nil {
 		return nil, err
@@ -826,10 +830,10 @@ func (wc *WorkflowClient) QueryWorkflowWithOptions(ctx context.Context, request 
 // - taskqueue name of taskqueue
 // - taskqueueType type of taskqueue, can be workflow or activity
 // The errors it can return:
-//  - serviceerror.InvalidArgument
-//  - serviceerror.Internal
-//  - serviceerror.Unavailable
-//  - serviceerror.NotFound
+//   - serviceerror.InvalidArgument
+//   - serviceerror.Internal
+//   - serviceerror.Unavailable
+//   - serviceerror.NotFound
 func (wc *WorkflowClient) DescribeTaskQueue(ctx context.Context, taskQueue string, taskQueueType enumspb.TaskQueueType) (*workflowservice.DescribeTaskQueueResponse, error) {
 	if err := wc.ensureInitialized(); err != nil {
 		return nil, err
@@ -952,6 +956,13 @@ func (wc *WorkflowClient) ensureInitialized() error {
 	return err
 }
 
+// ScheduleClient implements Client.ScheduleClient.
+func (wc *WorkflowClient) ScheduleClient() ScheduleClient {
+	return &scheduleClient{
+		workflowClient: wc,
+	}
+}
+
 // Close client and clean up underlying resources.
 func (wc *WorkflowClient) Close() {
 	// If there's a set of unclosed clients, we have to decrement it and then
@@ -978,10 +989,10 @@ func (wc *WorkflowClient) Close() {
 
 // Register a namespace with temporal server
 // The errors it can throw:
-//	- NamespaceAlreadyExistsError
-//	- serviceerror.InvalidArgument
-//	- serviceerror.Internal
-//	- serviceerror.Unavailable
+//   - NamespaceAlreadyExistsError
+//   - serviceerror.InvalidArgument
+//   - serviceerror.Internal
+//   - serviceerror.Unavailable
 func (nc *namespaceClient) Register(ctx context.Context, request *workflowservice.RegisterNamespaceRequest) error {
 	grpcCtx, cancel := newGRPCContext(ctx, defaultGrpcRetryParameters(ctx))
 	defer cancel()
@@ -995,10 +1006,10 @@ func (nc *namespaceClient) Register(ctx context.Context, request *workflowservic
 // NamespaceConfiguration - Configuration like Workflow Execution Retention Period In Days, Whether to emit metrics.
 // ReplicationConfiguration - replication config like clusters and active cluster name
 // The errors it can throw:
-//	- serviceerror.NamespaceNotFound
-//	- serviceerror.InvalidArgument
-//	- serviceerror.Internal
-//	- serviceerror.Unavailable
+//   - serviceerror.NamespaceNotFound
+//   - serviceerror.InvalidArgument
+//   - serviceerror.Internal
+//   - serviceerror.Unavailable
 func (nc *namespaceClient) Describe(ctx context.Context, namespace string) (*workflowservice.DescribeNamespaceResponse, error) {
 	request := &workflowservice.DescribeNamespaceRequest{
 		Namespace: namespace,
@@ -1015,10 +1026,10 @@ func (nc *namespaceClient) Describe(ctx context.Context, namespace string) (*wor
 
 // Update a namespace.
 // The errors it can throw:
-//	- serviceerror.NamespaceNotFound
-//	- serviceerror.InvalidArgument
-//	- serviceerror.Internal
-//	- serviceerror.Unavailable
+//   - serviceerror.NamespaceNotFound
+//   - serviceerror.InvalidArgument
+//   - serviceerror.Internal
+//   - serviceerror.Unavailable
 func (nc *namespaceClient) Update(ctx context.Context, request *workflowservice.UpdateNamespaceRequest) error {
 	grpcCtx, cancel := newGRPCContext(ctx, defaultGrpcRetryParameters(ctx))
 	defer cancel()
@@ -1129,7 +1140,7 @@ func (workflowRun *workflowRunImpl) GetWithOptions(
 		if !options.DisableFollowingRuns && attributes.NewExecutionRunId != "" {
 			return workflowRun.follow(ctx, valuePtr, attributes.NewExecutionRunId, options)
 		}
-		err = ConvertFailureToError(attributes.GetFailure(), workflowRun.dataConverter)
+		err = workflowRun.failureConverter.FailureToError(attributes.GetFailure())
 	case enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED:
 		attributes := closeEvent.GetWorkflowExecutionCanceledEventAttributes()
 		details := newEncodedValues(attributes.Details, workflowRun.dataConverter)
@@ -1212,11 +1223,17 @@ func serializeSearchAttributes(input map[string]interface{}) (*commonpb.SearchAt
 
 	attr := make(map[string]*commonpb.Payload)
 	for k, v := range input {
-		attrBytes, err := converter.GetDefaultDataConverter().ToPayload(v)
+		// If search attribute value is already of Payload type, then use it directly.
+		// This allows to copy search attributes from workflow info to child workflow options.
+		if vp, ok := v.(*commonpb.Payload); ok {
+			attr[k] = vp
+			continue
+		}
+		var err error
+		attr[k], err = converter.GetDefaultDataConverter().ToPayload(v)
 		if err != nil {
 			return nil, fmt.Errorf("encode search attribute [%s] error: %v", k, err)
 		}
-		attr[k] = attrBytes
 	}
 	return &commonpb.SearchAttributes{IndexedFields: attr}, nil
 }
@@ -1312,13 +1329,14 @@ func (w *workflowClientInterceptor) ExecuteWorkflow(
 
 	curRunIDCell := util.PopulatedOnceCell(runID)
 	return &workflowRunImpl{
-		workflowType:  in.WorkflowType,
-		workflowID:    workflowID,
-		firstRunID:    runID,
-		currentRunID:  &curRunIDCell,
-		iterFn:        iterFn,
-		dataConverter: w.client.dataConverter,
-		registry:      w.client.registry,
+		workflowType:     in.WorkflowType,
+		workflowID:       workflowID,
+		firstRunID:       runID,
+		currentRunID:     &curRunIDCell,
+		iterFn:           iterFn,
+		dataConverter:    w.client.dataConverter,
+		failureConverter: w.client.failureConverter,
+		registry:         w.client.registry,
 	}, nil
 }
 
@@ -1432,13 +1450,14 @@ func (w *workflowClientInterceptor) SignalWithStartWorkflow(
 
 	curRunIDCell := util.PopulatedOnceCell(response.GetRunId())
 	return &workflowRunImpl{
-		workflowType:  in.WorkflowType,
-		workflowID:    in.Options.ID,
-		firstRunID:    response.GetRunId(),
-		currentRunID:  &curRunIDCell,
-		iterFn:        iterFn,
-		dataConverter: w.client.dataConverter,
-		registry:      w.client.registry,
+		workflowType:     in.WorkflowType,
+		workflowID:       in.Options.ID,
+		firstRunID:       response.GetRunId(),
+		currentRunID:     &curRunIDCell,
+		iterFn:           iterFn,
+		dataConverter:    w.client.dataConverter,
+		failureConverter: w.client.failureConverter,
+		registry:         w.client.registry,
 	}, nil
 }
 

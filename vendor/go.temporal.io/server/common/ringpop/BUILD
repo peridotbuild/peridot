@@ -12,6 +12,7 @@ go_library(
         "//vendor/go.temporal.io/server/common/config",
         "//vendor/go.temporal.io/server/common/convert",
         "//vendor/go.temporal.io/server/common/dynamicconfig",
+        "//vendor/go.temporal.io/server/common/headers",
         "//vendor/go.temporal.io/server/common/log",
         "//vendor/go.temporal.io/server/common/log/tag",
         "//vendor/go.temporal.io/server/common/membership",

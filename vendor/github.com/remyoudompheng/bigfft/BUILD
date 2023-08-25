@@ -3,15 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "bigfft",
     srcs = [
-        "arith_386.s",
-        "arith_amd64.s",
-        "arith_arm.s",
-        "arith_arm64.s",
         "arith_decl.go",
-        "arith_mips64x.s",
-        "arith_mipsx.s",
-        "arith_ppc64x.s",
-        "arith_s390x.s",
         "fermat.go",
         "fft.go",
         "scan.go",

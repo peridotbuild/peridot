@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "errorcode.go",
         "errorcode_string.go",
+        "objectpath.go",
         "types.go",
         "types_118.go",
     ],
@@ -14,5 +15,4 @@ go_library(
         "//third_party:__subpackages__",
         "//vendor/golang.org/x/tools:__subpackages__",
     ],
-    deps = ["//vendor/golang.org/x/tools/go/types/objectpath"],
 )

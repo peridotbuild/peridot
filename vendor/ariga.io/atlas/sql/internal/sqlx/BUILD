@@ -8,6 +8,7 @@ go_library(
         "exclude.go",
         "plan.go",
         "sqlx.go",
+        "sqlx_oss.go",
     ],
     importmap = "go.resf.org/peridot/vendor/ariga.io/atlas/sql/internal/sqlx",
     importpath = "ariga.io/atlas/sql/internal/sqlx",

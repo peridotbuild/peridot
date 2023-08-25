@@ -42,7 +42,6 @@ go_library(
         "//vendor/go.temporal.io/server/common/util",
         "//vendor/go.temporal.io/server/service/worker/common",
         "//vendor/go.uber.org/fx",
-        "//vendor/golang.org/x/exp/maps",
         "//vendor/golang.org/x/exp/slices",
     ],
 )

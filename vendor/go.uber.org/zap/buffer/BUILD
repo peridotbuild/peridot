@@ -9,4 +9,5 @@ go_library(
     importmap = "go.resf.org/peridot/vendor/go.uber.org/zap/buffer",
     importpath = "go.uber.org/zap/buffer",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/go.uber.org/zap/internal/pool"],
 )

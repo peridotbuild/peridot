@@ -102,7 +102,14 @@ type (
 		// Indent is the string to use for indentation.
 		// If empty, no indentation is used.
 		Indent string
+		// Mode represents the migration planning mode to be used. If not specified, the driver picks its default.
+		// This is useful to indicate to the driver whether the context is a live database, an empty one, or the
+		// versioned migration workflow.
+		Mode PlanMode
 	}
+
+	// PlanMode defines the plan mode to use.
+	PlanMode uint8
 
 	// PlanOption allows configuring a drivers' plan using functional arguments.
 	PlanOption func(*PlanOptions)
@@ -122,6 +129,19 @@ type (
 // ReadState calls f(ctx).
 func (f StateReaderFunc) ReadState(ctx context.Context) (*schema.Realm, error) {
 	return f(ctx)
+}
+
+// List of migration planning modes.
+const (
+	PlanModeUnset    PlanMode = iota // Driver default.
+	PlanModeInPlace                  // Changes are applied inplace (e.g., 'schema diff').
+	PlanModeDeferred                 // Changes are planned for future applying (e.g., 'migrate diff').
+	PlanModeDump                     // Schema creation dump (e.g., 'schema inspect').
+)
+
+// Is reports whether m is match the given mode.
+func (m PlanMode) Is(m1 PlanMode) bool {
+	return m == m1 || m&m1 != 0
 }
 
 // ErrNoPlan is returned by Plan when there is no change between the two states.
@@ -165,14 +185,15 @@ func SchemaConn(drv Driver, name string, opts *schema.InspectOptions) StateReade
 }
 
 type (
-	// Planner can plan the steps to take to migrate from one state to another. It uses the enclosed Dir to write
+	// Planner can plan the steps to take to migrate from one state to another. It uses the enclosed Dir to
 	// those changes to versioned migration files.
 	Planner struct {
-		drv  Driver       // driver to use
-		dir  Dir          // where migration files are stored and read from
-		fmt  Formatter    // how to format a plan to migration files
-		sum  bool         // whether to create a sum file for the migration directory
-		opts []PlanOption // driver options
+		drv      Driver              // driver to use
+		dir      Dir                 // where migration files are stored and read from
+		fmt      Formatter           // how to format a plan to migration files
+		sum      bool                // whether to create a sum file for the migration directory
+		planOpts []PlanOption        // plan options
+		diffOpts []schema.DiffOption // diff options
 	}
 
 	// PlannerOption allows managing a Planner using functional arguments.
@@ -218,7 +239,6 @@ type (
 		dir         Dir                // The Dir with migration files to use.
 		rrw         RevisionReadWriter // The RevisionReadWriter to read and write database revisions to.
 		log         Logger             // The Logger to use.
-		fromVer     string             // Calculate pending files from the given version (including it).
 		baselineVer string             // Start the first migration after the given baseline version.
 		allowDirty  bool               // Allow start working on a non-clean database.
 		operator    string             // Revision.OperatorVersion
@@ -255,27 +275,23 @@ func (r RevisionType) Has(f RevisionType) bool {
 
 // String implements fmt.Stringer.
 func (r RevisionType) String() string {
-	switch {
-	case r == RevisionTypeBaseline:
+	switch r {
+	case RevisionTypeBaseline:
 		return "baseline"
-	case r == RevisionTypeExecute:
+	case RevisionTypeExecute:
 		return "applied"
-	case r == RevisionTypeResolved:
+	case RevisionTypeResolved:
 		return "manually set"
-	case r == RevisionTypeExecute|RevisionTypeResolved:
+	case RevisionTypeExecute | RevisionTypeResolved:
 		return "applied + manually set"
 	default:
-		return "unknown"
+		return fmt.Sprintf("unknown (%04b)", r)
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
 func (r RevisionType) MarshalText() ([]byte, error) {
-	s := r.String()
-	if s == "unknown" {
-		return nil, fmt.Errorf("unexpected revision type '%v'", r)
-	}
-	return []byte(s), nil
+	return []byte(r.String()), nil
 }
 
 // NewPlanner creates a new Planner.
@@ -297,7 +313,7 @@ func NewPlanner(drv Driver, dir Dir, opts ...PlannerOption) *Planner {
 // schema and returns an error otherwise.
 func PlanWithSchemaQualifier(q string) PlannerOption {
 	return func(p *Planner) {
-		p.opts = append(p.opts, func(o *PlanOptions) {
+		p.planOpts = append(p.planOpts, func(o *PlanOptions) {
 			o.SchemaQualifier = &q
 		})
 	}
@@ -307,9 +323,25 @@ func PlanWithSchemaQualifier(q string) PlannerOption {
 // An empty string indicates no indentation.
 func PlanWithIndent(indent string) PlannerOption {
 	return func(p *Planner) {
-		p.opts = append(p.opts, func(o *PlanOptions) {
+		p.planOpts = append(p.planOpts, func(o *PlanOptions) {
 			o.Indent = indent
 		})
+	}
+}
+
+// PlanWithMode allows setting a custom plan mode.
+func PlanWithMode(m PlanMode) PlannerOption {
+	return func(p *Planner) {
+		p.planOpts = append(p.planOpts, func(o *PlanOptions) {
+			o.Mode = m
+		})
+	}
+}
+
+// PlanWithDiffOptions allows setting custom diff options.
+func PlanWithDiffOptions(opts ...schema.DiffOption) PlannerOption {
+	return func(p *Planner) {
+		p.diffOpts = append(p.diffOpts, opts...)
 	}
 }
 
@@ -350,18 +382,7 @@ func (p *Planner) PlanSchema(ctx context.Context, name string, to StateReader) (
 }
 
 func (p *Planner) plan(ctx context.Context, name string, to StateReader, realmScope bool) (*Plan, error) {
-	from, err := NewExecutor(p.drv, p.dir, NopRevisionReadWriter{})
-	if err != nil {
-		return nil, err
-	}
-	current, err := from.Replay(ctx, func() StateReader {
-		if realmScope {
-			return RealmConn(p.drv, nil)
-		}
-		// In case the scope is the schema connection,
-		// inspect it and return its connected realm.
-		return SchemaConn(p.drv, "", nil)
-	}())
+	current, err := p.current(ctx, realmScope)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +393,7 @@ func (p *Planner) plan(ctx context.Context, name string, to StateReader, realmSc
 	var changes []schema.Change
 	switch {
 	case realmScope:
-		changes, err = p.drv.RealmDiff(current, desired)
+		changes, err = p.drv.RealmDiff(current, desired, p.diffOpts...)
 	default:
 		switch n, m := len(current.Schemas), len(desired.Schemas); {
 		case n == 0:
@@ -390,7 +411,7 @@ func (p *Planner) plan(ctx context.Context, name string, to StateReader, realmSc
 			if s1.Name != s2.Name {
 				s1.Name = s2.Name
 			}
-			changes, err = p.drv.SchemaDiff(&s1, &s2)
+			changes, err = p.drv.SchemaDiff(&s1, &s2, p.diffOpts...)
 		}
 	}
 	if err != nil {
@@ -399,7 +420,66 @@ func (p *Planner) plan(ctx context.Context, name string, to StateReader, realmSc
 	if len(changes) == 0 {
 		return nil, ErrNoPlan
 	}
-	return p.drv.PlanChanges(ctx, name, changes, p.opts...)
+	return p.drv.PlanChanges(ctx, name, changes, p.planOpts...)
+}
+
+// Checkpoint calculate the current state of the migration directory by executing its files,
+// and return a migration (checkpoint) Plan that represents its states.
+func (p *Planner) Checkpoint(ctx context.Context, name string) (*Plan, error) {
+	return p.checkpoint(ctx, name, true)
+}
+
+// CheckpointSchema is like Checkpoint but limits its scope to the schema connection.
+// Note, the operation fails in case the connection was not set to a schema.
+func (p *Planner) CheckpointSchema(ctx context.Context, name string) (*Plan, error) {
+	return p.checkpoint(ctx, name, false)
+}
+
+func (p *Planner) checkpoint(ctx context.Context, name string, realmScope bool) (*Plan, error) {
+	current, err := p.current(ctx, realmScope)
+	if err != nil {
+		return nil, err
+	}
+	var changes []schema.Change
+	switch {
+	case realmScope:
+		changes, err = p.drv.RealmDiff(schema.NewRealm(), current, p.diffOpts...)
+	default:
+		switch n := len(current.Schemas); {
+		case n == 0:
+			return nil, errors.New("no schema was found in current state after replaying migration directory")
+		case n > 1:
+			return nil, fmt.Errorf("%d schemas were found in current state after replaying migration directory", len(current.Schemas))
+		default:
+			s1 := current.Schemas[0]
+			s2 := schema.New(s1.Name).AddAttrs(s1.Attrs...)
+			changes, err = p.drv.SchemaDiff(s2, s1, p.diffOpts...)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	// No changes mean an empty checkpoint.
+	if len(changes) == 0 {
+		return &Plan{Name: name}, nil
+	}
+	return p.drv.PlanChanges(ctx, name, changes, p.planOpts...)
+}
+
+// current returns the current realm state.
+func (p *Planner) current(ctx context.Context, realmScope bool) (*schema.Realm, error) {
+	from, err := NewExecutor(p.drv, p.dir, NopRevisionReadWriter{})
+	if err != nil {
+		return nil, err
+	}
+	return from.Replay(ctx, func() StateReader {
+		if realmScope {
+			return RealmConn(p.drv, nil)
+		}
+		// In case the scope is the schema connection,
+		// inspect it and return its connected realm.
+		return SchemaConn(p.drv, "", nil)
+	}())
 }
 
 // WritePlan writes the given Plan to the Dir based on the configured Formatter.
@@ -415,20 +495,44 @@ func (p *Planner) WritePlan(plan *Plan) error {
 			return err
 		}
 	}
-	// If enabled, update the sum file.
-	if p.sum {
-		sum, err := p.dir.Checksum()
-		if err != nil {
-			return err
-		}
-		return WriteSumFile(p.dir, sum)
+	return p.writeSum()
+}
+
+// WriteCheckpoint writes the given Plan as a checkpoint file to the Dir based on the configured Formatter.
+func (p *Planner) WriteCheckpoint(plan *Plan, tag string) error {
+	ck, ok := p.dir.(CheckpointDir)
+	if !ok {
+		return fmt.Errorf("checkpoint is not supported by %T", p.dir)
 	}
-	return nil
+	// Format the plan into files.
+	files, err := p.fmt.Format(plan)
+	if err != nil {
+		return err
+	}
+	if len(files) != 1 {
+		return fmt.Errorf("expected one checkpoint file, got %d", len(files))
+	}
+	if err := ck.WriteCheckpoint(files[0].Name(), tag, files[0].Bytes()); err != nil {
+		return err
+	}
+	return p.writeSum()
+}
+
+// writeSum writes the sum file to the Dir, if enabled.
+func (p *Planner) writeSum() error {
+	if !p.sum {
+		return nil
+	}
+	sum, err := p.dir.Checksum()
+	if err != nil {
+		return err
+	}
+	return WriteSumFile(p.dir, sum)
 }
 
 var (
 	// ErrNoPendingFiles is returned if there are no pending migration files to execute on the managed database.
-	ErrNoPendingFiles = errors.New("sql/migrate: execute: nothing to do")
+	ErrNoPendingFiles = errors.New("sql/migrate: no pending migration files")
 	// ErrSnapshotUnsupported is returned if there is no Snapshoter given.
 	ErrSnapshotUnsupported = errors.New("sql/migrate: driver does not support taking a database snapshot")
 	// ErrCleanCheckerUnsupported is returned if there is no CleanChecker given.
@@ -507,15 +611,6 @@ func WithLogger(log Logger) ExecutorOption {
 	}
 }
 
-// WithFromVersion allows passing a file version as a starting point for calculating
-// pending migration scripts. It can be useful for skipping specific files.
-func WithFromVersion(v string) ExecutorOption {
-	return func(ex *Executor) error {
-		ex.fromVer = v
-		return nil
-	}
-}
-
 // WithOperatorVersion sets the operator version to save on the revisions
 // when executing migration files.
 func WithOperatorVersion(v string) ExecutorOption {
@@ -536,14 +631,11 @@ func (e *Executor) Pending(ctx context.Context) ([]File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("sql/migrate: execute: read revisions: %w", err)
 	}
-	// Select the correct migration files.
 	migrations, err := e.dir.Files()
 	if err != nil {
 		return nil, fmt.Errorf("sql/migrate: execute: select migration files: %w", err)
 	}
-	if len(migrations) == 0 {
-		return nil, ErrNoPendingFiles
-	}
+	migrations = SkipCheckpointFiles(migrations)
 	var pending []File
 	switch {
 	// If it is the first time we run.
@@ -556,7 +648,6 @@ func (e *Executor) Pending(ctx context.Context) ([]File, error) {
 		if cerr != nil && !e.allowDirty && e.baselineVer == "" {
 			return nil, fmt.Errorf("%w. baseline version or allow-dirty is required", cerr)
 		}
-		pending = migrations
 		if e.baselineVer != "" {
 			baseline := FilesLastIndex(migrations, func(f File) bool {
 				return f.Version() == e.baselineVer
@@ -565,22 +656,20 @@ func (e *Executor) Pending(ctx context.Context) ([]File, error) {
 				return nil, fmt.Errorf("baseline version %q not found", e.baselineVer)
 			}
 			f := migrations[baseline]
-			// Mark the revision in the database as baseline revision.
+			// Write the first revision in the database as a baseline revision.
 			if err := e.writeRevision(ctx, &Revision{Version: f.Version(), Description: f.Desc(), Type: RevisionTypeBaseline}); err != nil {
 				return nil, err
 			}
 			pending = migrations[baseline+1:]
+
+			// In case the "allow-dirty" option was set, or the database is clean,
+			// the starting-point is the first migration file or the last checkpoint.
+		} else if pending, err = FilesFromLastCheckpoint(e.dir); err != nil {
+			return nil, err
 		}
-	// Not the first time we execute and a custom starting point was provided.
-	case e.fromVer != "":
-		idx := FilesLastIndex(migrations, func(f File) bool {
-			return f.Version() == e.fromVer
-		})
-		if idx == -1 {
-			return nil, fmt.Errorf("starting point version %q not found in the migration directory", e.fromVer)
-		}
-		pending = migrations[idx:]
-	default:
+	// In case we applied/marked revisions in
+	// the past, and there is work to do.
+	case len(migrations) > 0:
 		var (
 			last      = revs[len(revs)-1]
 			partially = last.Applied != last.Total

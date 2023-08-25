@@ -18,6 +18,7 @@ go_library(
         "//vendor/github.com/google/s2a-go/internal/proto/v2/s2a_go_proto",
         "//vendor/github.com/google/s2a-go/internal/tokenmanager",
         "//vendor/github.com/google/s2a-go/internal/v2:internal",
+        "//vendor/github.com/google/s2a-go/retry",
         "//vendor/github.com/google/s2a-go/stream",
         "@com_github_golang_protobuf//proto:go_default_library",
         "@org_golang_google_grpc//credentials",

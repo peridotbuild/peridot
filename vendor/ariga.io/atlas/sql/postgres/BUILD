@@ -7,6 +7,7 @@ go_library(
         "crdb.go",
         "diff.go",
         "driver.go",
+        "driver_oss.go",
         "inspect.go",
         "migrate.go",
         "sqlspec.go",

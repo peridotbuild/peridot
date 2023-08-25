@@ -91,13 +91,13 @@ func (p PasswordAuthenticator) Success(data []byte) error {
 // to true if no Config is set. Most users should set SslOptions.Config to a *tls.Config.
 // SslOptions and Config.InsecureSkipVerify interact as follows:
 //
-//  Config.InsecureSkipVerify | EnableHostVerification | Result
-//  Config is nil             | false                  | do not verify host
-//  Config is nil             | true                   | verify host
-//  false                     | false                  | verify host
-//  true                      | false                  | do not verify host
-//  false                     | true                   | verify host
-//  true                      | true                   | verify host
+//	Config.InsecureSkipVerify | EnableHostVerification | Result
+//	Config is nil             | false                  | do not verify host
+//	Config is nil             | true                   | verify host
+//	false                     | false                  | verify host
+//	true                      | false                  | do not verify host
+//	false                     | true                   | verify host
+//	true                      | true                   | verify host
 type SslOptions struct {
 	*tls.Config
 
@@ -190,6 +190,7 @@ type Conn struct {
 	version         uint8
 	currentKeyspace string
 	host            *HostInfo
+	isSchemaV2      bool
 
 	session *Session
 
@@ -255,6 +256,7 @@ func (s *Session) dialWithoutObserver(ctx context.Context, host *HostInfo, cfg *
 		session:       s,
 		streams:       streams.New(cfg.ProtoVersion),
 		host:          host,
+		isSchemaV2:    true, // Try using "system.peers_v2" until proven otherwise
 		frameObserver: s.frameObserver,
 		w: &deadlineContextWriter{
 			w:         dialedHost.Conn,
@@ -420,7 +422,9 @@ func (s *startupCoordinator) options(ctx context.Context) error {
 
 func (s *startupCoordinator) startup(ctx context.Context, supported map[string][]string) error {
 	m := map[string]string{
-		"CQL_VERSION": s.conn.cfg.CQLVersion,
+		"CQL_VERSION":    s.conn.cfg.CQLVersion,
+		"DRIVER_NAME":    driverName,
+		"DRIVER_VERSION": driverVersion,
 	}
 
 	if s.conn.compressor != nil {
@@ -1618,21 +1622,51 @@ func (c *Conn) query(ctx context.Context, statement string, values ...interface{
 	return c.executeQuery(ctx, q)
 }
 
-func (c *Conn) awaitSchemaAgreement(ctx context.Context) (err error) {
+func (c *Conn) querySystemPeers(ctx context.Context, version cassVersion) *Iter {
 	const (
-		peerSchemasTemplate = "SELECT * FROM %s"
-		localSchemas = "SELECT schema_version FROM system.local WHERE key='local'"
+		peerSchema    = "SELECT * FROM system.peers"
+		peerV2Schemas = "SELECT * FROM system.peers_v2"
 	)
+
+	c.mu.Lock()
+	isSchemaV2 := c.isSchemaV2
+	c.mu.Unlock()
+
+	if version.AtLeast(4, 0, 0) && isSchemaV2 {
+		// Try "system.peers_v2" and fallback to "system.peers" if it's not found
+		iter := c.query(ctx, peerV2Schemas)
+
+		err := iter.checkErrAndNotFound()
+		if err != nil {
+			if errFrame, ok := err.(errorFrame); ok && errFrame.code == ErrCodeInvalid { // system.peers_v2 not found, try system.peers
+				c.mu.Lock()
+				c.isSchemaV2 = false
+				c.mu.Unlock()
+				return c.query(ctx, peerSchema)
+			} else {
+				return iter
+			}
+		}
+		return iter
+	} else {
+		return c.query(ctx, peerSchema)
+	}
+}
+
+func (c *Conn) querySystemLocal(ctx context.Context) *Iter {
+	return c.query(ctx, "SELECT * FROM system.local WHERE key='local'")
+}
+
+func (c *Conn) awaitSchemaAgreement(ctx context.Context) (err error) {
+	const localSchemas = "SELECT schema_version FROM system.local WHERE key='local'"
 
 	var versions map[string]struct{}
 	var schemaVersion string
 
 	endDeadline := time.Now().Add(c.session.cfg.MaxWaitSchemaAgreement)
 
-	queryString := fmt.Sprintf(peerSchemasTemplate, peersTableName(c.host.version))
-
 	for time.Now().Before(endDeadline) {
-		iter := c.query(ctx, queryString)
+		iter := c.querySystemPeers(ctx, c.host.version)
 
 		versions = make(map[string]struct{})
 
@@ -1691,23 +1725,6 @@ func (c *Conn) awaitSchemaAgreement(ctx context.Context) (err error) {
 
 	// not exported
 	return fmt.Errorf("gocql: cluster schema versions not consistent: %+v", schemas)
-}
-
-func (c *Conn) localHostInfo(ctx context.Context) (*HostInfo, error) {
-	row, err := c.query(ctx, "SELECT * FROM system.local WHERE key='local'").rowMap()
-	if err != nil {
-		return nil, err
-	}
-
-	port := c.conn.RemoteAddr().(*net.TCPAddr).Port
-
-	// TODO(zariel): avoid doing this here
-	host, err := c.session.hostInfoFromMap(row, &HostInfo{connectAddress: c.host.connectAddress, port: port})
-	if err != nil {
-		return nil, err
-	}
-
-	return c.session.ring.addOrUpdate(host), nil
 }
 
 var (

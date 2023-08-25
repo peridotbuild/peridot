@@ -7,6 +7,7 @@ go_library(
         "constants.go",
         "daemon.go",
         "defaultRetrySettings.go",
+        "pingable.go",
         "protoTaskTokenSerializer.go",
         "rpc.go",
         "taskTokenSerializerInterfaces.go",
@@ -18,6 +19,7 @@ go_library(
     deps = [
         "//vendor/github.com/dgryski/go-farm",
         "//vendor/github.com/gogo/protobuf/proto",
+        "//vendor/go.temporal.io/api/command/v1:command",
         "//vendor/go.temporal.io/api/common/v1:common",
         "//vendor/go.temporal.io/api/enums/v1:enums",
         "//vendor/go.temporal.io/api/history/v1:history",
@@ -28,6 +30,7 @@ go_library(
         "//vendor/go.temporal.io/server/api/token/v1:token",
         "//vendor/go.temporal.io/server/api/workflow/v1:workflow",
         "//vendor/go.temporal.io/server/common/backoff",
+        "//vendor/go.temporal.io/server/common/debug",
         "//vendor/go.temporal.io/server/common/dynamicconfig",
         "//vendor/go.temporal.io/server/common/log",
         "//vendor/go.temporal.io/server/common/log/tag",

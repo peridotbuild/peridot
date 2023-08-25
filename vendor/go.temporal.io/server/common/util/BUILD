@@ -6,5 +6,8 @@ go_library(
     importmap = "go.resf.org/peridot/vendor/go.temporal.io/server/common/util",
     importpath = "go.temporal.io/server/common/util",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/golang.org/x/exp/constraints"],
+    deps = [
+        "//vendor/golang.org/x/exp/constraints",
+        "//vendor/golang.org/x/exp/maps",
+    ],
 )

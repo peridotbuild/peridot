@@ -34,6 +34,5 @@ go_library(
         "//vendor/go.temporal.io/server/common/persistence/visibility/store/query",
         "//vendor/go.temporal.io/server/common/primitives/timestamp",
         "//vendor/go.temporal.io/server/common/searchattribute",
-        "//vendor/go.temporal.io/server/common/util",
     ],
 )

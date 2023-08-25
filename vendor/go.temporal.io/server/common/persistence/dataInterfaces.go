@@ -107,9 +107,16 @@ const (
 
 const numItemsInGarbageInfo = 3
 
+const ScheduledTaskMinPrecision = time.Millisecond
+
 type (
 	// InvalidPersistenceRequestError represents invalid request to persistence
 	InvalidPersistenceRequestError struct {
+		Msg string
+	}
+
+	// AppendHistoryTimeoutError represents a failed insert to history tree / node request
+	AppendHistoryTimeoutError struct {
 		Msg string
 	}
 
@@ -766,6 +773,13 @@ type (
 		TreeID string
 		// optional: can specify BranchID or allow random UUID to be generated
 		BranchID *string
+		// optional: can specify Ancestors to leave as empty
+		Ancestors []*persistencespb.HistoryBranchRange
+
+		// optional: supply optionally configured workflow settings as hints
+		RunTimeout        *time.Duration
+		ExecutionTimeout  *time.Duration
+		RetentionDuration *time.Duration
 	}
 
 	NewHistoryBranchResponse struct {
@@ -925,16 +939,15 @@ type (
 
 	// HistoryBranchDetail contains detailed information of a branch
 	HistoryBranchDetail struct {
-		TreeID   string
-		BranchID string
-		ForkTime *time.Time
-		Info     string
+		BranchToken []byte
+		ForkTime    *time.Time
+		Info        string
 	}
 
 	// GetHistoryTreeResponse is a response to GetHistoryTreeRequest
 	GetHistoryTreeResponse struct {
 		// all branches of a tree
-		Branches []*persistencespb.HistoryBranch
+		BranchTokens [][]byte
 	}
 
 	// GetAllHistoryTreeBranchesRequest is a request of GetAllHistoryTreeBranches
@@ -1170,6 +1183,10 @@ func (e *InvalidPersistenceRequestError) Error() string {
 	return e.Msg
 }
 
+func (e *AppendHistoryTimeoutError) Error() string {
+	return e.Msg
+}
+
 func (e *CurrentWorkflowConditionFailedError) Error() string {
 	return e.Msg
 }
@@ -1247,11 +1264,11 @@ func UpdateHistoryBranchToken(branchToken []byte, branchInfo *persistencespb.His
 }
 
 // NewHistoryBranchToken return a new branch token
-func NewHistoryBranchToken(treeID, branchID string) ([]byte, error) {
+func NewHistoryBranchToken(treeID, branchID string, ancestors []*persistencespb.HistoryBranchRange) ([]byte, error) {
 	bi := &persistencespb.HistoryBranch{
 		TreeId:    treeID,
 		BranchId:  branchID,
-		Ancestors: []*persistencespb.HistoryBranchRange{},
+		Ancestors: ancestors,
 	}
 	datablob, err := serialization.HistoryBranchToBlob(bi)
 	if err != nil {

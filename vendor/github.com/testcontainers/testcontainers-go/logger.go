@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/docker/docker/client"
-	"github.com/testcontainers/testcontainers-go/internal/testcontainersdocker"
 )
 
 // Logger is the default log instance
@@ -25,8 +24,6 @@ func LogDockerServerInfo(ctx context.Context, client client.APIClient, logger Lo
   API Version: %v
   Operating System: %v
   Total Memory: %v MB
-  Resolved Docker Host: %s
-  Resolved Docker Socket Path: %s
 `
 
 	info, err := client.Info(ctx)
@@ -37,10 +34,7 @@ func LogDockerServerInfo(ctx context.Context, client client.APIClient, logger Lo
 
 	logger.Printf(infoMessage, packagePath,
 		info.ServerVersion, client.ClientVersion(),
-		info.OperatingSystem, info.MemTotal/1024/1024,
-		testcontainersdocker.ExtractDockerHost(ctx),
-		testcontainersdocker.ExtractDockerSocket(ctx),
-	)
+		info.OperatingSystem, info.MemTotal/1024/1024)
 }
 
 // TestLogger returns a Logging implementation for testing.TB

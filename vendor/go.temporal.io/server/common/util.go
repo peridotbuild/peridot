@@ -35,6 +35,7 @@ import (
 
 	"github.com/dgryski/go-farm"
 	"github.com/gogo/protobuf/proto"
+	commandpb "go.temporal.io/api/command/v1"
 	commonpb "go.temporal.io/api/common/v1"
 	enumspb "go.temporal.io/api/enums/v1"
 	historypb "go.temporal.io/api/history/v1"
@@ -96,6 +97,13 @@ const (
 	taskNotReadyRescheduleInitialInterval    = 3 * time.Second
 	taskNotReadyRescheduleBackoffCoefficient = 1.5
 	taskNotReadyRescheduleMaxInterval        = 3 * time.Minute
+
+	// dependencyTaskNotCompletedRescheduleInitialInterval is lower than the interval the ack level most queues are
+	// updated at, which can lead to tasks being retried more frequently than they should be. If this becomes an issue,
+	// we should consider increasing this interval.
+	dependencyTaskNotCompletedRescheduleInitialInterval    = 3 * time.Second
+	dependencyTaskNotCompletedRescheduleBackoffCoefficient = 1.5
+	dependencyTaskNotCompletedRescheduleMaxInterval        = 3 * time.Minute
 
 	taskResourceExhaustedRescheduleInitialInterval    = 3 * time.Second
 	taskResourceExhaustedRescheduleBackoffCoefficient = 1.5
@@ -234,6 +242,15 @@ func CreateTaskReschedulePolicy() backoff.RetryPolicy {
 		WithExpirationInterval(backoff.NoInterval)
 }
 
+// CreateDependencyTaskNotCompletedReschedulePolicy creates a retry policy for rescheduling task with
+// ErrDependencyTaskNotCompleted
+func CreateDependencyTaskNotCompletedReschedulePolicy() backoff.RetryPolicy {
+	return backoff.NewExponentialRetryPolicy(dependencyTaskNotCompletedRescheduleInitialInterval).
+		WithBackoffCoefficient(dependencyTaskNotCompletedRescheduleBackoffCoefficient).
+		WithMaximumInterval(dependencyTaskNotCompletedRescheduleMaxInterval).
+		WithExpirationInterval(backoff.NoInterval)
+}
+
 // CreateTaskNotReadyReschedulePolicy creates a retry policy for rescheduling task with ErrTaskRetry
 func CreateTaskNotReadyReschedulePolicy() backoff.RetryPolicy {
 	return backoff.NewExponentialRetryPolicy(taskNotReadyRescheduleInitialInterval).
@@ -345,6 +362,12 @@ func IsResourceExhausted(err error) bool {
 	return false
 }
 
+// IsInternalError checks if the error is an internal error.
+func IsInternalError(err error) bool {
+	var internalErr *serviceerror.Internal
+	return errors.As(err, &internalErr)
+}
+
 // WorkflowIDToHistoryShard is used to map namespaceID-workflowID pair to a shardID.
 func WorkflowIDToHistoryShard(
 	namespaceID string,
@@ -356,11 +379,33 @@ func WorkflowIDToHistoryShard(
 	return int32(hash%uint32(numberOfShards)) + 1 // ShardID starts with 1
 }
 
-// PrettyPrintHistory prints history in human readable format
-func PrettyPrintHistory(history *historypb.History, logger log.Logger) {
-	fmt.Println("************** History *******************")
-	fmt.Println(proto.MarshalTextString(history))
-	fmt.Println("******************************************")
+// PrettyPrintHistory prints history in human-readable format
+func PrettyPrintHistory(history *historypb.History, header ...string) {
+	var sb strings.Builder
+	sb.WriteString("==========================================================================\n")
+	for _, h := range header {
+		sb.WriteString(h)
+		sb.WriteString("\n")
+	}
+	sb.WriteString("--------------------------------------------------------------------------\n")
+	_ = proto.MarshalText(&sb, history)
+	sb.WriteString("\n")
+	fmt.Print(sb.String())
+}
+
+// PrettyPrintCommands prints commands in human-readable format
+func PrettyPrintCommands(commands []*commandpb.Command, header ...string) {
+	var sb strings.Builder
+	sb.WriteString("==========================================================================\n")
+	for _, h := range header {
+		sb.WriteString(h)
+		sb.WriteString("\n")
+	}
+	sb.WriteString("--------------------------------------------------------------------------\n")
+	for _, command := range commands {
+		_ = proto.MarshalText(&sb, command)
+	}
+	fmt.Print(sb.String())
 }
 
 // IsValidContext checks that the thrift context is not expired on cancelled.
@@ -559,13 +604,12 @@ func CheckEventBlobSizeLimit(
 	namespace string,
 	workflowID string,
 	runID string,
-	scope metrics.Scope,
+	metricsHandler metrics.MetricsHandler,
 	logger log.Logger,
 	blobSizeViolationOperationTag tag.ZapTag,
 ) error {
 
-	scope.RecordDistribution(metrics.EventBlobSize, actualSize)
-
+	metricsHandler.Histogram(metrics.EventBlobSize.GetMetricName(), metrics.EventBlobSize.GetMetricUnit()).Record(int64(actualSize))
 	if actualSize > warnLimit {
 		if logger != nil {
 			logger.Warn("Blob data size exceeds the warning limit.",

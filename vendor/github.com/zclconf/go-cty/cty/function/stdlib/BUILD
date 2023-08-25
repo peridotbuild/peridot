@@ -9,6 +9,7 @@ go_library(
         "conversion.go",
         "csv.go",
         "datetime.go",
+        "datetime_rfc3339.go",
         "doc.go",
         "format.go",
         "format_fsm.go",

@@ -208,7 +208,7 @@ func (r *dlqHandlerImpl) MergeMessages(
 	}
 
 	for _, task := range replicationTasks {
-		if _, err := taskExecutor.Execute(
+		if err := taskExecutor.Execute(
 			ctx,
 			task,
 			true,
@@ -297,6 +297,18 @@ func (r *dlqHandlerImpl) readMessagesWithAckLevel(
 				Version:          task.Version,
 				FirstEventId:     task.FirstEventID,
 				NextEventId:      task.NextEventID,
+				ScheduledEventId: 0,
+			})
+		case *tasks.SyncWorkflowStateTask:
+			taskInfo = append(taskInfo, &replicationspb.ReplicationTaskInfo{
+				NamespaceId:      task.NamespaceID,
+				WorkflowId:       task.WorkflowID,
+				RunId:            task.RunID,
+				TaskType:         enumsspb.TASK_TYPE_REPLICATION_SYNC_WORKFLOW_STATE,
+				TaskId:           task.TaskID,
+				Version:          task.Version,
+				FirstEventId:     0,
+				NextEventId:      0,
 				ScheduledEventId: 0,
 			})
 		default:

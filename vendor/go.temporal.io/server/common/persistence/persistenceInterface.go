@@ -155,7 +155,9 @@ type (
 		DeleteHistoryBranch(ctx context.Context, request *InternalDeleteHistoryBranchRequest) error
 		// GetHistoryTree returns all branch information of a tree
 		GetHistoryTree(ctx context.Context, request *GetHistoryTreeRequest) (*InternalGetHistoryTreeResponse, error)
-		// GetAllHistoryTreeBranches returns all branches of all trees
+		// GetAllHistoryTreeBranches returns all branches of all trees.
+		// Note that branches may be skipped or duplicated across pages if there are branches created or deleted while
+		// paginating through results.
 		GetAllHistoryTreeBranches(ctx context.Context, request *GetAllHistoryTreeBranchesRequest) (*InternalGetAllHistoryTreeBranchesResponse, error)
 	}
 
@@ -486,11 +488,11 @@ type (
 	}
 
 	InternalGetHistoryTaskResponse struct {
-		Task commonpb.DataBlob
+		InternalHistoryTask
 	}
 
 	InternalGetHistoryTasksResponse struct {
-		Tasks         []commonpb.DataBlob
+		Tasks         []InternalHistoryTask
 		NextPageToken []byte
 	}
 

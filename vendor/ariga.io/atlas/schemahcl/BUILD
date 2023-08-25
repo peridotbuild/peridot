@@ -5,8 +5,7 @@ go_library(
     srcs = [
         "context.go",
         "extension.go",
-        "hcl.go",
-        "opts.go",
+        "schemahcl.go",
         "spec.go",
         "stdlib.go",
         "types.go",
@@ -28,5 +27,6 @@ go_library(
         "//vendor/github.com/zclconf/go-cty/cty/function",
         "//vendor/github.com/zclconf/go-cty/cty/function/stdlib",
         "//vendor/github.com/zclconf/go-cty/cty/gocty",
+        "//vendor/github.com/zclconf/go-cty/cty/json",
     ],
 )

@@ -59,7 +59,7 @@ var ErrControllerStarted = fmt.Errorf("controller already started")
 type Controller struct {
 	// lock synchronizes Start() and Stop().
 	lock                sync.Mutex
-	libraries           sync.Map
+	scopes              sync.Map
 	checkpointerFactory export.CheckpointerFactory
 
 	resource *resource.Resource
@@ -81,23 +81,25 @@ type Controller struct {
 var _ export.InstrumentationLibraryReader = &Controller{}
 var _ metric.MeterProvider = &Controller{}
 
+// Meter returns a new Meter defined by instrumentationName and configured
+// with opts.
 func (c *Controller) Meter(instrumentationName string, opts ...metric.MeterOption) metric.Meter {
 	cfg := metric.NewMeterConfig(opts...)
-	library := instrumentation.Library{
+	scope := instrumentation.Scope{
 		Name:      instrumentationName,
 		Version:   cfg.InstrumentationVersion(),
 		SchemaURL: cfg.SchemaURL(),
 	}
 
-	m, ok := c.libraries.Load(library)
+	m, ok := c.scopes.Load(scope)
 	if !ok {
 		checkpointer := c.checkpointerFactory.NewCheckpointer()
-		m, _ = c.libraries.LoadOrStore(
-			library,
+		m, _ = c.scopes.LoadOrStore(
+			scope,
 			registry.NewUniqueInstrumentMeterImpl(&accumulatorCheckpointer{
 				Accumulator:  sdk.NewAccumulator(checkpointer),
 				checkpointer: checkpointer,
-				library:      library,
+				scope:        scope,
 			}))
 	}
 	return sdkapi.WrapMeterImpl(m.(*registry.UniqueInstrumentMeterImpl))
@@ -106,7 +108,7 @@ func (c *Controller) Meter(instrumentationName string, opts ...metric.MeterOptio
 type accumulatorCheckpointer struct {
 	*sdk.Accumulator
 	checkpointer export.Checkpointer
-	library      instrumentation.Library
+	scope        instrumentation.Scope
 }
 
 var _ sdkapi.MeterImpl = &accumulatorCheckpointer{}
@@ -246,7 +248,7 @@ func (c *Controller) collect(ctx context.Context) error {
 // registered to this controller.  This briefly locks the controller.
 func (c *Controller) accumulatorList() []*accumulatorCheckpointer {
 	var r []*accumulatorCheckpointer
-	c.libraries.Range(func(key, value interface{}) bool {
+	c.scopes.Range(func(key, value interface{}) bool {
 		acc, ok := value.(*registry.UniqueInstrumentMeterImpl).MeterImpl().(*accumulatorCheckpointer)
 		if ok {
 			r = append(r, acc)
@@ -270,7 +272,7 @@ func (c *Controller) checkpoint(ctx context.Context) error {
 }
 
 // checkpointSingleAccumulator checkpoints a single instrumentation
-// library's accumulator, which involves calling
+// scope's accumulator, which involves calling
 // checkpointer.StartCollection, accumulator.Collect, and
 // checkpointer.FinishCollection in sequence.
 func (c *Controller) checkpointSingleAccumulator(ctx context.Context, ac *accumulatorCheckpointer) error {
@@ -310,7 +312,7 @@ func (c *Controller) checkpointSingleAccumulator(ctx context.Context, ac *accumu
 
 // export calls the exporter with a read lock on the Reader,
 // applying the configured export timeout.
-func (c *Controller) export(ctx context.Context) error {
+func (c *Controller) export(ctx context.Context) error { // nolint:revive  // method name shadows import.
 	if c.pushTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, c.pushTimeout)
@@ -328,7 +330,7 @@ func (c *Controller) ForEach(readerFunc func(l instrumentation.Library, r export
 		if err := func() error {
 			reader.RLock()
 			defer reader.RUnlock()
-			return readerFunc(acPair.library, reader)
+			return readerFunc(acPair.scope, reader)
 		}(); err != nil {
 			return err
 		}

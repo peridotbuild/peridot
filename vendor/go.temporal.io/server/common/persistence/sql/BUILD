@@ -44,5 +44,6 @@ go_library(
         "//vendor/go.temporal.io/server/common/primitives",
         "//vendor/go.temporal.io/server/common/resolver",
         "//vendor/go.temporal.io/server/service/history/tasks",
+        "//vendor/go.temporal.io/server/tests/testhelper",
     ],
 )

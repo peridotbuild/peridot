@@ -20,33 +20,48 @@ func VarAttr(k, v string) *schemahcl.Attr {
 	return schemahcl.RefAttr(k, &schemahcl.Ref{V: v})
 }
 
-type doc struct {
-	Tables  []*sqlspec.Table  `spec:"table"`
-	Schemas []*sqlspec.Schema `spec:"schema"`
-}
+type (
+	// SchemaSpec is returned by driver convert functions to
+	// marshal a *schema.Schema into top-level spec objects.
+	SchemaSpec struct {
+		Schema *sqlspec.Schema
+		Tables []*sqlspec.Table
+		Views  []*sqlspec.View
+	}
+	doc struct {
+		Tables  []*sqlspec.Table  `spec:"table"`
+		Views   []*sqlspec.View   `spec:"view"`
+		Schemas []*sqlspec.Schema `spec:"schema"`
+	}
+)
 
 // Marshal marshals v into an Atlas DDL document using a schemahcl.Marshaler. Marshal uses the given
-// schemaSpec function to convert a *schema.Schema into *sqlspec.Schema and []*sqlspec.Table.
-func Marshal(v any, marshaler schemahcl.Marshaler, schemaSpec func(schem *schema.Schema) (*sqlspec.Schema, []*sqlspec.Table, error)) ([]byte, error) {
+// schemaSpec function to convert a *schema.Schema into *sqlspec.Schema, []*sqlspec.Table and []*sqlspec.View.
+func Marshal(v any, marshaler schemahcl.Marshaler, convertFunc func(*schema.Schema) (*SchemaSpec, error)) ([]byte, error) {
 	d := &doc{}
 	switch s := v.(type) {
 	case *schema.Schema:
-		spec, tables, err := schemaSpec(s)
+		spec, err := convertFunc(s)
 		if err != nil {
 			return nil, fmt.Errorf("specutil: failed converting schema to spec: %w", err)
 		}
-		d.Tables = tables
-		d.Schemas = []*sqlspec.Schema{spec}
+		d.Tables = spec.Tables
+		d.Views = spec.Views
+		d.Schemas = []*sqlspec.Schema{spec.Schema}
 	case *schema.Realm:
 		for _, s := range s.Schemas {
-			spec, tables, err := schemaSpec(s)
+			spec, err := convertFunc(s)
 			if err != nil {
 				return nil, fmt.Errorf("specutil: failed converting schema to spec: %w", err)
 			}
-			d.Tables = append(d.Tables, tables...)
-			d.Schemas = append(d.Schemas, spec)
+			d.Tables = append(d.Tables, spec.Tables...)
+			d.Views = append(d.Views, spec.Views...)
+			d.Schemas = append(d.Schemas, spec.Schema)
 		}
-		if err := QualifyDuplicates(d.Tables); err != nil {
+		if err := QualifyObjects(d.Tables); err != nil {
+			return nil, err
+		}
+		if err := QualifyObjects(d.Views); err != nil {
 			return nil, err
 		}
 		if err := QualifyReferences(d.Tables, s); err != nil {
@@ -58,24 +73,53 @@ func Marshal(v any, marshaler schemahcl.Marshaler, schemaSpec func(schem *schema
 	return marshaler.MarshalSpec(d)
 }
 
-// QualifyDuplicates sets the Qualified field equal to the schema name in any tables
-// with duplicate names in the provided table specs.
-func QualifyDuplicates(tableSpecs []*sqlspec.Table) error {
-	seen := make(map[string]*sqlspec.Table, len(tableSpecs))
-	for _, tbl := range tableSpecs {
-		if s, ok := seen[tbl.Name]; ok {
-			schemaName, err := SchemaName(s.Schema)
+// SchemaObject describes a top-level schema object
+// that might be qualified, e.g. a table or a view.
+type SchemaObject interface {
+	Label() string
+	QualifierLabel() string
+	SetQualifier(string)
+	SchemaRef() *schemahcl.Ref
+}
+
+// QualifyObjects sets the Qualifier field equal to the schema
+// name in any objects with duplicate names in the provided specs.
+func QualifyObjects[T SchemaObject](specs []T) error {
+	var (
+		seen    = make(map[string]T, len(specs))
+		schemas = make(map[string]bool, len(specs))
+	)
+	// Loop first and qualify schema objects with the same label.
+	// For example, two tables named "users" reside in different
+	// schemas are converted to: ("s1", "users") and ("s2", "users").
+	for _, v := range specs {
+		if s, ok := seen[v.Label()]; ok {
+			schemaName, err := SchemaName(s.SchemaRef())
 			if err != nil {
 				return err
 			}
-			s.Qualifier = schemaName
-			schemaName, err = SchemaName(tbl.Schema)
+			s.SetQualifier(schemaName)
+			schemas[schemaName] = true
+			schemaName, err = SchemaName(v.SchemaRef())
 			if err != nil {
 				return err
 			}
-			tbl.Qualifier = schemaName
+			v.SetQualifier(schemaName)
+			schemas[schemaName] = true
 		}
-		seen[tbl.Name] = tbl
+		seen[v.Label()] = v
+	}
+	// After objects were qualified, they might be conflicted with different
+	// resources that labeled with the schema name. e.g., ("s1", "users") and
+	// ("s1"). To resolve this conflict, we qualify these objects as well.
+	for _, v := range specs {
+		if v.QualifierLabel() == "" && schemas[v.Label()] {
+			schemaName, err := SchemaName(v.SchemaRef())
+			if err != nil {
+				return err
+			}
+			v.SetQualifier(schemaName)
+		}
 	}
 	return nil
 }

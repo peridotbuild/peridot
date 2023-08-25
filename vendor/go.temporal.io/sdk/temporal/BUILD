@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "temporal",
     srcs = [
+        "default_failure_converter.go",
         "doc.go",
         "error.go",
         "retry_policy.go",
@@ -14,6 +15,7 @@ go_library(
     deps = [
         "//vendor/go.temporal.io/api/enums/v1:enums",
         "//vendor/go.temporal.io/api/serviceerror",
+        "//vendor/go.temporal.io/sdk/converter",
         "//vendor/go.temporal.io/sdk/internal",
     ],
 )

@@ -42,6 +42,7 @@ import (
 	commonpb "go.temporal.io/api/common/v1"
 	enumspb "go.temporal.io/api/enums/v1"
 	historypb "go.temporal.io/api/history/v1"
+	interactionpb "go.temporal.io/api/interaction/v1"
 	querypb "go.temporal.io/api/query/v1"
 	"go.temporal.io/api/serviceerror"
 	taskqueuepb "go.temporal.io/api/taskqueue/v1"
@@ -71,6 +72,8 @@ type (
 		// Process a single event and return the assosciated commands.
 		// Return List of commands made, any error.
 		ProcessEvent(event *historypb.HistoryEvent, isReplay bool, isLast bool) error
+		// ProcessInteraction processes interaction inputs
+		ProcessInteraction(meta *interactionpb.Meta, input *interactionpb.Input, isReplay bool, isLast bool) error
 		// ProcessQuery process a query request.
 		ProcessQuery(queryType string, queryArgs *commonpb.Payloads, header *commonpb.Header) (*commonpb.Payloads, error)
 		StackTrace() string
@@ -92,11 +95,6 @@ type (
 	// activityTask wraps a activity task.
 	activityTask struct {
 		task *workflowservice.PollActivityTaskQueueResponse
-	}
-
-	// resetStickinessTask wraps a ResetStickyTaskQueueRequest.
-	resetStickinessTask struct {
-		task *workflowservice.ResetStickyTaskQueueRequest
 	}
 
 	// workflowExecutionContextImpl is the cached workflow state for sticky execution
@@ -131,6 +129,7 @@ type (
 		laTunnel                 *localActivityTunnel
 		workflowPanicPolicy      WorkflowPanicPolicy
 		dataConverter            converter.DataConverter
+		failureConverter         converter.FailureConverter
 		contextPropagators       []ContextPropagator
 		cache                    *WorkerCache
 		deadlockDetectionTimeout time.Duration
@@ -149,6 +148,7 @@ type (
 		registry                         *registry
 		activityProvider                 activityProvider
 		dataConverter                    converter.DataConverter
+		failureConverter                 converter.FailureConverter
 		workerStopCh                     <-chan struct{}
 		contextPropagators               []ContextPropagator
 		namespace                        string
@@ -217,7 +217,6 @@ func (eh *history) IsReplayEvent(event *historypb.HistoryEvent) bool {
 }
 
 func (eh *history) IsNextWorkflowTaskFailed() (isFailed bool, binaryChecksum string, err error) {
-
 	nextIndex := eh.currentIndex + 1
 	if nextIndex >= len(eh.loadedEvents) && eh.hasMoreEvents() { // current page ends and there is more pages
 		if err := eh.loadMoreEvents(); err != nil {
@@ -266,6 +265,7 @@ func isCommandEvent(eventType enumspb.EventType) bool {
 		enumspb.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED,
 		enumspb.EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES,
 		enumspb.EVENT_TYPE_WORKFLOW_UPDATE_ACCEPTED,
+		enumspb.EVENT_TYPE_WORKFLOW_UPDATE_REJECTED,
 		enumspb.EVENT_TYPE_WORKFLOW_UPDATE_COMPLETED,
 		enumspb.EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED:
 		return true
@@ -410,6 +410,7 @@ func newWorkflowTaskHandler(params workerExecutionParameters, ppMgr pressurePoin
 		registry:                 registry,
 		workflowPanicPolicy:      params.WorkflowPanicPolicy,
 		dataConverter:            params.DataConverter,
+		failureConverter:         params.FailureConverter,
 		contextPropagators:       params.ContextPropagators,
 		cache:                    params.cache,
 		deadlockDetectionTimeout: params.DeadlockDetectionTimeout,
@@ -467,25 +468,15 @@ func (w *workflowExecutionContextImpl) completeWorkflow(result *commonpb.Payload
 	w.err = err
 }
 
-func (w *workflowExecutionContextImpl) shouldResetStickyOnEviction() bool {
-	// Not all evictions from the cache warrant a call to the server
-	// to reset stickiness.
-	// Cases when this is redundant or unnecessary include
-	// when an error was encountered during execution
-	// or workflow simply completed successfully.
-	return w.err == nil && !w.isWorkflowCompleted
-}
-
 func (w *workflowExecutionContextImpl) onEviction() {
 	// onEviction is run by LRU cache's removeFunc in separate goroutinue
 	w.mutex.Lock()
 
-	// Queue a ResetStickiness request *BEFORE* calling clearState
-	// because once destroyed, no sensible information
-	// may be ascertained about the execution context's state,
-	// nor should any of its methods be invoked.
-	if w.shouldResetStickyOnEviction() {
-		w.queueResetStickinessTask()
+	// Emit force eviction metrics.
+	// This metrics indicates too many concurrent running workflows to fit in sticky cache.
+	// Eviction on error or on workflow complete is normal and expected.
+	if w.err == nil && !w.isWorkflowCompleted {
+		w.wth.metricsHandler.Counter(metrics.StickyCacheTotalForcedEviction).Inc(1)
 	}
 
 	w.clearState()
@@ -494,22 +485,6 @@ func (w *workflowExecutionContextImpl) onEviction() {
 
 func (w *workflowExecutionContextImpl) IsDestroyed() bool {
 	return w.getEventHandler() == nil
-}
-
-func (w *workflowExecutionContextImpl) queueResetStickinessTask() {
-	var task resetStickinessTask
-	task.task = &workflowservice.ResetStickyTaskQueueRequest{
-		Namespace: w.workflowInfo.Namespace,
-		Execution: &commonpb.WorkflowExecution{
-			WorkflowId: w.workflowInfo.WorkflowExecution.ID,
-			RunId:      w.workflowInfo.WorkflowExecution.RunID,
-		},
-	}
-	// w.laTunnel could be nil for worker.ReplayHistory() because there is no worker started, in that case we don't
-	// care about resetStickinessTask.
-	if w.laTunnel != nil && w.laTunnel.resultCh != nil {
-		w.laTunnel.resultCh <- &task
-	}
 }
 
 func (w *workflowExecutionContextImpl) clearState() {
@@ -539,6 +514,7 @@ func (w *workflowExecutionContextImpl) createEventHandler() {
 		w.wth.metricsHandler,
 		w.wth.registry,
 		w.wth.dataConverter,
+		w.wth.failureConverter,
 		w.wth.contextPropagators,
 		w.wth.deadlockDetectionTimeout,
 	)
@@ -690,6 +666,19 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *workflowservi
 				return err
 			}
 		}
+		if w.workflowInfo != nil {
+			// Reset the search attributes and memos from the WorkflowExecutionStartedEvent.
+			// The search attributes and memo may have been modified by calls like UpsertMemo
+			// or UpsertSearchAttributes. They must be reset to avoid non determinism on replay.
+			h := task.History
+			startedEvent := h.Events[0]
+			attributes := startedEvent.GetWorkflowExecutionStartedEventAttributes()
+			if attributes == nil {
+				return errors.New("first history event is not WorkflowExecutionStarted")
+			}
+			w.workflowInfo.SearchAttributes = attributes.SearchAttributes
+			w.workflowInfo.Memo = attributes.Memo
+		}
 	}
 	return nil
 }
@@ -698,9 +687,9 @@ func (w *workflowExecutionContextImpl) resetStateIfDestroyed(task *workflowservi
 func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 	workflowTask *workflowTask,
 	heartbeatFunc workflowTaskHeartbeatFunc,
-) (completeRequest interface{}, errRet error) {
+) (completeRequest interface{}, resetter EventLevelResetter, errRet error) {
 	if workflowTask == nil || workflowTask.task == nil {
-		return nil, errors.New("nil workflow task provided")
+		return nil, nil, errors.New("nil workflow task provided")
 	}
 	task := workflowTask.task
 	if task.History == nil || len(task.History.Events) == 0 {
@@ -709,11 +698,11 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 		}
 	}
 	if task.Query == nil && len(task.History.Events) == 0 {
-		return nil, errors.New("nil or empty history")
+		return nil, nil, errors.New("nil or empty history")
 	}
 
 	if task.Query != nil && len(task.Queries) != 0 {
-		return nil, errors.New("invalid query workflow task")
+		return nil, nil, errors.New("invalid query workflow task")
 	}
 
 	runID := task.WorkflowExecution.GetRunId()
@@ -729,7 +718,7 @@ func (wth *workflowTaskHandlerImpl) ProcessWorkflowTask(
 
 	workflowContext, err := wth.getOrCreateWorkflowContext(task, workflowTask.historyIterator)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	defer func() {
@@ -823,7 +812,21 @@ processWorkflowLoop:
 	}
 	errRet = err
 	completeRequest = response
+	resetter = workflowContext.SetPreviousStartedEventID
 	return
+}
+
+// indexInvocations builds a map of the interaction invocations contained in a
+// workflow task where the index is the interaction's event level (i.e. the
+// event after which the interaction can execute) and the value is the
+// invocation itself. This function may return an empty map but it will not
+// return nil.
+func indexInvocations(workflowTask *workflowTask) map[int64][]*interactionpb.Invocation {
+	out := map[int64][]*interactionpb.Invocation{}
+	for _, inter := range workflowTask.task.GetInteractions() {
+		out[inter.GetMeta().GetEventId()] = append(out[inter.GetMeta().GetEventId()], inter)
+	}
+	return out
 }
 
 func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflowTask) (interface{}, error) {
@@ -838,6 +841,8 @@ func (w *workflowExecutionContextImpl) ProcessWorkflowTask(workflowTask *workflo
 	reorderedHistory := newHistory(workflowTask, eventHandler)
 	var replayCommands []*commandpb.Command
 	var respondEvents []*historypb.HistoryEvent
+
+	invocations := indexInvocations(workflowTask)
 
 	skipReplayCheck := w.skipReplayCheck()
 
@@ -905,6 +910,14 @@ ProcessEvents:
 			if err != nil {
 				return nil, err
 			}
+
+			for _, inv := range invocations[event.GetEventId()] {
+				err := eventHandler.ProcessInteraction(inv.GetMeta(), inv.GetInput(), isInReplay, isLast)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			if w.isWorkflowCompleted {
 				break ProcessEvents
 			}
@@ -1142,6 +1155,10 @@ func (w *workflowExecutionContextImpl) SetCurrentTask(task *workflowservice.Poll
 	}
 }
 
+func (w *workflowExecutionContextImpl) SetPreviousStartedEventID(eventID int64) {
+	w.previousStartedEventID = eventID
+}
+
 func (w *workflowExecutionContextImpl) ResetIfStale(task *workflowservice.PollWorkflowTaskQueueResponse, historyIterator HistoryIterator) error {
 	if len(task.History.Events) > 0 && task.History.Events[0].GetEventId() != w.previousStartedEventID+1 {
 		w.wth.logger.Debug("Cached state staled, new task has unexpected events",
@@ -1151,8 +1168,8 @@ func (w *workflowExecutionContextImpl) ResetIfStale(task *workflowservice.PollWo
 			tagCachedPreviousStartedEventID, w.previousStartedEventID,
 			tagTaskFirstEventID, task.History.Events[0].GetEventId(),
 			tagTaskStartedEventID, task.GetStartedEventId(),
-			tagPreviousStartedEventID, task.GetPreviousStartedEventId())
-
+			tagPreviousStartedEventID, task.GetPreviousStartedEventId(),
+		)
 		w.clearState()
 		return w.resetStateIfDestroyed(task, historyIterator)
 	}
@@ -1160,21 +1177,28 @@ func (w *workflowExecutionContextImpl) ResetIfStale(task *workflowservice.PollWo
 }
 
 func skipDeterministicCheckForCommand(d *commandpb.Command) bool {
-	if d.GetCommandType() == enumspb.COMMAND_TYPE_RECORD_MARKER {
+	switch d.GetCommandType() {
+	case enumspb.COMMAND_TYPE_RECORD_MARKER:
 		markerName := d.GetRecordMarkerCommandAttributes().GetMarkerName()
 		if markerName == versionMarkerName || markerName == mutableSideEffectMarkerName {
 			return true
 		}
+	case enumspb.COMMAND_TYPE_ACCEPT_WORKFLOW_UPDATE,
+		enumspb.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION:
+		return true
 	}
 	return false
 }
 
 func skipDeterministicCheckForEvent(e *historypb.HistoryEvent) bool {
-	if e.GetEventType() == enumspb.EVENT_TYPE_MARKER_RECORDED {
+	switch e.GetEventType() {
+	case enumspb.EVENT_TYPE_MARKER_RECORDED:
 		markerName := e.GetMarkerRecordedEventAttributes().GetMarkerName()
 		if markerName == versionMarkerName || markerName == mutableSideEffectMarkerName {
 			return true
 		}
+		// case enumspb.EVENT_TYPE_WORKFLOW_TASK_STARTED:
+		//	return true
 	}
 	return false
 }
@@ -1436,8 +1460,8 @@ func isCommandMatchEvent(d *commandpb.Command, e *historypb.HistoryEvent, strict
 			eventAttributes := e.GetWorkflowUpdateCompletedEventAttributes()
 			commandAttributes := d.GetCompleteWorkflowUpdateCommandAttributes()
 
-			if !proto.Equal(eventAttributes.GetSuccess(), commandAttributes.GetSuccess()) ||
-				!proto.Equal(eventAttributes.GetFailure(), commandAttributes.GetFailure()) {
+			if !proto.Equal(eventAttributes.GetOutput().GetSuccess(), commandAttributes.GetOutput().GetSuccess()) ||
+				!proto.Equal(eventAttributes.GetOutput().GetFailure(), commandAttributes.GetOutput().GetFailure()) {
 				return false
 			}
 		}
@@ -1489,8 +1513,8 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 	task *workflowservice.PollWorkflowTaskQueueResponse,
 	workflowContext *workflowExecutionContextImpl,
 	commands []*commandpb.Command,
-	forceNewWorkflowTask bool) interface{} {
-
+	forceNewWorkflowTask bool,
+) interface{} {
 	// for query task
 	if task.Query != nil {
 		queryCompletedRequest := &workflowservice.RespondQueryTaskCompletedRequest{
@@ -1549,7 +1573,7 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 		// Workflow failures
 		metricsHandler.Counter(metrics.WorkflowFailedCounter).Inc(1)
 		closeCommand = createNewCommand(enumspb.COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION)
-		failure := ConvertErrorToFailure(workflowContext.err, wth.dataConverter)
+		failure := wth.failureConverter.ErrorToFailure(workflowContext.err)
 		closeCommand.Attributes = &commandpb.Command_FailWorkflowExecutionCommandAttributes{FailWorkflowExecutionCommandAttributes: &commandpb.FailWorkflowExecutionCommandAttributes{
 			Failure: failure,
 		}}
@@ -1601,8 +1625,8 @@ func (wth *workflowTaskHandlerImpl) completeWorkflow(
 }
 
 func errorToFailWorkflowTask(taskToken []byte, err error, identity string, dataConverter converter.DataConverter,
-	namespace string) *workflowservice.RespondWorkflowTaskFailedRequest {
-
+	failureConverter converter.FailureConverter, namespace string,
+) *workflowservice.RespondWorkflowTaskFailedRequest {
 	cause := enumspb.WORKFLOW_TASK_FAILED_CAUSE_WORKFLOW_WORKER_UNHANDLED_FAILURE
 	// If it was a panic due to a bad state machine or if it was a history
 	// mismatch error, mark as non-deterministic
@@ -1617,7 +1641,7 @@ func errorToFailWorkflowTask(taskToken []byte, err error, identity string, dataC
 	return &workflowservice.RespondWorkflowTaskFailedRequest{
 		TaskToken:      taskToken,
 		Cause:          cause,
-		Failure:        ConvertErrorToFailure(err, dataConverter),
+		Failure:        failureConverter.ErrorToFailure(err),
 		Identity:       identity,
 		BinaryChecksum: getBinaryChecksum(),
 		Namespace:      namespace,
@@ -1664,6 +1688,7 @@ func newActivityTaskHandlerWithCustomProvider(
 		registry:                         registry,
 		activityProvider:                 activityProvider,
 		dataConverter:                    params.DataConverter,
+		failureConverter:                 params.FailureConverter,
 		workerStopCh:                     params.WorkerStopChannel,
 		contextPropagators:               params.ContextPropagators,
 		namespace:                        params.Namespace,
@@ -1877,7 +1902,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskQueue string, t *workflowservice
 		metricsHandler.Counter(metrics.UnregisteredActivityInvocationCounter).Inc(1)
 		return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil,
 			NewActivityNotRegisteredError(activityType, ath.getRegisteredActivityNames()),
-			ath.dataConverter, ath.namespace, false), nil
+			ath.dataConverter, ath.failureConverter, ath.namespace, false), nil
 	}
 
 	// panic handler
@@ -1895,7 +1920,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskQueue string, t *workflowservice
 			metricsHandler.Counter(metrics.ActivityTaskErrorCounter).Inc(1)
 			panicErr := newPanicError(p, st)
 			result = convertActivityResultToRespondRequest(ath.identity, t.TaskToken, nil, panicErr,
-				ath.dataConverter, ath.namespace, false)
+				ath.dataConverter, ath.failureConverter, ath.namespace, false)
 		}
 	}()
 
@@ -1935,7 +1960,7 @@ func (ath *activityTaskHandlerImpl) Execute(taskQueue string, t *workflowservice
 		)
 	}
 	return convertActivityResultToRespondRequest(ath.identity, t.TaskToken, output, err,
-		ath.dataConverter, ath.namespace, isActivityCancel), nil
+		ath.dataConverter, ath.failureConverter, ath.namespace, isActivityCancel), nil
 }
 
 func (ath *activityTaskHandlerImpl) getActivity(name string) activity {
@@ -1989,7 +2014,8 @@ func createNewCommand(commandType enumspb.CommandType) *commandpb.Command {
 }
 
 func recordActivityHeartbeat(ctx context.Context, service workflowservice.WorkflowServiceClient, metricsHandler metrics.Handler,
-	identity string, taskToken []byte, details *commonpb.Payloads) error {
+	identity string, taskToken []byte, details *commonpb.Payloads,
+) error {
 	namespace := getNamespaceFromActivityCtx(ctx)
 	request := &workflowservice.RecordActivityTaskHeartbeatRequest{
 		TaskToken: taskToken,
@@ -2012,14 +2038,16 @@ func recordActivityHeartbeat(ctx context.Context, service workflowservice.Workfl
 }
 
 func recordActivityHeartbeatByID(ctx context.Context, service workflowservice.WorkflowServiceClient, metricsHandler metrics.Handler,
-	identity, namespace, workflowID, runID, activityID string, details *commonpb.Payloads) error {
+	identity, namespace, workflowID, runID, activityID string, details *commonpb.Payloads,
+) error {
 	request := &workflowservice.RecordActivityTaskHeartbeatByIdRequest{
 		Namespace:  namespace,
 		WorkflowId: workflowID,
 		RunId:      runID,
 		ActivityId: activityID,
 		Details:    details,
-		Identity:   identity}
+		Identity:   identity,
+	}
 
 	var heartbeatResponse *workflowservice.RecordActivityTaskHeartbeatByIdResponse
 	grpcCtx, cancel := newGRPCContext(ctx,

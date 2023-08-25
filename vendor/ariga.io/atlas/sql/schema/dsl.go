@@ -70,6 +70,21 @@ func (s *Schema) AddTables(tables ...*Table) *Schema {
 	return s
 }
 
+// AddViews adds and links the given views to the schema.
+func (s *Schema) AddViews(views ...*View) *Schema {
+	for _, v := range views {
+		v.SetSchema(s)
+	}
+	s.Views = append(s.Views, views...)
+	return s
+}
+
+// AddObjects adds the given objects to the schema.
+func (s *Schema) AddObjects(objs ...Object) *Schema {
+	s.Objects = append(s.Objects, objs...)
+	return s
+}
+
 // NewRealm creates a new Realm.
 func NewRealm(schemas ...*Schema) *Realm {
 	r := &Realm{Schemas: schemas}
@@ -209,6 +224,48 @@ func (t *Table) AddForeignKeys(fks ...*ForeignKey) *Table {
 func (t *Table) AddAttrs(attrs ...Attr) *Table {
 	t.Attrs = append(t.Attrs, attrs...)
 	return t
+}
+
+// NewView creates a new View.
+func NewView(name, def string) *View {
+	return &View{Name: name, Def: def}
+}
+
+// SetSchema sets the schema (named-database) of the view.
+func (v *View) SetSchema(s *Schema) *View {
+	v.Schema = s
+	return v
+}
+
+// AddColumns appends the given columns to the table column list.
+func (v *View) AddColumns(columns ...*Column) *View {
+	v.Columns = append(v.Columns, columns...)
+	return v
+}
+
+// SetComment sets or appends the Comment attribute
+// to the view with the given value.
+func (v *View) SetComment(c string) *View {
+	ReplaceOrAppend(&v.Attrs, &Comment{Text: c})
+	return v
+}
+
+// AddAttrs adds and additional attributes to the view.
+func (v *View) AddAttrs(attrs ...Attr) *View {
+	v.Attrs = append(v.Attrs, attrs...)
+	return v
+}
+
+// AddDeps adds the given objects as dependencies to the view.
+func (v *View) AddDeps(objs ...Object) *View {
+	v.Deps = append(v.Deps, objs...)
+	return v
+}
+
+// SetCheckOption sets the check option of the view.
+func (v *View) SetCheckOption(opt string) *View {
+	ReplaceOrAppend(&v.Attrs, &ViewCheckOption{V: opt})
+	return v
 }
 
 // NewColumn creates a new column with the given name.
@@ -427,6 +484,13 @@ type TimeOption func(*TimeType)
 func TimePrecision(precision int) TimeOption {
 	return func(b *TimeType) {
 		b.Precision = &precision
+	}
+}
+
+// TimeScale configures the scale of the time type.
+func TimeScale(scale int) TimeOption {
+	return func(b *TimeType) {
+		b.Scale = &scale
 	}
 }
 

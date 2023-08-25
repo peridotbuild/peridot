@@ -21,8 +21,11 @@ go_library(
         "//vendor/github.com/golang/mock/gomock",
         "//vendor/go.temporal.io/server/common",
         "//vendor/go.temporal.io/server/common/backoff",
+        "//vendor/go.temporal.io/server/common/clock",
         "//vendor/go.temporal.io/server/common/dynamicconfig",
         "//vendor/go.temporal.io/server/common/log",
         "//vendor/go.temporal.io/server/common/log/tag",
+        "//vendor/go.temporal.io/server/common/quotas",
+        "//vendor/go.temporal.io/server/common/util",
     ],
 )

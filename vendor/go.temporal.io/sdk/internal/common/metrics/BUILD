@@ -15,5 +15,11 @@ go_library(
         "//third_party:__subpackages__",
         "//vendor/go.temporal.io/sdk:__subpackages__",
     ],
-    deps = ["@org_golang_google_grpc//:go_default_library"],
+    deps = [
+        "//vendor/github.com/gogo/status",
+        "//vendor/go.temporal.io/api/enums/v1:enums",
+        "//vendor/go.temporal.io/api/serviceerror",
+        "@org_golang_google_grpc//:go_default_library",
+        "@org_golang_google_grpc//codes",
+    ],
 )

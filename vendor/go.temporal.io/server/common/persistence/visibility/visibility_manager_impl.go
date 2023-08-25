@@ -102,6 +102,7 @@ func (p *visibilityManagerImpl) RecordWorkflowExecutionClosed(
 		InternalVisibilityRequestBase: requestBase,
 		CloseTime:                     request.CloseTime,
 		HistoryLength:                 request.HistoryLength,
+		HistorySizeBytes:              request.HistorySizeBytes,
 	}
 	return p.store.RecordWorkflowExecutionClosed(ctx, req)
 }
@@ -244,6 +245,21 @@ func (p *visibilityManagerImpl) CountWorkflowExecutions(
 	}
 
 	return response, err
+}
+
+func (p *visibilityManagerImpl) GetWorkflowExecution(
+	ctx context.Context,
+	request *manager.GetWorkflowExecutionRequest,
+) (*manager.GetWorkflowExecutionResponse, error) {
+	response, err := p.store.GetWorkflowExecution(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	execution, err := p.convertInternalWorkflowExecutionInfo(response.Execution)
+	if err != nil {
+		return nil, err
+	}
+	return &manager.GetWorkflowExecutionResponse{Execution: execution}, err
 }
 
 func (p *visibilityManagerImpl) newInternalVisibilityRequestBase(request *manager.VisibilityRequestBase) (*store.InternalVisibilityRequestBase, error) {

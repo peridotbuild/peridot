@@ -18,6 +18,7 @@ go_library(
         "//vendor/github.com/prometheus/client_model/go",
         "//vendor/github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
         "//vendor/github.com/prometheus/common/model",
-        "@com_github_golang_protobuf//proto:go_default_library",
+        "@org_golang_google_protobuf//encoding/prototext",
+        "@org_golang_google_protobuf//proto",
     ],
 )

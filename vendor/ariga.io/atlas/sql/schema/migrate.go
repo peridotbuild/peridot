@@ -7,6 +7,7 @@ package schema
 import (
 	"context"
 	"errors"
+	"reflect"
 	"time"
 )
 
@@ -84,6 +85,52 @@ type (
 	// RenameTable describes a table rename change.
 	RenameTable struct {
 		From, To *Table
+	}
+
+	// AddView describes a view creation change.
+	AddView struct {
+		V     *View
+		Extra []Clause // Extra clauses and options.
+	}
+
+	// DropView describes a view removal change.
+	DropView struct {
+		V     *View
+		Extra []Clause // Extra clauses.
+	}
+
+	// ModifyView describes a view modification change.
+	ModifyView struct {
+		From, To *View
+	}
+
+	// RenameView describes a view rename change.
+	RenameView struct {
+		From, To *View
+	}
+
+	// AddObject describes a generic object creation change.
+	AddObject struct {
+		O     Object
+		Extra []Clause // Extra clauses and options.
+	}
+
+	// DropObject describes a generic object removal change.
+	DropObject struct {
+		O     Object
+		Extra []Clause // Extra clauses.
+	}
+
+	// ModifyObject describes a generic object modification change.
+	// Unlike tables changes, the diffing types are implemented by
+	// the underlying driver.
+	ModifyObject struct {
+		From, To Object
+	}
+
+	// RenameObject describes a generic object rename change.
+	RenameObject struct {
+		From, To Object
 	}
 
 	// AddColumn describes a column creation change.
@@ -264,23 +311,79 @@ func (k ChangeKind) Is(c ChangeKind) bool {
 	return k == c || k&c != 0
 }
 
-// Differ is the interface implemented by the different
-// drivers for comparing and diffing schema top elements.
-type Differ interface {
-	// RealmDiff returns a diff report for migrating a realm
-	// (or a database) from state "from" to state "to". An error
-	// is returned if such step is not possible.
-	RealmDiff(from, to *Realm) ([]Change, error)
+type (
+	// Differ is the interface implemented by the different
+	// drivers for comparing and diffing schema top elements.
+	Differ interface {
+		// RealmDiff returns a diff report for migrating a realm
+		// (or a database) from state "from" to state "to". An error
+		// is returned if such step is not possible.
+		RealmDiff(from, to *Realm, opts ...DiffOption) ([]Change, error)
 
-	// SchemaDiff returns a diff report for migrating a schema
-	// from state "from" to state "to". An error is returned
-	// if such step is not possible.
-	SchemaDiff(from, to *Schema) ([]Change, error)
+		// SchemaDiff returns a diff report for migrating a schema
+		// from state "from" to state "to". An error is returned
+		// if such step is not possible.
+		SchemaDiff(from, to *Schema, opts ...DiffOption) ([]Change, error)
 
-	// TableDiff returns a diff report for migrating a table
-	// from state "from" to state "to". An error is returned
-	// if such step is not possible.
-	TableDiff(from, to *Table) ([]Change, error)
+		// TableDiff returns a diff report for migrating a table
+		// from state "from" to state "to". An error is returned
+		// if such step is not possible.
+		TableDiff(from, to *Table, opts ...DiffOption) ([]Change, error)
+	}
+
+	// DiffOptions defines the standard and per-driver configuration
+	// for the schema diffing process.
+	DiffOptions struct {
+		// SkipChanges defines a list of change types to skip.
+		SkipChanges []Change
+
+		// Extra defines per-driver configuration. If not
+		// nil, should be set to schemahcl.Extension.
+		Extra any // avoid circular dependency with schemahcl.
+	}
+
+	// DiffOption allows configuring the DiffOptions using functional options.
+	DiffOption func(*DiffOptions)
+)
+
+// NewDiffOptions creates a new DiffOptions from the given configuration.
+func NewDiffOptions(opts ...DiffOption) *DiffOptions {
+	o := &DiffOptions{}
+	for _, opt := range opts {
+		opt(o)
+	}
+	return o
+}
+
+// DiffSkipChanges returns a DiffOption that skips the given change types.
+// For example, in order to skip all destructive changes, use:
+//
+//	DiffSkipChanges(&DropSchema{}, &DropTable{}, &DropColumn{}, &DropIndex{}, &DropForeignKey{})
+func DiffSkipChanges(changes ...Change) DiffOption {
+	return func(o *DiffOptions) {
+		o.SkipChanges = append(o.SkipChanges, changes...)
+	}
+}
+
+// Skipped reports whether the given change should be skipped.
+func (o *DiffOptions) Skipped(c Change) bool {
+	for _, s := range o.SkipChanges {
+		if reflect.TypeOf(c) == reflect.TypeOf(s) {
+			return true
+		}
+	}
+	return false
+}
+
+// AddOrSkip adds the given change to the list of changes if it is not skipped.
+func (o *DiffOptions) AddOrSkip(changes Changes, cs ...Change) Changes {
+	for _, c := range cs {
+		if !o.Skipped(c) {
+			changes = append(changes, c)
+		}
+	}
+	return changes
+
 }
 
 // ErrLocked is returned on Lock calls which have failed to obtain the lock.
@@ -434,6 +537,14 @@ func (*AddTable) change()         {}
 func (*DropTable) change()        {}
 func (*ModifyTable) change()      {}
 func (*RenameTable) change()      {}
+func (*AddView) change()          {}
+func (*DropView) change()         {}
+func (*ModifyView) change()       {}
+func (*RenameView) change()       {}
+func (*AddObject) change()        {}
+func (*DropObject) change()       {}
+func (*ModifyObject) change()     {}
+func (*RenameObject) change()     {}
 func (*AddIndex) change()         {}
 func (*DropIndex) change()        {}
 func (*ModifyIndex) change()      {}

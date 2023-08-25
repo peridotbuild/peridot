@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "interaction",
+    srcs = ["message.pb.go"],
+    importmap = "go.resf.org/peridot/vendor/go.temporal.io/api/interaction/v1",
+    importpath = "go.temporal.io/api/interaction/v1",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/proto",
+        "//vendor/go.temporal.io/api/common/v1:common",
+        "//vendor/go.temporal.io/api/enums/v1:enums",
+        "//vendor/go.temporal.io/api/failure/v1:failure",
+    ],
+)

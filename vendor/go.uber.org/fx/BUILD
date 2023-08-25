@@ -20,6 +20,7 @@ go_library(
         "provide.go",
         "replace.go",
         "shutdown.go",
+        "signal.go",
         "supply.go",
         "version.go",
     ],

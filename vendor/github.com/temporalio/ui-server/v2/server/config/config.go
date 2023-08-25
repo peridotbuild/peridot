@@ -39,6 +39,7 @@ type (
 		TLS                 TLS    `yaml:"tls"`
 		Auth                Auth   `yaml:"auth"`
 		EnableUI            bool   `yaml:"enableUi"`
+		UIAssetPath         string `yaml:"uiAssetPath"`
 		EnableOpenAPI       bool   `yaml:"enableOpenApi"`
 		CORS                CORS   `yaml:"cors"`
 		DefaultNamespace    string `yaml:"defaultNamespace"`
@@ -50,12 +51,20 @@ type (
 		RefreshInterval     time.Duration `yaml:"refreshInterval"`
 		Codec               Codec         `yaml:"codec"`
 		DisableWriteActions bool          `yaml:"disableWriteActions"`
+		// Discrete configuration for Workflow Actions in the UI
+		WorkflowTerminateDisabled bool `yaml:"workflowTerminateDisabled"`
+		WorkflowCancelDisabled    bool `yaml:"workflowCancelDisabled"`
+		WorkflowSignalDisabled    bool `yaml:"workflowSignalDisabled"`
+		WorkflowResetDisabled     bool `yaml:"workflowResetDisabled"`
+		// Whether bulk/batch actions are enabled in the UI
+		BatchActionsDisabled bool `yaml:"batchActionsDisabled"`
 		// Forward specified HTTP headers from HTTP API requests to Temporal gRPC backend
 		ForwardHeaders []string `yaml:"forwardHeaders"`
 	}
 
 	CORS struct {
-		AllowOrigins []string `yaml:"allowOrigins"`
+		AllowOrigins   []string `yaml:"allowOrigins"`
+		CookieInsecure bool     `yaml:"cookieInsecure"`
 	}
 
 	TLS struct {

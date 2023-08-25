@@ -18,7 +18,6 @@ go_library(
     ],
     deps = [
         "//vendor/github.com/docker/docker/client",
-        "//vendor/github.com/testcontainers/testcontainers-go/internal",
         "//vendor/github.com/testcontainers/testcontainers-go/internal/config",
         "//vendor/github.com/testcontainers/testcontainers-go/internal/testcontainerssession",
     ],

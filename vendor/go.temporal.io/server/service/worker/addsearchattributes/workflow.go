@@ -28,8 +28,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/olivere/elastic/v7"
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -40,6 +42,7 @@ import (
 	"go.temporal.io/server/common/metrics"
 	esclient "go.temporal.io/server/common/persistence/visibility/store/elasticsearch/client"
 	"go.temporal.io/server/common/searchattribute"
+	"go.temporal.io/server/common/util"
 )
 
 const (
@@ -59,10 +62,10 @@ type (
 	}
 
 	activities struct {
-		esClient      esclient.Client
-		saManager     searchattribute.Manager
-		metricsClient metrics.Client
-		logger        log.Logger
+		esClient       esclient.Client
+		saManager      searchattribute.Manager
+		metricsHandler metrics.MetricsHandler
+		logger         log.Logger
 	}
 )
 
@@ -138,8 +141,9 @@ func (a *activities) AddESMappingFieldActivity(ctx context.Context, params Workf
 	a.logger.Info("Creating Elasticsearch mapping.", tag.ESIndex(params.IndexName), tag.ESMapping(params.CustomAttributesToAdd))
 	_, err := a.esClient.PutMapping(ctx, params.IndexName, params.CustomAttributesToAdd)
 	if err != nil {
-		a.metricsClient.IncCounter(metrics.AddSearchAttributesWorkflowScope, metrics.AddSearchAttributesFailuresCount)
-		if esclient.IsRetryableError(err) {
+		a.metricsHandler.Counter(metrics.AddSearchAttributesFailuresCount.GetMetricName()).Record(1)
+
+		if a.isRetryableError(err) {
 			a.logger.Error("Unable to update Elasticsearch mapping (retryable error).", tag.ESIndex(params.IndexName), tag.Error(err))
 			return fmt.Errorf("%w: %v", ErrUnableToUpdateESMapping, err)
 		}
@@ -151,6 +155,20 @@ func (a *activities) AddESMappingFieldActivity(ctx context.Context, params Workf
 	return nil
 }
 
+func (a *activities) isRetryableError(err error) bool {
+	var esErr *elastic.Error
+	if !errors.As(err, &esErr) {
+		return true
+	}
+
+	switch esErr.Status {
+	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusConflict:
+		return false
+	default:
+		return true
+	}
+}
+
 func (a *activities) WaitForYellowStatusActivity(ctx context.Context, indexName string) error {
 	if a.esClient == nil {
 		a.logger.Info("Elasticsearch client is not configured. Skipping Elasticsearch status check.")
@@ -160,7 +178,7 @@ func (a *activities) WaitForYellowStatusActivity(ctx context.Context, indexName 
 	status, err := a.esClient.WaitForYellowStatus(ctx, indexName)
 	if err != nil {
 		a.logger.Error("Unable to get Elasticsearch cluster status.", tag.ESIndex(indexName), tag.Error(err))
-		a.metricsClient.IncCounter(metrics.AddSearchAttributesWorkflowScope, metrics.AddSearchAttributesFailuresCount)
+		a.metricsHandler.Counter(metrics.AddSearchAttributesFailuresCount.GetMetricName()).Record(1)
 		return err
 	}
 	a.logger.Info("Elasticsearch cluster status.", tag.ESIndex(indexName), tag.ESClusterStatus(status))
@@ -173,12 +191,12 @@ func (a *activities) UpdateClusterMetadataActivity(ctx context.Context, params W
 		return fmt.Errorf("%w: %v", ErrUnableToGetSearchAttributes, err)
 	}
 
-	newCustomSearchAttributes := maps.Clone(oldSearchAttributes.Custom())
+	newCustomSearchAttributes := util.CloneMapNonNil(oldSearchAttributes.Custom())
 	maps.Copy(newCustomSearchAttributes, params.CustomAttributesToAdd)
 	err = a.saManager.SaveSearchAttributes(ctx, params.IndexName, newCustomSearchAttributes)
 	if err != nil {
 		a.logger.Info("Unable to save search attributes to cluster metadata.", tag.ESIndex(params.IndexName), tag.Error(err))
-		a.metricsClient.IncCounter(metrics.AddSearchAttributesWorkflowScope, metrics.AddSearchAttributesFailuresCount)
+		a.metricsHandler.Counter(metrics.AddSearchAttributesFailuresCount.GetMetricName()).Record(1)
 		return fmt.Errorf("%w: %v", ErrUnableToSaveSearchAttributes, err)
 	}
 	a.logger.Info("Search attributes saved to cluster metadata.", tag.ESIndex(params.IndexName))

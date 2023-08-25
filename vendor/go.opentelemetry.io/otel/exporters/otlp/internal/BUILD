@@ -4,9 +4,7 @@ go_library(
     name = "internal",
     srcs = [
         "config.go",
-        "header.go",
         "partialsuccess.go",
-        "wrappederror.go",
     ],
     importmap = "go.resf.org/peridot/vendor/go.opentelemetry.io/otel/exporters/otlp/internal",
     importpath = "go.opentelemetry.io/otel/exporters/otlp/internal",
@@ -14,5 +12,4 @@ go_library(
         "//third_party:__subpackages__",
         "//vendor/go.opentelemetry.io/otel/exporters/otlp:__subpackages__",
     ],
-    deps = ["//vendor/go.opentelemetry.io/otel"],
 )
