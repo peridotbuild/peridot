@@ -53,5 +53,6 @@ def ui_bundle(name, srcs = [], data = [], deps = [], css = False):
             "//conditions:default": False,
         }),
         tsconfig = "//:tsconfig",
+        config = "//tools/build_rules/ui_bundle:esbuild_config",
         **esbuild_kwargs
     )

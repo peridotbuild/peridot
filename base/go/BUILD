@@ -17,6 +17,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go",
     srcs = [
+        "auth.go",
         "db.go",
         "flags.go",
         "frontend_server.go",
@@ -27,10 +28,13 @@ go_library(
         "slice.go",
         "wrapper_helpers.go",
     ],
+    embedsrcs = ["assets/oh_no_unauthenticated.png"],
     importpath = "go.resf.org/peridot/base/go",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/coreos/go-oidc/v3/oidc",
         "//vendor/github.com/grpc-ecosystem/go-grpc-middleware",
+        "//vendor/github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth",
         "//vendor/github.com/grpc-ecosystem/go-grpc-prometheus",
         "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2/runtime",
         "//vendor/github.com/prometheus/client_golang/prometheus/promhttp",
@@ -38,7 +42,13 @@ go_library(
         "//vendor/github.com/wk8/go-ordered-map/v2:go-ordered-map",
         "//vendor/go.ciq.dev/pika",
         "@org_golang_google_grpc//:go_default_library",
+        "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//credentials/insecure",
+        "@org_golang_google_grpc//metadata",
+        "@org_golang_google_grpc//status",
+        "@org_golang_google_protobuf//encoding/protojson",
         "@org_golang_google_protobuf//types/known/timestamppb",
+        "@org_golang_google_protobuf//types/known/wrapperspb",
+        "@org_golang_x_oauth2//:oauth2",
     ],
 )

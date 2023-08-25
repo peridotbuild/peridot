@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@aspect_rules_swc//swc:defs.bzl", "swc")
+load("//tools/build_rules/ui_library:defs.bzl", "ui_library")
 
-swc(
+ui_library(
     name = "ts",
     srcs = glob([
         "*.tsx",
         "*.ts",
     ]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//:node_modules/await-to-js",
+    ],
 )

@@ -21,4 +21,11 @@ ui_library(
         "*.ts",
     ]),
     visibility = ["//visibility:public"],
+    deps = [
+        "//:node_modules/@mui/lab",
+        "//:node_modules/@mui/material",
+        "//:node_modules/react",
+        "//:node_modules/tslib",
+        "//base/ts",
+    ],
 )
