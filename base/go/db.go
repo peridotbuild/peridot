@@ -16,17 +16,20 @@ package base
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 	"go.ciq.dev/pika"
+	"math/rand"
 )
 
 type Pika[T any] interface {
 	pika.QuerySet[T]
 
-	F(keyval ...any) Pika[T]
-	Transaction(ctx context.Context) (Pika[T], error)
 	U(x any) error
+	F(keyval ...any) Pika[T]
+	D(x any) error
+	Transaction(ctx context.Context) (Pika[T], error)
 }
 
 type DB struct {
@@ -64,6 +67,16 @@ func NewDBArgs(keyval ...any) *orderedmap.OrderedMap[string, any] {
 	return args
 }
 
+func NameGen(prefix string) string {
+	// last part is a random int64
+	// generate a length=18 random int
+	minRan := 100000000000000000
+	maxRan := 999999999999999999
+	ran := minRan + rand.Intn(maxRan-minRan)
+
+	return fmt.Sprintf("%s/%d", prefix, ran)
+}
+
 //goland:noinspection GoExportedFuncWithUnexportedType
 func Q[T any](db *DB) *innerDB[T] {
 	return &innerDB[T]{pika.Q[T](db.PostgreSQL), db}
@@ -79,6 +92,35 @@ func (inner *innerDB[T]) F(keyval ...any) Pika[T] {
 
 	inner.QuerySet = qs.Args(args)
 	return inner
+}
+
+func (inner *innerDB[T]) D(x any) error {
+	// Check if x has GetID() method
+	var id any
+	idInterface, ok := x.(idInterfaceForInt)
+	if ok {
+		intID := idInterface.GetID()
+		if intID == 0 {
+			return fmt.Errorf("id is 0")
+		}
+		id = intID
+	}
+
+	idInterface2, ok := x.(idInterfaceForString)
+	if ok {
+		stringID := idInterface2.GetID()
+		if stringID == "" {
+			return fmt.Errorf("id is empty")
+		}
+		id = stringID
+	}
+
+	if id == nil {
+		return errors.New("id is nil")
+	}
+
+	qs := inner.F("name", id)
+	return qs.Delete()
 }
 
 func (inner *innerDB[T]) Transaction(ctx context.Context) (Pika[T], error) {
@@ -119,6 +161,6 @@ func (inner *innerDB[T]) U(x any) error {
 		return inner.Update(y)
 	}
 
-	qs := inner.F("id", id)
+	qs := inner.F("name", id)
 	return qs.Update(y)
 }
