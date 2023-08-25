@@ -83,7 +83,7 @@ type FrontendInfo struct {
 }
 
 type frontendTemplateData struct {
-	User   *oidc.UserInfo
+	User   UserInfo
 	Prefix string
 }
 
@@ -199,7 +199,7 @@ func (info *FrontendInfo) renderUnauthorized(w http.ResponseWriter, message stri
 
 // frontendAuthHandler verifies that the user is authenticated
 // if not redirects to /auth/oidc/login
-func (info *FrontendInfo) frontendAuthHandler(provider *oidc.Provider, h http.Handler) http.Handler {
+func (info *FrontendInfo) frontendAuthHandler(provider OidcProvider, h http.Handler) http.Handler {
 	excludedSuffixes := []string{
 		"/auth/oidc/login",
 		"/auth/oidc/callback",
@@ -360,7 +360,7 @@ func FrontendServer(info *FrontendInfo, embedfs *embed.FS) error {
 
 		user := r.Context().Value("user")
 		if user != nil {
-			data.User = user.(*oidc.UserInfo)
+			data.User = user.(UserInfo)
 		}
 
 		err = tmpl.Execute(w, data)
@@ -377,20 +377,22 @@ func FrontendServer(info *FrontendInfo, embedfs *embed.FS) error {
 	})
 
 	// Handle auth routes
-	var provider *oidc.Provider
+	var provider OidcProvider
 	if !info.NoAuth {
 		ctx := context.TODO()
-		provider, err = oidc.NewProvider(ctx, info.OIDCIssuer)
+		provider2, err := oidc.NewProvider(ctx, info.OIDCIssuer)
 		if err != nil {
 			return fmt.Errorf("failed to create oidc provider: %w", err)
 		}
+
+		provider = &OidcProviderImpl{provider2}
 
 		redirectURL := info.Self + "/auth/oidc/callback"
 
 		oauth2Config := oauth2.Config{
 			ClientID:     info.OIDCClientID,
 			ClientSecret: info.OIDCClientSecret,
-			Endpoint:     provider.Endpoint(),
+			Endpoint:     provider2.Endpoint(),
 			RedirectURL:  redirectURL,
 			Scopes:       []string{oidc.ScopeOpenID, "profile", "email", "groups"},
 		}

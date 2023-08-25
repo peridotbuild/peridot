@@ -70,7 +70,10 @@ func setupApi(ctx *cli.Context) (*runtime.ServeMux, error) {
 }
 
 func setupAdminApi(ctx *cli.Context) (*runtime.ServeMux, error) {
-	oidcInterceptorDetails := base.FlagsToOidcInterceptorDetails(ctx)
+	oidcInterceptorDetails, err := base.FlagsToOidcInterceptorDetails(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	s, err := mothershipadmin_rpc.NewServer(
 		base.GetDBFromFlags(ctx),

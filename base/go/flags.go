@@ -15,6 +15,7 @@
 package base
 
 import (
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/urfave/cli/v2"
 	"os"
 )
@@ -188,11 +189,16 @@ func FlagsToFrontendInfo(ctx *cli.Context) *FrontendInfo {
 }
 
 // FlagsToOidcInterceptorDetails converts the cli flags to oidc interceptor details.
-func FlagsToOidcInterceptorDetails(ctx *cli.Context) *OidcInterceptorDetails {
-	return &OidcInterceptorDetails{
-		Issuer: ctx.String("oidc-issuer"),
-		Group:  ctx.String("required-oidc-group"),
+func FlagsToOidcInterceptorDetails(ctx *cli.Context) (*OidcInterceptorDetails, error) {
+	provider, err := oidc.NewProvider(ctx.Context, ctx.String("oidc-issuer"))
+	if err != nil {
+		return nil, err
 	}
+
+	return &OidcInterceptorDetails{
+		Provider: &OidcProviderImpl{provider},
+		Group:    ctx.String("required-oidc-group"),
+	}, nil
 }
 
 // GetDBFromFlags gets the database from the cli flags.

@@ -22,7 +22,10 @@ import (
 )
 
 func run(ctx *cli.Context) error {
-	oidcInterceptorDetails := base.FlagsToOidcInterceptorDetails(ctx)
+	oidcInterceptorDetails, err := base.FlagsToOidcInterceptorDetails(ctx)
+	if err != nil {
+		return err
+	}
 
 	s, err := mothershipadmin_rpc.NewServer(
 		base.GetDBFromFlags(ctx),
