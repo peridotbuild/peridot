@@ -15,6 +15,8 @@
  */
 
 import React from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
@@ -23,39 +25,51 @@ import Button from '@mui/material/Button';
 import { Theme } from '@mui/material/styles';
 
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import EngineeringIcon from '@mui/icons-material/Engineering';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 
-import { Dashboard } from './Dashboard';
+import { Workers } from './Workers';
 import { Drawer } from 'base/ts/mui/Drawer';
-import { Route, Routes } from 'react-router-dom';
+import { CreateWorker } from 'tools/mothership/admin/ui/CreateWorker';
+import { GetWorker } from 'tools/mothership/admin/ui/GetWorker';
 
 export const App = () => {
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar
-        position="fixed"
         elevation={0}
+        position="fixed"
         sx={{ zIndex: (theme: Theme) => theme.zIndex.drawer + 1 }}
       >
         <Toolbar variant="dense">
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Mship Admin
           </Typography>
+          <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
+            <Button className="native-link" href="/" variant="primary">
+              Go back to Mship
+            </Button>
+          </Box>
         </Toolbar>
       </AppBar>
       <Drawer
         sections={[
           {
             links: [
-              { text: 'Dashboard', href: '/', icon: <DashboardIcon /> },
+              { text: 'Workers', href: '/workers', icon: <EngineeringIcon /> },
             ],
           },
         ]}
       />
-      <Box component="main" sx={{ p: 3, flexGrow: 1 }}>
+      <Box component="main" sx={{ flexGrow: 1 }}>
         <Toolbar variant="dense" />
         <Routes>
-          <Route index element={<Dashboard />} />
+          <Route index element={<Navigate to="/workers" replace />} />
+          <Route path="/workers">
+            <Route index element={<Workers />} />
+            <Route path="create" element={<CreateWorker />} />
+            <Route path=":name" element={<GetWorker />} />
+          </Route>
         </Routes>
       </Box>
     </Box>

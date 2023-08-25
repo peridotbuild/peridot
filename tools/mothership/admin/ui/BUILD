@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//tools/build_rules/ui_bundle:defs.bzl", "ui_bundle")
 
 ui_bundle(
@@ -21,30 +21,18 @@ ui_bundle(
         "//:node_modules/@mui/icons-material",
         "//:node_modules/@mui/material",
         "//base/ts/mui",
+        "//tools/mothership/proto/admin/v1:mshipadminpb_ts_proto",
     ],
 )
 
 go_library(
-    name = "ui_lib",
-    srcs = ["main.go"],
+    name = "ui",
+    srcs = ["ui.go"],
+    # keep
     embedsrcs = [
         ":bundle",  # keep
-        "App.tsx",
-        "BUILD",
-        "Dashboard.tsx",
-        "entrypoint.tsx",
-        "main.go",
     ],
     importpath = "go.resf.org/peridot/tools/mothership/admin/ui",
-    visibility = ["//visibility:private"],
-    deps = [
-        "//base/go",
-        "//vendor/github.com/urfave/cli/v2:cli",
-    ],
-)
-
-go_binary(
-    name = "ui",
-    embed = [":ui_lib"],
     visibility = ["//visibility:public"],
+    deps = ["//base/go"],
 )
