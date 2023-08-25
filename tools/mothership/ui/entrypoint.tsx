@@ -25,7 +25,7 @@ import { peridotTheme } from 'base/ts/mui/theme';
 
 const root = createRoot(document.getElementById('app') || document.body);
 root.render(
-  <BrowserRouter>
+  <BrowserRouter basename={window.__peridot_prefix__ || ''}>
     <ThemeProvider theme={peridotTheme}>
       <CssBaseline />
       <App />

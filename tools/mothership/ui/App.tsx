@@ -33,15 +33,16 @@ export const App = () => {
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar
+        elevation={0}
         position="fixed"
         sx={{ zIndex: (theme: Theme) => theme.zIndex.drawer + 1 }}
       >
         <Toolbar variant="dense">
           <Link to="/">
-            <img src="/_ga/mship_gopher.png" height="43.5px" />
+            <img src="/_ga/mship_gopher.png" height="41.5px" />
           </Link>
           <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
-            <Button className="native-link" href="/admin">
+            <Button className="native-link" href="/admin" variant="primary">
               Admin
             </Button>
           </Box>
