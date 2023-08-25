@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "fs",
+    srcs = [
+        "doc.go",
+        "fs.go",
+        "security.go",
+        "zsyscall_windows.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/Microsoft/go-winio/internal/fs",
+    importpath = "github.com/Microsoft/go-winio/internal/fs",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/Microsoft/go-winio:__subpackages__",
+    ],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/github.com/Microsoft/go-winio/internal/stringbuffer",
+            "//vendor/golang.org/x/sys/windows",
+        ],
+        "//conditions:default": [],
+    }),
+)

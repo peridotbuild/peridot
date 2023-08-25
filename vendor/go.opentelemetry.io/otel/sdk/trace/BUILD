@@ -32,7 +32,7 @@ go_library(
         "//vendor/go.opentelemetry.io/otel/sdk/internal",
         "//vendor/go.opentelemetry.io/otel/sdk/internal/env",
         "//vendor/go.opentelemetry.io/otel/sdk/resource",
-        "//vendor/go.opentelemetry.io/otel/semconv/v1.10.0:v1_10_0",
+        "//vendor/go.opentelemetry.io/otel/semconv/v1.17.0:v1_17_0",
         "//vendor/go.opentelemetry.io/otel/trace",
     ],
 )

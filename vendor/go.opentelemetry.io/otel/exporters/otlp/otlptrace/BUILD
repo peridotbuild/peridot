@@ -10,6 +10,7 @@ go_library(
     importpath = "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/go.opentelemetry.io/otel/exporters/otlp/internal",
         "//vendor/go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/tracetransform",
         "//vendor/go.opentelemetry.io/otel/sdk/trace",
         "//vendor/go.opentelemetry.io/proto/otlp/trace/v1:trace",

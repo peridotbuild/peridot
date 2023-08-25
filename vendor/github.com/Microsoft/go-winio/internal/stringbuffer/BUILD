@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "stringbuffer",
+    srcs = ["wstring.go"],
+    importmap = "go.resf.org/peridot/vendor/github.com/Microsoft/go-winio/internal/stringbuffer",
+    importpath = "github.com/Microsoft/go-winio/internal/stringbuffer",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/Microsoft/go-winio:__subpackages__",
+    ],
+)

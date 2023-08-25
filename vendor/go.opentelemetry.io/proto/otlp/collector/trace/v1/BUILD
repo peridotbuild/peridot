@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "trace",
     srcs = [
-        "trace_config.pb.go",
         "trace_service.pb.go",
         "trace_service.pb.gw.go",
         "trace_service_grpc.pb.go",
