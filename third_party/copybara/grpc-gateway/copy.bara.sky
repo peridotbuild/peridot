@@ -1,0 +1,18 @@
+core.workflow(
+    name = "default",
+    origin = git.github_origin(
+        url = "https://github.com/grpc-ecosystem/grpc-gateway",
+        ref = "v2.16.2",
+    ),
+    destination = folder.destination(),
+    origin_files = glob(["protoc-gen-openapiv2/defs.bzl", "LICENSE"]),
+    destination_files = glob(["third_party/grpc-gateway/**"], exclude = ["README_INTERNAL.txt"]),
+    authoring = authoring.pass_thru("peridot-copybara <peridot+copybara@lists.resf.org>"),
+    transformations = [
+        core.move("", "third_party/grpc-gateway"),
+        core.replace(
+            before = "//protoc-gen-openapiv2:protoc-gen-openapiv2",
+            after = "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2",
+        ),
+    ],
+)
