@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-issuer: http://localhost:5556/dex
+issuer: http://127.0.0.1:5556/dex
 
 storage:
-  type: sqlite3
-  config:
-    file: dex.db
+  type: memory
 
 web:
   http: 0.0.0.0:5556
+
+oauth2:
+  skipApprovalScreen: true
 
 frontend:
   issuer: peridot
@@ -30,6 +31,7 @@ staticClients:
   - id: local
     redirectURIs:
       - 'http://localhost:9111/auth/oidc/callback'
+      - 'http://localhost:9111/admin/auth/oidc/callback'
     name: 'Frontend App'
     secret: local
 
