@@ -30,18 +30,19 @@ service MshipAdmin {
     };
   }
 
+  // (-- api-linter: core::0133::http-body=disabled
+  //     aip.dev/not-precedent: See below in the CreateWorkerRequest. We only allow worker_id --)
   // Creates a worker
   rpc CreateWorker(CreateWorkerRequest) returns (Worker) {
     option (google.api.http) = {
       post: "/v1/workers"
-      body: "worker"
+      body: "*"
     };
-    option (google.api.method_signature) = "worker,worker_id";
+    option (google.api.method_signature) = "worker_id";
   }
 
   // Deletes a worker
-  // Only deletes the worker entry, but not the references to the worker
-  // from entries this worker has created.
+  // Worker cannot be deleted if it has created an entry.
   rpc DeleteWorker(DeleteWorkerRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       delete: "/v1/{name=workers/*}"
@@ -89,13 +90,13 @@ message ListWorkersResponse {
   string next_page_token = 2;
 }
 
+// (-- api-linter: core::0133::request-resource-field=disabled
+//     aip.dev/not-precedent: There is no reason to require worker as we only allow the worker_id field to be customized. --)
 // CreateWorkerRequest is the request message for CreateWorker.
 message CreateWorkerRequest {
-  // Required. The worker to create.
-  Worker worker = 1 [(google.api.field_behavior) = REQUIRED];
-
   // Required. The worker name to use.
-  string worker_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // This id has to be at least 4 characters long and must be unique.
+  string worker_id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 // DeleteWorkerRequest is the request message for DeleteWorker.

@@ -22,7 +22,6 @@ taskrunner2(
         "//devtools/devdex",
     ],
     watch_targets = [
-        "//tools/mothership/cmd/mship_api",
-        "//tools/mothership/ui",
+        "//tools/mothership/cmd/mship_dev",
     ],
 )

@@ -7,31 +7,39 @@ import (
 )
 
 type Server struct {
+	base.GRPCServer
 	mshipadminpb.UnimplementedMshipAdminServer
 
 	db *base.DB
 }
 
-func NewServer(db *base.DB) *Server {
-	return &Server{
-		db: db,
+func NewServer(db *base.DB, oidcInterceptorDetails *base.OidcInterceptorDetails, opts ...base.GRPCServerOption) (*Server, error) {
+	oidcInterceptor, err := base.OidcGrpcInterceptor(oidcInterceptorDetails)
+	if err != nil {
+		return nil, err
 	}
-}
 
-func (s *Server) Start(opts ...base.GRPCServerOption) error {
+	opts = append(opts, base.WithUnaryInterceptors(oidcInterceptor))
 	grpcServer, err := base.NewGRPCServer(opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	grpcServer.RegisterService(func(server *grpc.Server) {
+	return &Server{
+		GRPCServer: *grpcServer,
+		db:         db,
+	}, nil
+}
+
+func (s *Server) Start() error {
+	s.RegisterService(func(server *grpc.Server) {
 		mshipadminpb.RegisterMshipAdminServer(server, s)
 	})
-	if err := grpcServer.GatewayEndpoints(
+	if err := s.GatewayEndpoints(
 		mshipadminpb.RegisterMshipAdminHandler,
 	); err != nil {
 		return err
 	}
 
-	return grpcServer.Start()
+	return s.GRPCServer.Start()
 }

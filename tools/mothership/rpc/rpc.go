@@ -21,31 +21,33 @@ import (
 )
 
 type Server struct {
+	base.GRPCServer
 	mothershippb.UnimplementedSrpmArchiverServer
 
 	db *base.DB
 }
 
-func NewServer(db *base.DB) *Server {
-	return &Server{
-		db: db,
-	}
-}
-
-func (s *Server) Start(opts ...base.GRPCServerOption) error {
+func NewServer(db *base.DB, opts ...base.GRPCServerOption) (*Server, error) {
 	grpcServer, err := base.NewGRPCServer(opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	grpcServer.RegisterService(func(server *grpc.Server) {
+	return &Server{
+		GRPCServer: *grpcServer,
+		db:         db,
+	}, nil
+}
+
+func (s *Server) Start() error {
+	s.RegisterService(func(server *grpc.Server) {
 		mothershippb.RegisterSrpmArchiverServer(server, s)
 	})
-	if err := grpcServer.GatewayEndpoints(
+	if err := s.GatewayEndpoints(
 		mothershippb.RegisterSrpmArchiverHandler,
 	); err != nil {
 		return err
 	}
 
-	return grpcServer.Start()
+	return s.GRPCServer.Start()
 }

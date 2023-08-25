@@ -46,7 +46,7 @@ message Entry {
   // SHA256 of the package.
   // This value is output only as the API server will determine
   // the SHA256 of the package.
-  string sha256 = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string sha256_sum = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Worker ID of the worker that archived the package.
   // This value is output only as the API server will determine
@@ -56,9 +56,9 @@ message Entry {
   // user instead of a worker.
   google.protobuf.StringValue worker_id = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Batch ID of the batch the package was archived in.
+  // Name of the batch the package was archived in.
   // If this field is not set, the package was not archived in a batch.
-  google.protobuf.Int64Value batch_id = 7;
+  google.protobuf.StringValue batch = 7;
 
   // User email of the user that archived the package.
   // This value is output only as the API server will determine

@@ -1,6 +1,7 @@
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("//tools/build_rules/oapi_gen:defs.bzl", "oapi_gen_ts")
 
 proto_library(
     name = "mshipadminpb_proto",
@@ -16,6 +17,12 @@ proto_library(
         "@go_googleapis//google/api:annotations_proto",
         "@googleapis//google/api:annotations_proto",
     ],
+)
+
+oapi_gen_ts(
+    name = "mshipadminpb_ts_proto",
+    proto = ":mshipadminpb_proto",
+    visibility = ["//visibility:public"],
 )
 
 go_proto_library(

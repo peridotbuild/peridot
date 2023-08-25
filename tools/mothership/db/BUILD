@@ -16,11 +16,16 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "db",
-    srcs = ["worker.go"],
+    srcs = [
+        "entry.go",
+        "worker.go",
+    ],
     importpath = "go.resf.org/peridot/tools/mothership/db",
     visibility = ["//visibility:public"],
     deps = [
         "//base/go",
         "//tools/mothership/proto/admin/v1:pb",
+        "//tools/mothership/proto/v1:pb",
+        "@org_golang_google_protobuf//types/known/timestamppb",
     ],
 )

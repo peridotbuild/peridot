@@ -17,13 +17,16 @@ package main
 import (
 	"github.com/urfave/cli/v2"
 	base "go.resf.org/peridot/base/go"
-	mothership_rpc "go.resf.org/peridot/tools/mothership/rpc"
+	mothershipadmin_rpc "go.resf.org/peridot/tools/mothership/admin/rpc"
 	"os"
 )
 
 func run(ctx *cli.Context) error {
-	s, err := mothership_rpc.NewServer(
+	oidcInterceptorDetails := base.FlagsToOidcInterceptorDetails(ctx)
+
+	s, err := mothershipadmin_rpc.NewServer(
 		base.GetDBFromFlags(ctx),
+		oidcInterceptorDetails,
 		base.FlagsToGRPCServerOptions(ctx)...,
 	)
 	if err != nil {
@@ -34,16 +37,16 @@ func run(ctx *cli.Context) error {
 
 func main() {
 	base.ChangeDefaultDatabaseURL("mothership")
-	base.ChangeDefaultForEnvVar(base.EnvVarGRPCPort, "6677")
-	base.ChangeDefaultForEnvVar(base.EnvVarGatewayPort, "6678")
+	base.ChangeDefaultForEnvVar(base.EnvVarGRPCPort, "6687")
+	base.ChangeDefaultForEnvVar(base.EnvVarGatewayPort, "6688")
 
 	app := &cli.App{
-		Name:   "mship_server",
+		Name:   "mship_admin_server",
 		Action: run,
-		Flags:  base.WithDefaultCliFlagsNoAuth(),
+		Flags:  base.WithDefaultCliFlags(),
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		base.LogFatalf("failed to start mship_api: %v", err)
+		base.LogFatalf("failed to start mship_admin_server: %v", err)
 	}
 }

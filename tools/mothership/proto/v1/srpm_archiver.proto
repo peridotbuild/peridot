@@ -19,6 +19,7 @@ package peridot.tools.mothership.v1;
 import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
+import "tools/mothership/proto/v1/entry.proto";
 
 option java_multiple_files = true;
 option java_outer_classname = "SrpmArchiverProto";
@@ -32,5 +33,68 @@ option go_package = "go.resf.org/peridot/tools/mothership/pb;mothershippb";
 // importing SRPMs into the forge.
 service SrpmArchiver {
   option (google.api.default_host) = "mship.resf.org";
+
+  // Returns an entry
+  rpc GetEntry(GetEntryRequest) returns (Entry) {
+    option (google.api.http) = {
+      get: "/v1/{name=entries/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Returns a list of entries that match the filter criteria.
+  rpc ListEntries(ListEntriesRequest) returns (ListEntriesResponse) {
+    option (google.api.http) = {
+      get: "/v1/entries"
+    };
+  }
 }
 
+// Request message for GetEntry method.
+message GetEntryRequest {
+  // The name of the entry to retrieve.
+  // For example: "entries/1234".
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for ListEntries method.
+message ListEntriesRequest {
+  // The maximum number of entries to return.
+  // The service may return fewer than this value.
+  // If unspecified, at most 50 entries will be returned.
+  // The maximum value is 1000; values above 1000 will be coerced to 1000.
+  int32 page_size = 1;
+
+  // A page token, received from a previous `ListEntries` call.
+  // Provide this to retrieve the subsequent page.
+  //
+  // When paginating, all other parameters provided to `ListEntries` must
+  // match the call that provided the page token.
+  string page_token = 2;
+
+  // The filter string, following the syntax described in
+  // https://google.aip.dev/160.
+  // Supports all fields of the `Entry` resource.
+  // Examples:
+  //   - By name: `name="entries/1234"`
+  string filter = 3;
+
+  // The order to sort the results by. For example: `name desc`.
+  // Supports all fields of the `Worker` resource.
+  // Needs a suffix of either `asc` or `desc`.
+  // Example: `name asc`, `created_at desc`.
+  string order_by = 4;
+}
+
+// Response message for ListEntries method.
+message ListEntriesResponse {
+  // The list of entries.
+  repeated Entry entries = 1;
+
+  // A token to retrieve next page of results.
+  // Pass this value in the
+  // [ListEntriesRequest.page_token][peridot.tools.mothership.v1.ListEntriesRequest.page_token]
+  // field in the subsequent call to `ListEntries` method to retrieve the next
+  // page of results.
+  string next_page_token = 2;
+}
