@@ -61,7 +61,7 @@ oapi_gen_ts_sdk = rule(
         "_oapi_converter": attr.label(
             allow_single_file = True,
             default = Label("//tools/build_rules/oapi_gen:oapi.sh"),
-            doc = "The script that converts an OpenAPI spec to a fern generators.yaml file",
+            doc = "The script that converts an OpenAPI spec to a TypeScript SDK",
         ),
     },
 )
