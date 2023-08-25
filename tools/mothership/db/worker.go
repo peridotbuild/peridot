@@ -18,14 +18,18 @@ import (
 	"database/sql"
 	base "go.resf.org/peridot/base/go"
 	mshipadminpb "go.resf.org/peridot/tools/mothership/admin/pb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 type Worker struct {
 	PikaTableName string `pika:"workers"`
 
-	Name            string       `json:"name"`
-	WorkerID        string       `json:"worker_id"`
-	LastCheckinTime sql.NullTime `json:"last_check_in_time"`
+	Name            string       `db:"name"`
+	CreateTime      time.Time    `db:"create_time" pika:"omitempty"`
+	WorkerID        string       `db:"worker_id"`
+	LastCheckinTime sql.NullTime `db:"last_checkin_time"`
+	ApiSecret       string       `db:"api_secret"`
 }
 
 func (w *Worker) GetID() string {
@@ -36,6 +40,7 @@ func (w *Worker) ToPB() *mshipadminpb.Worker {
 	return &mshipadminpb.Worker{
 		Name:            w.Name,
 		WorkerId:        w.WorkerID,
+		CreateTime:      timestamppb.New(w.CreateTime),
 		LastCheckinTime: base.SqlNullTime(w.LastCheckinTime),
 	}
 }
