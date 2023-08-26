@@ -90,8 +90,7 @@ export function ResourceTable<T extends StandardResource>(
   const [rows, setRows] = React.useState<T[] | undefined>(undefined);
   const [loading, setLoading] = React.useState<boolean>(false);
 
-  // Update the query parameters when any of the pagination state changes
-  React.useEffect(() => {
+  const updateSearch = (replace = false) => {
     const search = new URLSearchParams(location.search);
     if (pageToken) {
       search.set('pt', pageToken);
@@ -104,16 +103,68 @@ export function ResourceTable<T extends StandardResource>(
     } else {
       search.delete('pth');
     }
-    setSearch(search);
+
+    // Compare search and only update if different
+    // If replace is true, then we should always update
+    if (!replace) {
+      if ('?' + search.toString() === location.search) {
+        return;
+      }
+    }
+
+    setSearch(search, { replace });
+  };
+
+  // First update should replace the query parameters with the initial state
+  React.useEffect(() => {
+    updateSearch(true);
+  }, []);
+
+  // Update state when query parameters change
+  React.useEffect(() => {
+    const pt = search.get('pt') || undefined;
+    const pth = search.get('pth');
+    let initPageTokenHistory: string[] = [];
+    if (pth) {
+      try {
+        initPageTokenHistory = JSON.parse(atob(pth));
+      } catch (e) {}
+    }
+    let initRowsPerPage = parseInt(search.get('rpp') || '25') || 25;
+    if (!allowedPageSizes.includes(initRowsPerPage)) {
+      initRowsPerPage = 25;
+    }
+    if (pageToken !== pt) {
+      setPageToken(pt);
+    }
+    if (rowsPerPage !== initRowsPerPage) {
+      setRowsPerPage(initRowsPerPage);
+    }
+    if (
+      JSON.stringify(pageTokenHistory) !== JSON.stringify(initPageTokenHistory)
+    ) {
+      setPageTokenHistory(initPageTokenHistory);
+    }
+  }, [search]);
+
+  // Update the query parameters when any of the pagination state changes
+  React.useEffect(() => {
+    updateSearch();
   }, [pageToken, pageTokenHistory]);
 
   // Rows per page changing means we need to reset the page token history
   React.useEffect(() => {
     const search = new URLSearchParams(location.search);
     search.set('rpp', rowsPerPage.toString());
-    setSearch(search);
+
     setPageTokenHistory([]);
     setPageToken(undefined);
+
+    if ('?' + search.toString() === location.search) {
+      return;
+    }
+
+    setSearch(search);
   }, [rowsPerPage]);
 
   // Load the resource using useEffect
