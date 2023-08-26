@@ -99,15 +99,10 @@ export const NewResource = <T extends StandardResource>(
   return (
     <>
       {props.showDialog && res && (
-        <Dialog
-          disableEscapeKeyDown
-          disableScrollLock
-          open>
+        <Dialog disableEscapeKeyDown open>
           {props.showDialog(res)}
           <DialogActions>
-            <Button onClick={navigateToResource}>
-              Go to resource
-            </Button>
+            <Button onClick={navigateToResource}>Go to resource</Button>
           </DialogActions>
         </Dialog>
       )}
