@@ -55,6 +55,7 @@ func setupAdminUi(ctx *cli.Context) (*base.FrontendInfo, error) {
 	assets := mship_admin_ui.InitFrontendInfo(info)
 	info.NoRun = true
 	info.Self = "http://localhost:9111/admin"
+	info.OIDCGroup = "authors"
 	err := base.FrontendServer(info, assets)
 	if err != nil {
 		return nil, err
@@ -88,6 +89,7 @@ func setupAdminApi(ctx *cli.Context) (*runtime.ServeMux, error) {
 	if err != nil {
 		return nil, err
 	}
+	oidcInterceptorDetails.Group = "authors"
 
 	s, err := mothershipadmin_rpc.NewServer(
 		base.GetDBFromFlags(ctx),
