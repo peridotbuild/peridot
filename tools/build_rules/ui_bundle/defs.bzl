@@ -43,14 +43,22 @@ def ui_bundle(name, srcs = [], data = [], deps = [], css = False):
             "//:node_modules/tslib",
         ],
         output_dir = True,
-        splitting = True,
+        splitting = False,
         entry_point = "entrypoint.tsx",
+        format = "iife",
         # The transpiling is done with swc, so we don't need to do it here.
         target = "esnext",
-        sourcemap = "inline",
         minify = select({
             "//base:minify_esbuild_enabled": True,
             "//conditions:default": False,
+        }),
+        define = select({
+            "//base:minify_esbuild_enabled": {
+                "process.env.NODE_ENV": '"production"',
+            },
+            "//conditions:default": {
+                "process.env.NODE_ENV": '"development"',
+            },
         }),
         tsconfig = "//:tsconfig",
         config = "//tools/build_rules/ui_bundle:esbuild_config",

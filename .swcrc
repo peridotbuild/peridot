@@ -1,25 +1,24 @@
 {
   "module": {
-    "type": "commonjs",
+    "type": "es6",
     "strict": true,
-    "strictMode": true
+    "strictMode": false
   },
   "jsc": {
     "parser": {
       "syntax": "typescript",
       "jsx": true,
-      "dynamicImport": false,
+      "dynamicImport": true,
       "privateMethod": false,
       "functionBind": false,
       "exportDefaultFrom": true,
-      "exportNamespaceFrom": false,
+      "exportNamespaceFrom": true,
       "decorators": true,
       "decoratorsBeforeExport": false,
-      "topLevelAwait": true,
-      "importMeta": false,
+      "topLevelAwait": false,
+      "importMeta": true,
       "tsx": true
     },
-    "transform": null,
     "target": "es2017",
     "loose": true,
     "externalHelpers": false,
