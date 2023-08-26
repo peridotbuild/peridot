@@ -46,6 +46,9 @@ export const App = () => {
             Mship Admin
           </Typography>
           <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
+            <Button className="native-link" href="/admin/auth/oidc/logout" variant="primary">
+              Logout
+            </Button>
             <Button className="native-link" href="/" variant="primary">
               Go back to Mship
             </Button>

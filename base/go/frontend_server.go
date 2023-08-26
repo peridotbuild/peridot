@@ -497,6 +497,22 @@ func FrontendServer(info *FrontendInfo, embedfs *embed.FS) error {
 			// Redirect to self, this is due to the "root" not being / for all apps
 			http.Redirect(w, r, info.Self, http.StatusFound)
 		})
+
+		// Handle logout
+		http.HandleFunc(prefix+"/auth/oidc/logout", func(w http.ResponseWriter, r *http.Request) {
+			// Delete the auth cookie
+			http.SetCookie(w, &http.Cookie{
+				Name:   frontendAuthCookieKey,
+				Value:  "",
+				Path:   "/",
+				MaxAge: -1,
+				// secure if self is https
+				Secure: strings.HasPrefix(info.Self, "https://"),
+			})
+
+			// Redirect to self, this is due to the "root" not being / for all apps
+			http.Redirect(w, r, info.Self, http.StatusFound)
+		})
 	}
 
 	var handler http.Handler = nil
