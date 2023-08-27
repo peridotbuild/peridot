@@ -15,6 +15,7 @@
 package mothership_worker_server
 
 import (
+	"errors"
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -46,4 +47,6 @@ func ProcessRPMWorkflow(ctx workflow.Context, req *mothershippb.ProcessRPMReques
 	if err != nil {
 		return nil, err
 	}
+
+	return nil, errors.New("unimplemented")
 }
