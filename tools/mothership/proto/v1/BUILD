@@ -20,7 +20,9 @@ load("//tools/build_rules/oapi_gen:defs.bzl", "oapi_gen_ts")
 proto_library(
     name = "mothershippb_proto",
     srcs = [
+        "batch.proto",
         "entry.proto",
+        "process_rpm.proto",
         "srpm_archiver.proto",
     ],
     visibility = ["//visibility:public"],
@@ -28,6 +30,7 @@ proto_library(
         "@com_google_protobuf//:timestamp_proto",
         "@com_google_protobuf//:wrappers_proto",
         "@go_googleapis//google/api:annotations_proto",
+        "@go_googleapis//google/longrunning:longrunning_proto",
         "@googleapis//google/api:annotations_proto",
     ],
 )
@@ -49,6 +52,7 @@ go_proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "@go_googleapis//google/api:annotations_go_proto",
+        "@go_googleapis//google/longrunning:longrunning_go_proto",
         "@org_golang_google_genproto//googleapis/api/annotations",
     ],
 )

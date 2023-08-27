@@ -19,7 +19,10 @@ package peridot.tools.mothership.v1;
 import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
+import "google/longrunning/operations.proto";
+import "tools/mothership/proto/v1/batch.proto";
 import "tools/mothership/proto/v1/entry.proto";
+import "tools/mothership/proto/v1/process_rpm.proto";
 
 option java_multiple_files = true;
 option java_outer_classname = "SrpmArchiverProto";
@@ -33,6 +36,31 @@ option go_package = "go.resf.org/peridot/tools/mothership/pb;mothershippb";
 // importing SRPMs into the forge.
 service SrpmArchiver {
   option (google.api.default_host) = "mship.resf.org";
+
+  // Returns a batch
+  rpc GetBatch(GetBatchRequest) returns (Batch) {
+    option (google.api.http) = {
+      get: "/v1/{name=batches/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // Returns a list of batches that match the filter criteria.
+  rpc ListBatches(ListBatchesRequest) returns (ListBatchesResponse) {
+    option (google.api.http) = {
+      get: "/v1/batches"
+    };
+  }
+
+  // Creates a batch.
+  // Only worker credentials can create a batch.
+  rpc CreateBatch(CreateBatchRequest) returns (Batch) {
+    option (google.api.http) = {
+      post: "/v1/batches"
+      body: "batch"
+    };
+    option (google.api.method_signature) = "batch";
+  }
 
   // Returns an entry
   rpc GetEntry(GetEntryRequest) returns (Entry) {
@@ -48,6 +76,97 @@ service SrpmArchiver {
       get: "/v1/entries"
     };
   }
+
+  // Submits an SRPM to be archived.
+  // A worker can call this method to submit an SRPM to be archived.
+  // The call can occur even before uploading the SRPM to the object storage
+  // that way it can be ensured that a certain hash is "leased" by the worker.
+  // Other workers will still keep the hash in their backlog until the SRPM is
+  // verified processed.
+  // Until they can query an entry with `sha256_sum=X` matching the hash of the
+  // SRPM, it will not be deleted from the backlog.
+  // If after 2 hours the SRPM is not processed, the worker can assume that
+  // the SRPM is lost and can be re-uploaded. It that case, the entry will be
+  // re-assigned to the worker.
+  rpc SubmitEntry(SubmitEntryRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/entries:submitEntry"
+      body: "*"
+    };
+    option (google.longrunning.operation_info) = {
+      response_type: "ProcessRPMResponse"
+      metadata_type: "ProcessRPMMetadata"
+    };
+  }
+
+  // WorkerUploadObject is used by workers to upload objects to the
+  // object storage service.
+  // Returns 409 (Conflict) if the SRPM already exists. This should indicate to the
+  // worker that they should not continue processing the SRPM.
+  rpc WorkerUploadObject(stream WorkerUploadObjectRequest) returns (WorkerUploadObjectResponse) {
+    option (google.api.http) = {
+      post: "/v1/srpms:workerUploadObject"
+      body: "chunk"
+    };
+  }
+}
+
+// Request message for GetBatch method.
+message GetBatchRequest {
+  // The name of the batch to retrieve.
+  // For example: "batches/1234".
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for ListBatches method.
+message ListBatchesRequest {
+  // The maximum number of batches to return.
+  // The service may return fewer than this value.
+  // If unspecified, at most 50 batches will be returned.
+  // The maximum value is 1000; values above 1000 will return an error
+  int32 page_size = 1;
+
+  // A page token, received from a previous `ListBatches` call.
+  // Provide this to retrieve the subsequent page.
+  //
+  // When paginating, all other parameters provided to `ListBatches` must
+  // match the call that provided the page token.
+  string page_token = 2;
+
+  // The filter string, following the syntax described in
+  // https://google.aip.dev/160.
+  // Supports all fields of the `Batch` resource.
+  // Examples:
+  //   - By name: `name="batches/1234"`
+  string filter = 3;
+
+  // The order to sort the results by. For example: `name desc`.
+  // Supports all fields of the `Batch` resource.
+  // Needs a suffix of either `asc` or `desc`.
+  // Example: `name asc`, `created_at desc`.
+  string order_by = 4;
+}
+
+// Response message for ListBatches method.
+message ListBatchesResponse {
+  // The list of batches.
+  repeated Batch batches = 1;
+
+  // A token to retrieve next page of results.
+  // Pass this value in the
+  // [ListBatchesRequest.page_token][peridot.tools.mothership.v1.ListBatchesRequest.page_token]
+  // field in the subsequent call to `ListBatches` method to retrieve the next
+  // page of results.
+  string next_page_token = 2;
+}
+
+// Request message for CreateBatch method.
+message CreateBatchRequest {
+  // The batch to create.
+  Batch batch = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Custom ID for the batch. Optional
+  string batch_id = 2;
 }
 
 // Request message for GetEntry method.
@@ -62,7 +181,7 @@ message ListEntriesRequest {
   // The maximum number of entries to return.
   // The service may return fewer than this value.
   // If unspecified, at most 50 entries will be returned.
-  // The maximum value is 1000; values above 1000 will be coerced to 1000.
+  // The maximum value is 1000; values above 1000 will return an error
   int32 page_size = 1;
 
   // A page token, received from a previous `ListEntries` call.
@@ -97,4 +216,27 @@ message ListEntriesResponse {
   // field in the subsequent call to `ListEntries` method to retrieve the next
   // page of results.
   string next_page_token = 2;
+}
+
+// Request message for SubmitEntry method.
+message SubmitEntryRequest {
+  // Process request for RPM.
+  // This request is sent to the worker to process the RPM.
+  ProcessRPMRequest process_rpm_request = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The name of the batch to submit the entry to.
+  // For example: "batches/1234".
+  string batch = 2;
+}
+
+// Request message for WorkerUploadObject method.
+message WorkerUploadObjectRequest {
+  // The object to upload.
+  bytes chunk = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Response message for WorkerUploadObject method.
+message WorkerUploadObjectResponse {
+  // The object URI.
+  string uri = 1 [(google.api.field_behavior) = REQUIRED];
 }
