@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "curve25519",
+    srcs = [
+        "curve25519.go",
+        "curve25519_compat.go",
+        "curve25519_go120.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/golang.org/x/crypto/curve25519",
+    importpath = "golang.org/x/crypto/curve25519",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/golang.org/x/crypto/curve25519/internal/field"],
+)

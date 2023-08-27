@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "url",
+    srcs = ["url.go"],
+    importmap = "go.resf.org/peridot/vendor/github.com/go-git/go-git/v5/internal/url",
+    importpath = "github.com/go-git/go-git/v5/internal/url",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/go-git/go-git/v5:__subpackages__",
+    ],
+)

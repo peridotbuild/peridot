@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "sha3",
+    srcs = [
+        "doc.go",
+        "hashes.go",
+        "keccakf.go",
+        "rc.go",
+        "sha3.go",
+        "sha3_s390x.s",
+        "shake.go",
+        "xor.go",
+        "xor_generic.go",
+        "xor_unaligned.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/cloudflare/circl/internal/sha3",
+    importpath = "github.com/cloudflare/circl/internal/sha3",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/github.com/cloudflare/circl:__subpackages__",
+    ],
+)

@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "config",
+    srcs = [
+        "common.go",
+        "decoder.go",
+        "doc.go",
+        "encoder.go",
+        "format.go",
+        "option.go",
+        "section.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/go-git/go-git/v5/plumbing/format/config",
+    importpath = "github.com/go-git/go-git/v5/plumbing/format/config",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/go-git/gcfg"],
+)

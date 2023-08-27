@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ssh",
+    srcs = [
+        "auth_method.go",
+        "common.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/go-git/go-git/v5/plumbing/transport/ssh",
+    importpath = "github.com/go-git/go-git/v5/plumbing/transport/ssh",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/go-git/go-git/v5/plumbing/transport",
+        "//vendor/github.com/go-git/go-git/v5/plumbing/transport/internal/common",
+        "//vendor/github.com/kevinburke/ssh_config",
+        "//vendor/github.com/skeema/knownhosts",
+        "//vendor/github.com/xanzy/ssh-agent",
+        "//vendor/golang.org/x/crypto/ssh",
+        "@org_golang_x_net//proxy",
+    ],
+)

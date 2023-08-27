@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "field",
+    srcs = [
+        "fe.go",
+        "fe_amd64.go",
+        "fe_amd64.s",
+        "fe_amd64_noasm.go",
+        "fe_arm64.go",
+        "fe_arm64.s",
+        "fe_arm64_noasm.go",
+        "fe_generic.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/golang.org/x/crypto/curve25519/internal/field",
+    importpath = "golang.org/x/crypto/curve25519/internal/field",
+    visibility = [
+        "//third_party:__subpackages__",
+        "//vendor/golang.org/x/crypto/curve25519:__subpackages__",
+    ],
+)

@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "config",
+    srcs = [
+        "branch.go",
+        "config.go",
+        "modules.go",
+        "refspec.go",
+        "url.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/go-git/go-git/v5/config",
+    importpath = "github.com/go-git/go-git/v5/config",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/go-git/go-billy/v5/osfs",
+        "//vendor/github.com/go-git/go-git/v5/internal/url",
+        "//vendor/github.com/go-git/go-git/v5/plumbing",
+        "//vendor/github.com/go-git/go-git/v5/plumbing/format/config",
+    ],
+)

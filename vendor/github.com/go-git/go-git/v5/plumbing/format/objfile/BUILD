@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "objfile",
+    srcs = [
+        "doc.go",
+        "reader.go",
+        "writer.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/go-git/go-git/v5/plumbing/format/objfile",
+    importpath = "github.com/go-git/go-git/v5/plumbing/format/objfile",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/go-git/go-git/v5/plumbing",
+        "//vendor/github.com/go-git/go-git/v5/plumbing/format/packfile",
+        "//vendor/github.com/go-git/go-git/v5/utils/sync",
+    ],
+)
