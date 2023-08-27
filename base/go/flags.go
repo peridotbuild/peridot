@@ -17,6 +17,7 @@ package base
 import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/urfave/cli/v2"
+	"go.temporal.io/sdk/client"
 	"os"
 )
 
@@ -34,7 +35,13 @@ const (
 	EnvVarFrontendRequiredOIDCGroup    EnvVar = "FRONTEND_REQUIRED_OIDC_GROUP"
 	EnvVarTemporalNamespace            EnvVar = "TEMPORAL_NAMESPACE"
 	EnvVarTemporalAddress              EnvVar = "TEMPORAL_ADDRESS"
+	EnvVarTemporalTaskQueue            EnvVar = "TEMPORAL_TASK_QUEUE"
 	EnvVarFrontendSelf                 EnvVar = "FRONTEND_SELF"
+	EnvVarStorageEndpoint              EnvVar = "STORAGE_ENDPOINT"
+	EnvVarStorageConnectionString      EnvVar = "STORAGE_CONNECTION_STRING"
+	EnvVarStorageRegion                EnvVar = "STORAGE_REGION"
+	EnvVarStorageSecure                EnvVar = "STORAGE_SECURE"
+	EnvVarStoragePathStyle             EnvVar = "STORAGE_PATH_STYLE"
 )
 
 var defaultCliFlagsDatabaseOnly = []cli.Flag{
@@ -61,6 +68,12 @@ var defaultCliFlagsTemporal = append(defaultCliFlagsDatabaseOnly, []cli.Flag{
 		Usage:   "temporal address",
 		EnvVars: []string{string(EnvVarTemporalAddress)},
 		Value:   "localhost:7233",
+	},
+	&cli.StringFlag{
+		Name:    "temporal-task-queue",
+		Aliases: []string{"q"},
+		Usage:   "temporal task queue",
+		EnvVars: []string{string(EnvVarTemporalTaskQueue)},
 	},
 }...)
 
@@ -136,6 +149,39 @@ var defaultFrontendCliFlags = append(defaultFrontendNoAuthCliFlags, []cli.Flag{
 	},
 }...)
 
+var storageFlags = []cli.Flag{
+	&cli.StringFlag{
+		Name:    "storage-endpoint",
+		Usage:   "storage endpoint",
+		EnvVars: []string{string(EnvVarStorageEndpoint)},
+		Value:   "",
+	},
+	&cli.StringFlag{
+		Name:    "storage-connection-string",
+		Usage:   "storage connection string",
+		EnvVars: []string{string(EnvVarStorageConnectionString)},
+	},
+	&cli.StringFlag{
+		Name:    "storage-region",
+		Usage:   "storage region",
+		EnvVars: []string{string(EnvVarStorageRegion)},
+		// RESF default region
+		Value: "us-east-2",
+	},
+	&cli.BoolFlag{
+		Name:    "storage-secure",
+		Usage:   "storage secure",
+		EnvVars: []string{string(EnvVarStorageSecure)},
+		Value:   true,
+	},
+	&cli.BoolFlag{
+		Name:    "storage-path-style",
+		Usage:   "storage path style",
+		EnvVars: []string{string(EnvVarStoragePathStyle)},
+		Value:   false,
+	},
+}
+
 // WithDefaultCliFlags adds the default cli flags to the app.
 func WithDefaultCliFlags(flags ...cli.Flag) []cli.Flag {
 	return append(defaultCliFlags, flags...)
@@ -164,6 +210,11 @@ func WithDefaultFrontendNoAuthCliFlags(flags ...cli.Flag) []cli.Flag {
 // WithDefaultFrontendCliFlags adds the default frontend cli flags to the app.
 func WithDefaultFrontendCliFlags(flags ...cli.Flag) []cli.Flag {
 	return append(defaultFrontendCliFlags, flags...)
+}
+
+// WithStorageFlags adds the storage flags to the app.
+func WithStorageFlags(flags ...cli.Flag) []cli.Flag {
+	return append(storageFlags, flags...)
 }
 
 // FlagsToGRPCServerOptions converts the cli flags to gRPC server options.
@@ -211,6 +262,11 @@ func GetDBFromFlags(ctx *cli.Context) *DB {
 	return db
 }
 
+// GetTemporalClientFromFlags gets the temporal client from the cli flags.
+func GetTemporalClientFromFlags(ctx *cli.Context, opts client.Options) (client.Client, error) {
+	return NewTemporalClient(ctx.String("temporal-address"), ctx.String("temporal-namespace"), opts)
+}
+
 // ChangeDefaultForEnvVar changes the default value of a flag based on an environment variable.
 func ChangeDefaultForEnvVar(envVar EnvVar, newDefault string) {
 	// Check if the environment variable is set.
@@ -222,6 +278,11 @@ func ChangeDefaultForEnvVar(envVar EnvVar, newDefault string) {
 	if err := os.Setenv(string(envVar), newDefault); err != nil {
 		LogFatalf("failed to set environment variable %s: %v", envVar, err)
 	}
+}
+
+// RareUseChangeDefault changes the default value of an arbitrary environment variable.
+func RareUseChangeDefault(envVar string, newDefault string) {
+	ChangeDefaultForEnvVar(EnvVar(envVar), newDefault)
 }
 
 // ChangeDefaultDatabaseURL changes the default value of the database url based on an environment variable.
