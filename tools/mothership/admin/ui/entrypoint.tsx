@@ -21,12 +21,12 @@ import CssBaseline from '@mui/material/CssBaseline';
 import ThemeProvider from '@mui/material/styles/ThemeProvider';
 
 import { App } from './App';
-import { peridotTheme } from 'base/ts/mui/theme';
+import { peridotDarkTheme } from 'base/ts/mui/theme';
 
 const root = createRoot(document.getElementById('app') || document.body);
 root.render(
   <BrowserRouter basename={window.__peridot_prefix__ || ''}>
-    <ThemeProvider theme={peridotTheme}>
+    <ThemeProvider theme={peridotDarkTheme}>
       <CssBaseline />
       <App />
     </ThemeProvider>
