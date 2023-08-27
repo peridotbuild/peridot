@@ -21,6 +21,9 @@
     - "core::0133::http-uri-parent"
     - "core::0132::request-parent-required"
     - "core::0133::request-parent-required"
+    # We want to allow certain POST methods to set body to something other than "*".
+    # Useful for non-JSON payloads.
+    - "core::0136::http-body"
 - included_paths:
     - "third_party/**/*.proto"
     - "vendor/**/*.proto"
