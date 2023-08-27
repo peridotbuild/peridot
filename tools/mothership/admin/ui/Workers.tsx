@@ -29,9 +29,9 @@ import {
 
 export const Workers = () => {
   return (
-    <Box sx={{p: 1.5, width: '100%'}}>
+    <Box sx={{p: 1.5, px: 3, width: '100%'}}>
       <Box sx={{ mb: 2, ml: 'auto', textAlign: 'right' }}>
-        <Button href="/workers/create" variant="contained" size="small">
+        <Button href="/workers/create" variant="outlined" size="small">
           Create a new worker
         </Button>
       </Box>

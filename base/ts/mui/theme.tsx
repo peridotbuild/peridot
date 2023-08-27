@@ -16,7 +16,10 @@
 
 import React from 'react';
 import { createTheme, ThemeOptions } from '@mui/material/styles';
-import { Link as RouterLink, LinkProps as RouterLinkProps } from 'react-router-dom';
+import {
+  Link as RouterLink,
+  LinkProps as RouterLinkProps,
+} from 'react-router-dom';
 import { LinkProps } from '@mui/material/Link';
 
 const LinkBehavior = React.forwardRef<
@@ -52,3 +55,9 @@ export const peridotThemeOptions: ThemeOptions = {
 };
 
 export const peridotTheme = createTheme(peridotThemeOptions);
+export const peridotDarkTheme = createTheme({
+  ...peridotThemeOptions,
+  palette: {
+    mode: 'dark',
+  },
+});

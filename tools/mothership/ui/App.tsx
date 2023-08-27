@@ -33,7 +33,7 @@ export const App = () => {
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar
-        elevation={0}
+        elevation={5}
         position="fixed"
         sx={{ zIndex: (theme: Theme) => theme.zIndex.drawer + 1 }}
       >
