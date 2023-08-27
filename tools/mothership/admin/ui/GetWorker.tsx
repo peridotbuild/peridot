@@ -88,7 +88,8 @@ export const GetWorker = () => {
       </Dialog>
       <Box
         sx={{
-          p: 1.5,
+          px: 1.5,
+          height: '48px',
           display: 'flex',
           justifyContent: 'justify-between',
           alignItems: 'center',
