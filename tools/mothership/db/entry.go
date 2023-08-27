@@ -25,14 +25,15 @@ import (
 type Entry struct {
 	PikaTableName string `pika:"entries"`
 
-	Name       string         `db:"name"`
-	EntryID    string         `db:"entry_id"`
-	CreateTime time.Time      `db:"create_time"`
-	OSRelease  string         `db:"os_release"`
-	Sha256Sum  string         `db:"sha256_sum"`
-	WorkerID   sql.NullString `db:"worker_id"`
-	BatchName  sql.NullString `db:"batch_name"`
-	UserEmail  sql.NullString `db:"user_email"`
+	Name           string         `db:"name"`
+	EntryID        string         `db:"entry_id"`
+	CreateTime     time.Time      `db:"create_time"`
+	OSRelease      string         `db:"os_release"`
+	Sha256Sum      string         `db:"sha256_sum"`
+	RepositoryName string         `db:"repository_name"`
+	WorkerID       sql.NullString `db:"worker_id"`
+	BatchName      sql.NullString `db:"batch_name"`
+	UserEmail      sql.NullString `db:"user_email"`
 }
 
 func (e *Entry) GetID() string {
