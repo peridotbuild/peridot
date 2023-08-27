@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go-rpmutils",
+    srcs = [
+        "errors.go",
+        "fileinfo.go",
+        "filesigs.go",
+        "header.go",
+        "nevra.go",
+        "payload.go",
+        "rpmutils.go",
+        "signatures.go",
+        "tags.go",
+        "uncompress.go",
+        "uncompress_cgo.go",
+        "uncompress_nocgo.go",
+        "vercmp.go",
+        "verify.go",
+        "writeheader.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/sassoftware/go-rpmutils",
+    importpath = "github.com/sassoftware/go-rpmutils",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/DataDog/zstd",
+        "//vendor/github.com/klauspost/compress/zstd",
+        "//vendor/github.com/sassoftware/go-rpmutils/cpio",
+        "//vendor/github.com/sassoftware/go-rpmutils/fileutil",
+        "//vendor/github.com/ulikunitz/xz/lzma",
+        "//vendor/github.com/xi2/xz",
+        "//vendor/golang.org/x/crypto/openpgp",
+        "//vendor/golang.org/x/crypto/openpgp/packet",
+    ],
+)

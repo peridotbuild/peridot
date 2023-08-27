@@ -517,6 +517,12 @@ def go_dependencies():
         sum = "h1:Shsta01QNfFxHCfpW6YH2STWB0MudeXXEWMr20OEh60=",
         version = "v1.5.0",
     )
+    go_repository(
+        name = "com_github_datadog_zstd",
+        importpath = "github.com/DataDog/zstd",
+        sum = "h1:EndNeuB0l9syBZhut0wns3gV1hL8zX8LIu6ZiVHWLIQ=",
+        version = "v1.4.5",
+    )
 
     go_repository(
         name = "com_github_davecgh_go_spew",
@@ -712,6 +718,12 @@ def go_dependencies():
         importpath = "github.com/go-errors/errors",
         sum = "h1:J6MZopCL4uSllY1OfXM374weqZFFItUbrImctkmUxIA=",
         version = "v1.4.2",
+    )
+    go_repository(
+        name = "com_github_go_git_go_billy_v5",
+        importpath = "github.com/go-git/go-billy/v5",
+        sum = "h1:Uwp5tDRkPr+l/TnbHOQzp+tmJfLceOlbVucgpTz8ix4=",
+        version = "v5.4.1",
     )
 
     go_repository(
@@ -1866,6 +1878,13 @@ def go_dependencies():
         version = "v0.0.0-20190219015601-e8b6b52668fe",
     )
     go_repository(
+        name = "com_github_sassoftware_go_rpmutils",
+        importpath = "github.com/sassoftware/go-rpmutils",
+        sum = "h1:pKW0HDYMFWQ5b4JQPiI3WI12hGsVoW0V8+GMoZiI/JE=",
+        version = "v0.2.0",
+    )
+
+    go_repository(
         name = "com_github_seccomp_libseccomp_golang",
         importpath = "github.com/seccomp/libseccomp-golang",
         sum = "h1:RpforrEYXWkmGwJHIGnLZ3tTWStkjVVstwzNGqxX2Ds=",
@@ -2087,6 +2106,13 @@ def go_dependencies():
         sum = "h1:td4jdvLcExb4cBISKIpHuGoVXh+dVKhn2Um6rjCsSsg=",
         version = "v2.4.1+incompatible",
     )
+    go_repository(
+        name = "com_github_ulikunitz_xz",
+        importpath = "github.com/ulikunitz/xz",
+        sum = "h1:RsKRIA2MO8x56wkkcd3LbtcE/uMszhb6DpRf+3uwa3I=",
+        version = "v0.5.9",
+    )
+
     go_repository(
         name = "com_github_urfave_cli",
         importpath = "github.com/urfave/cli",

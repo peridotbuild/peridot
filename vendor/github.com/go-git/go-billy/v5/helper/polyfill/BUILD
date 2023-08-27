@@ -1,0 +1,10 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "polyfill",
+    srcs = ["polyfill.go"],
+    importmap = "go.resf.org/peridot/vendor/github.com/go-git/go-billy/v5/helper/polyfill",
+    importpath = "github.com/go-git/go-billy/v5/helper/polyfill",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/go-git/go-billy/v5:go-billy"],
+)

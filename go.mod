@@ -10,16 +10,20 @@ replace (
 )
 
 require (
+	github.com/aws/aws-sdk-go v1.44.331
 	github.com/bazelbuild/bazel-watcher v0.23.7
 	github.com/coreos/go-oidc/v3 v3.6.0
 	github.com/dexidp/dex v0.0.0-20230804184036-a9d1fd31c329
+	github.com/go-git/go-billy/v5 v5.4.1
 	github.com/google/addlicense v1.1.1
 	github.com/googleapis/api-linter v1.56.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.17.1
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
+	github.com/sassoftware/go-rpmutils v0.2.0
 	github.com/stretchr/testify v1.8.4
 	github.com/temporalio/temporalite v0.3.1-0.20230117200252-2df426ad3426
 	github.com/testcontainers/testcontainers-go v0.21.0
@@ -31,6 +35,9 @@ require (
 	go.resf.org/peridot/tools/mothership/admin/pb v0.0.0-00010101000000-000000000000
 	go.resf.org/peridot/tools/mothership/pb v0.0.0-00010101000000-000000000000
 	go.starlark.net v0.0.0-20230814145427-12f4cb8177e4
+	go.temporal.io/api v1.13.1-0.20221110200459-6a3cb21a3415
+	go.temporal.io/sdk v1.19.0
+	golang.org/x/crypto v0.12.0
 	golang.org/x/mod v0.12.0
 	golang.org/x/oauth2 v0.11.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d
@@ -54,6 +61,7 @@ require (
 	github.com/AppsFlyer/go-sundheit v0.5.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
@@ -63,7 +71,6 @@ require (
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230512164433-5d1fd1a340c9 // indirect
 	github.com/apache/thrift v0.18.1 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
-	github.com/aws/aws-sdk-go v1.44.331 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/beevik/etree v1.2.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
@@ -171,7 +178,6 @@ require (
 	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pborman/uuid v1.2.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
@@ -196,8 +202,10 @@ require (
 	github.com/twmb/murmur3 v1.1.8 // indirect
 	github.com/uber-common/bark v1.3.0 // indirect
 	github.com/uber-go/tally/v4 v4.1.6 // indirect
+	github.com/ulikunitz/xz v0.5.9 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
+	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2 // indirect
 	github.com/zclconf/go-cty v1.13.3 // indirect
@@ -218,8 +226,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v0.31.0 // indirect
 	go.opentelemetry.io/otel/trace v1.10.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
-	go.temporal.io/api v1.13.1-0.20221110200459-6a3cb21a3415 // indirect
-	go.temporal.io/sdk v1.19.0 // indirect
 	go.temporal.io/server v1.19.1 // indirect
 	go.temporal.io/version v0.3.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
@@ -227,7 +233,6 @@ require (
 	go.uber.org/fx v1.19.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
-	golang.org/x/crypto v0.12.0 // indirect
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
