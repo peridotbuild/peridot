@@ -1,6 +1,53 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 # ------------------------------------------------------------------------------
+# rules_py
+# ------------------------------------------------------------------------------
+http_archive(
+    name = "aspect_rules_py",
+    sha256 = "d87463035d7df79b79e9a03247c463bda3623f26b7a24dd1ebee9ced2be38f4e",
+    strip_prefix = "rules_py-0.3.0",
+    url = "https://github.com/aspect-build/rules_py/releases/download/v0.3.0/rules_py-v0.3.0.tar.gz",
+)
+
+http_archive(
+    name = "rules_python",
+    patch_cmds = ["""\
+cat >> python/BUILD.bazel <<EOF
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+
+bzl_library(
+    name = "defs",
+    srcs = [
+        ":bzl",
+        "@bazel_tools//tools/python:srcs_version.bzl",
+        "@bazel_tools//tools/python:utils.bzl",
+        "@bazel_tools//tools/python:private/defs.bzl",
+        "@bazel_tools//tools/python:toolchain.bzl",
+    ],
+    visibility = ["//visibility:public"],
+)
+EOF
+"""],
+    sha256 = "5868e73107a8e85d8f323806e60cad7283f34b32163ea6ff1020cf27abef6036",
+    strip_prefix = "rules_python-0.25.0",
+    url = "https://github.com/bazelbuild/rules_python/releases/download/0.25.0/rules_python-0.25.0.tar.gz",
+)
+
+load("@rules_python//python:repositories.bzl", "py_repositories")
+
+py_repositories()
+
+load("@rules_python//python:repositories.bzl", "python_register_toolchains")
+
+python_register_toolchains(
+    name = "python_3_11",
+    # Available versions are listed in @rules_python//python:versions.bzl.
+    # We recommend using the same version your team is already standardized on.
+    python_version = "3.11",
+)
+
+# ------------------------------------------------------------------------------
 # bazel_skylib
 # ------------------------------------------------------------------------------
 http_archive(
