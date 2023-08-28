@@ -25,6 +25,7 @@ export interface ResourceViewField {
   key: string;
   label: string;
   type?: 'text' | 'number' | 'date';
+  linkToSelf?: boolean;
 }
 
 export interface ResourceViewProps<T> {
@@ -46,7 +47,18 @@ export function ResourceView<T>(props: ResourceViewProps<T>) {
             <Box sx={{ my: 2.5 }}>
               <Typography variant="subtitle2">{field.label}</Typography>
               <Typography variant="body1">
-                {(props.resource as any)[field.key]?.toString() || '--'}
+                {field.linkToSelf ? (() => {
+                  const value = (props.resource as any)[field.key]?.toString();
+                  if (!value) {
+                    return '--';
+                  }
+
+                  return (
+                    <a href={value} target="_blank" rel="noreferrer">
+                      {value}
+                    </a>
+                  );
+                })() : (props.resource as any)[field.key]?.toString() || '--'}
               </Typography>
             </Box>
           ))}
