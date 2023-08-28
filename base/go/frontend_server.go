@@ -108,6 +108,13 @@ var frontendHtmlTemplate = `
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap"
     />
+
+    <style>
+        a, a:link, a:active, a:hover {
+          /* color: inherit; */
+          color: #66b2ff;
+        }
+    </style>
 </head>
 <body>
     <div id="app"></div>
