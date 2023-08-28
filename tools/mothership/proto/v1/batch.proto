@@ -42,6 +42,7 @@ message Batch {
   google.protobuf.Timestamp update_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the batch was sealed.
+  // Batches are automatically sealed after an hour of inactivity.
   google.protobuf.Timestamp seal_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Bugtracker URI of the batch.
