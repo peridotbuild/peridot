@@ -16,6 +16,7 @@ require (
 	github.com/dexidp/dex v0.0.0-20230804184036-a9d1fd31c329
 	github.com/go-git/go-billy/v5 v5.4.1
 	github.com/go-git/go-git/v5 v5.8.1
+	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/addlicense v1.1.1
 	github.com/googleapis/api-linter v1.56.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
