@@ -24,28 +24,30 @@ import (
 
 func FromFlags(ctx *cli.Context) (*S3, error) {
 	// Parse the connection string
-	parsedURI, err := url.Parse(ctx.String(string(base.EnvVarStorageConnectionString)))
+	parsedURI, err := url.Parse(ctx.String("storage-connection-string"))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse storage connection string")
 	}
 
 	// Retrieve the bucket name
-	bucket := parsedURI.Path
+	bucket := parsedURI.Host
 
 	// Remove the leading/trailing slashes
 	bucket = strings.TrimSuffix(strings.TrimPrefix(bucket, "/"), "/")
 
 	// Convert certain flags into environment variables so that they can be used by the AWS SDK
-	base.RareUseChangeDefault("AWS_REGION", ctx.String(string(base.EnvVarStorageRegion)))
-	base.RareUseChangeDefault("AWS_ENDPOINT", ctx.String(string(base.EnvVarStorageEndpoint)))
+	base.RareUseChangeDefault("AWS_REGION", ctx.String("storage-region"))
+	base.RareUseChangeDefault("AWS_ENDPOINT", ctx.String("storage-endpoint"))
 
-	if !ctx.Bool(string(base.EnvVarStorageSecure)) {
+	if !ctx.Bool("storage-secure") {
 		base.RareUseChangeDefault("AWS_DISABLE_SSL", "true")
 	}
 
-	if ctx.Bool(string(base.EnvVarStoragePathStyle)) {
+	if ctx.Bool("storage-path-style") {
 		base.RareUseChangeDefault("AWS_S3_FORCE_PATH_STYLE", "true")
 	}
+
+	base.LogInfof("Using S3 bucket: %s", bucket)
 
 	return New(bucket)
 }

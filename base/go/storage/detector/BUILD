@@ -22,7 +22,9 @@ go_library(
     deps = [
         "//base/go",
         "//base/go/storage",
+        "//base/go/storage/memory",
         "//base/go/storage/s3",
+        "//vendor/github.com/go-git/go-billy/v5/osfs",
         "//vendor/github.com/pkg/errors",
         "//vendor/github.com/urfave/cli/v2:cli",
     ],

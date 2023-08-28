@@ -15,16 +15,17 @@
 package storage_detector
 
 import (
+	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
-	base "go.resf.org/peridot/base/go"
 	"go.resf.org/peridot/base/go/storage"
+	storage_memory "go.resf.org/peridot/base/go/storage/memory"
 	storage_s3 "go.resf.org/peridot/base/go/storage/s3"
 	"net/url"
 )
 
 func FromFlags(ctx *cli.Context) (storage.Storage, error) {
-	parsedURI, err := url.Parse(ctx.String(string(base.EnvVarStorageConnectionString)))
+	parsedURI, err := url.Parse(ctx.String("storage-connection-string"))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse storage connection string")
 	}
@@ -32,6 +33,8 @@ func FromFlags(ctx *cli.Context) (storage.Storage, error) {
 	switch parsedURI.Scheme {
 	case "s3":
 		return storage_s3.FromFlags(ctx)
+	case "memory":
+		return storage_memory.New(osfs.New("/")), nil
 	default:
 		return nil, errors.Errorf("unknown storage scheme: %s", parsedURI.Scheme)
 	}

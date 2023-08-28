@@ -25,7 +25,6 @@ import (
 	"go.resf.org/peridot/base/go/storage"
 	"net/url"
 	"os"
-	"strings"
 )
 
 // S3 is an implementation of the Storage interface for S3.
@@ -178,22 +177,8 @@ func (s *S3) CanReadURI(uri string) (bool, error) {
 		return false, nil
 	}
 
-	// Split the path into bucket and object.
-	// The first element is the bucket, the rest is the object.
-	split := strings.SplitN(parsed.Path, "/", 2)
-
-	// Verify length.
-	if len(split) < 2 {
-		return false, nil
-	}
-
-	// Verify bucket.
-	if split[0] != s.bucket {
-		return false, nil
-	}
-
-	// Verify object.
-	if len(split[1]) == 0 {
+	// Verify that the host matches the bucket.
+	if parsed.Host != s.bucket {
 		return false, nil
 	}
 

@@ -282,7 +282,15 @@ func ChangeDefaultForEnvVar(envVar EnvVar, newDefault string) {
 
 // RareUseChangeDefault changes the default value of an arbitrary environment variable.
 func RareUseChangeDefault(envVar string, newDefault string) {
-	ChangeDefaultForEnvVar(EnvVar(envVar), newDefault)
+	// Check if the environment variable is set.
+	if _, ok := os.LookupEnv(envVar); ok {
+		return
+	}
+
+	// Change the default value.
+	if err := os.Setenv(envVar, newDefault); err != nil {
+		LogFatalf("failed to set environment variable %s: %v", envVar, err)
+	}
 }
 
 // ChangeDefaultDatabaseURL changes the default value of the database url based on an environment variable.
