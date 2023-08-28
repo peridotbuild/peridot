@@ -17,16 +17,22 @@ package mothership_worker_server
 import (
 	base "go.resf.org/peridot/base/go"
 	"go.resf.org/peridot/base/go/storage"
+	"go.resf.org/peridot/tools/mothership/worker_server/forge"
+	"golang.org/x/crypto/openpgp"
 )
 
 type Worker struct {
 	db      *base.DB
 	storage storage.Storage
+	gpgKeys openpgp.EntityList
+	forge   forge.Forge
 }
 
-func New(db *base.DB, storage storage.Storage) *Worker {
+func New(db *base.DB, storage storage.Storage, gpgKeys openpgp.EntityList, forge forge.Forge) *Worker {
 	return &Worker{
 		db:      db,
 		storage: storage,
+		gpgKeys: gpgKeys,
+		forge:   forge,
 	}
 }

@@ -48,5 +48,19 @@ func ProcessRPMWorkflow(ctx workflow.Context, req *mothershippb.ProcessRPMReques
 		return nil, err
 	}
 
+	// If resource exists, then we can start the import.
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		// We'll wait up to 5 minutes for the import to finish.
+		// Most imports are fast, but some packages are very large.
+		StartToCloseTimeout: 5 * time.Minute,
+		RetryPolicy: &temporal.RetryPolicy{
+			MaximumAttempts: 0,
+		},
+	})
+	err = workflow.ExecuteActivity(ctx, w.ImportRPM, req.RpmUri, req.Checksum).Get(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, errors.New("unimplemented")
 }
