@@ -15,7 +15,6 @@
 package mothership_worker_server
 
 import (
-	"errors"
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -28,7 +27,7 @@ var w Worker
 // Usually a client worker will first initiate an upload to the storage backend,
 // then send a request to the Server `SubmitEntry` method (or send a request
 // then upload the resource).
-func ProcessRPMWorkflow(ctx workflow.Context, req *mothershippb.ProcessRPMRequest) (*mothershippb.ProcessRPMResponse, error) {
+func ProcessRPMWorkflow(ctx workflow.Context, args *mothershippb.ProcessRPMArgs) (*mothershippb.ProcessRPMResponse, error) {
 	// First verify that the resource exists.
 	// The resource can be uploaded after the request is sent.
 	// So we should wait up to 2 hours. The initial timeouts should be low
@@ -43,7 +42,7 @@ func ProcessRPMWorkflow(ctx workflow.Context, req *mothershippb.ProcessRPMReques
 			MaximumAttempts: (60 * 60 * 2) / 25,
 		},
 	})
-	err := workflow.ExecuteActivity(ctx, w.VerifyResourceExists, req.RpmUri).Get(ctx, nil)
+	err := workflow.ExecuteActivity(ctx, w.VerifyResourceExists, args.Request.RpmUri).Get(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,10 +56,23 @@ func ProcessRPMWorkflow(ctx workflow.Context, req *mothershippb.ProcessRPMReques
 			MaximumAttempts: 0,
 		},
 	})
-	err = workflow.ExecuteActivity(ctx, w.ImportRPM, req.RpmUri, req.Checksum).Get(ctx, nil)
+	var importRpmRes mothershippb.ImportRPMResponse
+	err = workflow.ExecuteActivity(ctx, w.ImportRPM, args.Request.RpmUri, args.Request.Checksum).Get(ctx, &importRpmRes)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, errors.New("unimplemented")
+	// Now the import has reached the Git forge. Let's create an entry.
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 25 * time.Second,
+	})
+	var entry mothershippb.Entry
+	err = workflow.ExecuteActivity(ctx, w.CreateEntry, args, &importRpmRes).Get(ctx, &entry)
+	if err != nil {
+		return nil, err
+	}
+
+	return &mothershippb.ProcessRPMResponse{
+		Entry: &entry,
+	}, nil
 }

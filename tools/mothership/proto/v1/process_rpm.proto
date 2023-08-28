@@ -40,6 +40,29 @@ message ProcessRPMRequest {
   // Self reported checksum of the RPM
   // Must be a SHA256 checksum and match the RPM
   string checksum = 3 [(google.api.field_behavior) = REQUIRED];
+
+  // Self reported repository of the RPM
+  // e.g. BaseOS
+  string repository = 4 [(google.api.field_behavior) = REQUIRED];
+
+  // Batch to associate the RPM with
+  string batch = 5;
+}
+
+// ProcessRPMInternalRequest is the request message that the Server
+// uses in its call to the ProcessRPM workflow
+message ProcessRPMInternalRequest {
+  // Worker ID of the worker processing the RPM
+  string worker_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// ProcessRPMArgs is the arguments for the ProcessRPM workflow
+message ProcessRPMArgs {
+  // Public request
+  ProcessRPMRequest request = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Internal request
+  ProcessRPMInternalRequest internal_request = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 // ProcessRPMMetadata is the metadata for the ProcessRPM workflow
@@ -62,4 +85,11 @@ message ImportRPMResponse {
   // Commit hash of the imported RPM
   // e.g. 1234567890abcdef1234567890abcdef12345678
   string commit_hash = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Commit URI of the imported RPM
+  string commit_uri = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // NEVRA of the imported RPM
+  // e.g. rpm-1.0.0-1.el8.x86_64
+  string nevra = 3 [(google.api.field_behavior) = REQUIRED];
 }

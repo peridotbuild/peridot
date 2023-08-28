@@ -20,7 +20,6 @@ go_library(
     importpath = "go.resf.org/peridot/base/go/storage/detector",
     visibility = ["//visibility:public"],
     deps = [
-        "//base/go",
         "//base/go/storage",
         "//base/go/storage/memory",
         "//base/go/storage/s3",

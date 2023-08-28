@@ -176,7 +176,11 @@ func (w *Worker) ImportRPM(uri string, checksumSha256 string) (*mothershippb.Imp
 		return nil, errors.Wrap(err, "failed to import SRPM")
 	}
 
+	commitURI := w.forge.GetCommitViewerURL(repoName, commit.Hash.String())
+
 	return &mothershippb.ImportRPMResponse{
 		CommitHash: commit.Hash.String(),
+		CommitUri:  commitURI,
+		Nevra:      nevra.String(),
 	}, nil
 }

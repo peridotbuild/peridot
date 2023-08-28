@@ -17,6 +17,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "worker_server",
     srcs = [
+        "entry.go",
         "process_rpm.go",
         "worker.go",
         "workflows.go",
@@ -26,6 +27,7 @@ go_library(
     deps = [
         "//base/go",
         "//base/go/storage",
+        "//tools/mothership/db",
         "//tools/mothership/proto/v1:pb",
         "//tools/mothership/worker_server/forge",
         "//tools/mothership/worker_server/srpm_import",

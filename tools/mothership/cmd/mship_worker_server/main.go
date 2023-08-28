@@ -102,6 +102,7 @@ func run(ctx *cli.Context) error {
 }
 
 func main() {
+	base.ChangeDefaultDatabaseURL("mothership")
 	base.ChangeDefaultForEnvVar(base.EnvVarTemporalTaskQueue, "mship_worker_server")
 
 	flags := base.WithDefaultCliFlagsTemporal(base.WithStorageFlags()...)
