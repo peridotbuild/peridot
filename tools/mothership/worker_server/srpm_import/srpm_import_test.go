@@ -125,6 +125,35 @@ func TestUploadLookaside_NotEmpty(t *testing.T) {
 	require.True(t, ok)
 }
 
+func TestUploadLookaside_NotEmpty_OnlyOnceForHash(t *testing.T) {
+	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm")
+	require.Nil(t, err)
+	require.NotNil(t, s)
+	defer func() {
+		require.Nil(t, s.Close())
+	}()
+	require.Nil(t, s.determineLookasideBlobs())
+
+	fs := osfs.New("/")
+	lookaside := storage_memory.New(fs)
+	require.Nil(t, s.uploadLookasideBlobs(lookaside))
+
+	ok, err := lookaside.Exists("d86b3392c1202e8ff5a423b302e6284db7f8f435ea9f39b5b1b20fd3ac36dfcb")
+	require.Nil(t, err)
+	require.True(t, ok)
+
+	_, err = lookaside.PutBytes("d86b3392c1202e8ff5a423b302e6284db7f8f435ea9f39b5b1b20fd3ac36dfcb", []byte("test"))
+	require.Nil(t, err)
+
+	require.Nil(t, s.uploadLookasideBlobs(lookaside))
+
+	bts, err := lookaside.Get("d86b3392c1202e8ff5a423b302e6284db7f8f435ea9f39b5b1b20fd3ac36dfcb")
+	require.Nil(t, err)
+	// This verifies that the upload only checked for the hash once, and didn't
+	// overwrite the existing blob.
+	require.Equal(t, []byte("test"), bts)
+}
+
 func TestWriteMetadataFile(t *testing.T) {
 	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm")
 	require.Nil(t, err)
