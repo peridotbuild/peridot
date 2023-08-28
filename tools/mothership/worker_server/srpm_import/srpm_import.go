@@ -231,7 +231,7 @@ func (s *State) uploadLookasideBlobs(lookaside storage.Storage) error {
 //
 // For example:
 //
-//	SOURCES/bar 1234567890abcdef
+//	1234567890abcdef SOURCES/bar
 func (s *State) writeMetadataFile(targetFS billy.Filesystem) error {
 	// Open metadata file for writing.
 	name, err := s.rpm.Header.GetStrings(rpmutils.NAME)
@@ -249,7 +249,7 @@ func (s *State) writeMetadataFile(targetFS billy.Filesystem) error {
 	// Write each line to the metadata file.
 	for path, hash := range s.lookasideBlobs {
 		// RPM sources MUST be in SOURCES/ directory
-		_, err = f.Write([]byte(filepath.Join("SOURCES", path) + " " + hash + "\n"))
+		_, err = f.Write([]byte(hash + " " + filepath.Join("SOURCES", path) + "\n"))
 		if err != nil {
 			return errors.Wrap(err, "failed to write line to metadata file")
 		}
@@ -467,7 +467,6 @@ func (s *State) populateTargetRepo(repo *git.Repository, targetFS billy.Filesyst
 	}
 	importStr := fmt.Sprintf("import %s-%s-%s", nevra.Name, nevra.Version, nevra.Release)
 	hash, err := wt.Commit(importStr, &git.CommitOptions{
-		All: true,
 		Author: &object.Signature{
 			Name:  s.authorName,
 			Email: s.authorEmail,
@@ -534,7 +533,8 @@ func (s *State) Import(opts *git.CloneOptions, storer storage2.Storer, targetFS 
 	}
 	dist := elDistRegex.FindString(nevra.Release)
 	err = s.pushTargetRepo(repo, &git.PushOptions{
-		Auth: opts.Auth,
+		Force: true,
+		Auth:  opts.Auth,
 		RefSpecs: []config.RefSpec{
 			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", dist)),
 			config.RefSpec(fmt.Sprintf("refs/tags/imports/%s/*:refs/tags/imports/%[1]s/*", dist)),

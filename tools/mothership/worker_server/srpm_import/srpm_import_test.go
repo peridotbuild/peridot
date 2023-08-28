@@ -150,7 +150,7 @@ func TestWriteMetadataFile(t *testing.T) {
 	n, err := f.Read(buf)
 	require.Nil(t, err)
 
-	require.Equal(t, "SOURCES/bash-4.4.tar.gz d86b3392c1202e8ff5a423b302e6284db7f8f435ea9f39b5b1b20fd3ac36dfcb\n", string(buf[:n]))
+	require.Equal(t, "d86b3392c1202e8ff5a423b302e6284db7f8f435ea9f39b5b1b20fd3ac36dfcb SOURCES/bash-4.4.tar.gz\n", string(buf[:n]))
 
 	f, err = fs.Open(".gitignore")
 	require.Nil(t, err)
@@ -232,7 +232,7 @@ func TestWriteMetadataExpandLayout(t *testing.T) {
 	buf, err := io.ReadAll(f)
 	require.Nil(t, err)
 
-	require.Equal(t, "SOURCES/efi-rpm-macros-3.tar.bz2 f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86\n", string(buf))
+	require.Equal(t, "f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86 SOURCES/efi-rpm-macros-3.tar.bz2\n", string(buf))
 }
 
 func TestGetRepo_New(t *testing.T) {
@@ -484,7 +484,7 @@ func TestPopulateTargetRepo_New(t *testing.T) {
 	require.Nil(t, err)
 	buf, err := io.ReadAll(f)
 	require.Nil(t, err)
-	require.Equal(t, "SOURCES/efi-rpm-macros-3.tar.bz2 f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86\n", string(buf))
+	require.Equal(t, "f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86 SOURCES/efi-rpm-macros-3.tar.bz2\n", string(buf))
 
 	// Verify layout
 	ls, err := fs.ReadDir(".")
@@ -621,7 +621,7 @@ func TestPopulateTargetRepo_Existing(t *testing.T) {
 	require.Nil(t, err)
 	buf, err := io.ReadAll(f)
 	require.Nil(t, err)
-	require.Equal(t, "SOURCES/efi-rpm-macros-3.tar.bz2 f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86\n", string(buf))
+	require.Equal(t, "f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86 SOURCES/efi-rpm-macros-3.tar.bz2\n", string(buf))
 
 	// Verify layout
 	ls, err := fs.ReadDir(".")
@@ -769,7 +769,7 @@ func TestImport1_New(t *testing.T) {
 	require.Nil(t, err)
 	buf, err := io.ReadAll(f)
 	require.Nil(t, err)
-	require.Equal(t, "SOURCES/efi-rpm-macros-3.tar.bz2 f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86\n", string(buf))
+	require.Equal(t, "f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86 SOURCES/efi-rpm-macros-3.tar.bz2\n", string(buf))
 
 	// Verify layout
 	ls, err := fs.ReadDir(".")
@@ -851,7 +851,7 @@ func TestImport2_New(t *testing.T) {
 	require.Nil(t, err)
 	buf, err := io.ReadAll(f)
 	require.Nil(t, err)
-	require.Equal(t, "SOURCES/bash-4.4.tar.gz d86b3392c1202e8ff5a423b302e6284db7f8f435ea9f39b5b1b20fd3ac36dfcb\n", string(buf))
+	require.Equal(t, "d86b3392c1202e8ff5a423b302e6284db7f8f435ea9f39b5b1b20fd3ac36dfcb SOURCES/bash-4.4.tar.gz\n", string(buf))
 
 	// Verify layout
 	ls, err := fs.ReadDir(".")
