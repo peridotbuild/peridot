@@ -202,7 +202,20 @@ func (s *State) determineLookasideBlobs() error {
 func (s *State) uploadLookasideBlobs(lookaside storage.Storage) error {
 	// The object name is the SHA256 hash of the file.
 	for path, hash := range s.lookasideBlobs {
-		_, err := lookaside.Put(hash, filepath.Join(s.tempDir, path))
+		// First check if they exist, since it's a waste of time to upload
+		// something that already exists.
+		// They are uploaded by hash, so if the hash already exists, then the
+		// file already exists.
+		exists, err := lookaside.Exists(hash)
+		if err != nil {
+			return errors.Wrap(err, "failed to check if blob exists")
+		}
+
+		if exists {
+			continue
+		}
+
+		_, err = lookaside.Put(hash, filepath.Join(s.tempDir, path))
 		if err != nil {
 			return errors.Wrap(err, "failed to upload file")
 		}
@@ -334,11 +347,12 @@ func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS
 	}
 
 	// Create a new remote
-	refspec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%[1]s", dist))
 	_, err = repo.CreateRemote(&config.RemoteConfig{
-		Name:  "origin",
-		URLs:  []string{opts.URL},
-		Fetch: []config.RefSpec{refspec},
+		Name: "origin",
+		URLs: []string{opts.URL},
+		Fetch: []config.RefSpec{
+			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", dist)),
+		},
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create remote")
@@ -346,8 +360,11 @@ func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS
 
 	// Fetch the remote
 	err = repo.Fetch(&git.FetchOptions{
+		Auth:       opts.Auth,
 		RemoteName: "origin",
-		RefSpecs:   []config.RefSpec{refspec},
+		RefSpecs: []config.RefSpec{
+			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", dist)),
+		},
 	})
 
 	// Checkout the branch
@@ -360,7 +377,7 @@ func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS
 		}
 	} else {
 		err = wt.Checkout(&git.CheckoutOptions{
-			Branch: plumbing.NewRemoteReferenceName("origin", dist),
+			Branch: plumbing.NewBranchReferenceName(dist),
 			Force:  true,
 		})
 	}
@@ -450,11 +467,13 @@ func (s *State) populateTargetRepo(repo *git.Repository, targetFS billy.Filesyst
 	}
 	importStr := fmt.Sprintf("import %s-%s-%s", nevra.Name, nevra.Version, nevra.Release)
 	hash, err := wt.Commit(importStr, &git.CommitOptions{
+		All: true,
 		Author: &object.Signature{
 			Name:  s.authorName,
 			Email: s.authorEmail,
 			When:  time.Now(),
 		},
+		AllowEmptyCommits: true,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to commit changes")
@@ -495,34 +514,47 @@ func (s *State) pushTargetRepo(repo *git.Repository, opts *git.PushOptions) erro
 }
 
 // Import imports the SRPM into the target repository.
-func (s *State) Import(opts *git.CloneOptions, storer storage2.Storer, targetFS billy.Filesystem, lookaside storage.Storage) error {
+func (s *State) Import(opts *git.CloneOptions, storer storage2.Storer, targetFS billy.Filesystem, lookaside storage.Storage) (*object.Commit, error) {
 	// Get the target repository.
 	repo, err := s.getRepo(opts, storer, targetFS)
 	if err != nil {
-		return errors.Wrap(err, "failed to get repo")
+		return nil, errors.Wrap(err, "failed to get repo")
 	}
 
 	// Populate the target repository.
 	err = s.populateTargetRepo(repo, targetFS, lookaside)
 	if err != nil {
-		return errors.Wrap(err, "failed to populate target repo")
+		return nil, errors.Wrap(err, "failed to populate target repo")
 	}
 
 	// Push the target repository.
 	nevra, err := s.rpm.Header.GetNEVRA()
 	if err != nil {
-		return errors.Wrap(err, "failed to get NEVRA")
+		return nil, errors.Wrap(err, "failed to get NEVRA")
 	}
 	dist := elDistRegex.FindString(nevra.Release)
 	err = s.pushTargetRepo(repo, &git.PushOptions{
+		Auth: opts.Auth,
 		RefSpecs: []config.RefSpec{
 			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", dist)),
 			config.RefSpec(fmt.Sprintf("refs/tags/imports/%s/*:refs/tags/imports/%[1]s/*", dist)),
 		},
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to push target repo")
+		return nil, errors.Wrap(err, "failed to push target repo")
 	}
 
-	return nil
+	// Get latest commit
+	head, err := repo.Head()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get HEAD")
+	}
+
+	// Get commit object
+	commit, err := repo.CommitObject(head.Hash())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get commit object")
+	}
+
+	return commit, nil
 }

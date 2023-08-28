@@ -736,7 +736,8 @@ func TestImport1_New(t *testing.T) {
 	storer := memory.NewStorage()
 	fs := memfs.New()
 	lookaside := storage_memory.New(osfs.New("/"))
-	require.Nil(t, s.Import(opts, storer, fs, lookaside))
+	_, err = s.Import(opts, storer, fs, lookaside)
+	require.Nil(t, err)
 
 	// Open repo
 	repo, err := git.PlainOpen(tempDir)
@@ -817,7 +818,8 @@ func TestImport2_New(t *testing.T) {
 	storer := memory.NewStorage()
 	fs := memfs.New()
 	lookaside := storage_memory.New(osfs.New("/"))
-	require.Nil(t, s.Import(opts, storer, fs, lookaside))
+	_, err = s.Import(opts, storer, fs, lookaside)
+	require.Nil(t, err)
 
 	// Open repo
 	repo, err := git.PlainOpen(tempDir)
