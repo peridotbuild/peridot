@@ -56,3 +56,10 @@ message ProcessRPMResponse {
   // The entry created for the RPM
   Entry entry = 1;
 }
+
+// ImportRPMResponse is the response message for the ImportRPM activity
+message ImportRPMResponse {
+  // Commit hash of the imported RPM
+  // e.g. 1234567890abcdef1234567890abcdef12345678
+  string commit_hash = 1 [(google.api.field_behavior) = REQUIRED];
+}
