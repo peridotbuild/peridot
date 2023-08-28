@@ -25,6 +25,7 @@ import (
 	"go.resf.org/peridot/base/go/storage"
 	"net/url"
 	"os"
+	"strings"
 )
 
 // S3 is an implementation of the Storage interface for S3.
@@ -160,6 +161,9 @@ func (s *S3) Exists(object string) (bool, error) {
 			if awsErr.Code() == s3.ErrCodeNoSuchKey {
 				return false, nil
 			}
+		}
+		if strings.Contains(err.Error(), "NotFound") {
+			return false, nil
 		}
 		return false, err
 	}
