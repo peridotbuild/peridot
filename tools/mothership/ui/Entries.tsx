@@ -24,7 +24,7 @@ import {
 } from 'bazel-bin/tools/mothership/proto/v1/mothershippb_ts_proto_gen';
 import { reqap } from 'base/ts/reqap';
 
-export const Dashboard = () => {
+export const Entries = () => {
   return (
     <ResourceTable<V1Entry>
       load={(pageSize: number, pageToken?: string) => reqap(srpmArchiverApi.listEntries({

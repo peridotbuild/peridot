@@ -15,19 +15,15 @@
  */
 
 import React from 'react';
-import { Link, Route, Routes } from 'react-router-dom';
+import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
-import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import { Theme } from '@mui/material/styles';
 
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import ListAltIcon from '@mui/icons-material/ListAlt';
-
-import { Dashboard } from './Dashboard';
-import { Drawer } from 'base/ts/mui/Drawer';
+import { GetEntry } from 'tools/mothership/ui/GetEntry';
+import { Entries } from 'tools/mothership/ui/Entries';
 
 export const App = () => {
   return (
@@ -51,7 +47,11 @@ export const App = () => {
       <Box component="main" sx={{ p: 3, flexGrow: 1 }}>
         <Toolbar variant="dense" />
         <Routes>
-          <Route index element={<Dashboard />} />
+          <Route index element={<Navigate to="/entries" replace />} />
+          <Route path="/entries">
+            <Route index element={<Entries />} />
+            <Route path=":name" element={<GetEntry />} />
+          </Route>
         </Routes>
       </Box>
     </Box>
