@@ -31,7 +31,9 @@ CREATE TABLE entries
   repository_name VARCHAR(255)        NOT NULL,
   worker_id       VARCHAR(255) REFERENCES workers (worker_id),
   batch_name      VARCHAR(255),
-  user_email      TEXT
+  user_email      TEXT,
+  commit_uri      TEXT                NOT NULL,
+  commit_hash     TEXT                NOT NULL
 );
 
 CREATE TABLE batches

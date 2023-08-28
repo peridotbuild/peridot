@@ -27,13 +27,15 @@ type Entry struct {
 
 	Name           string         `db:"name"`
 	EntryID        string         `db:"entry_id"`
-	CreateTime     time.Time      `db:"create_time"`
+	CreateTime     time.Time      `db:"create_time" pika:"omitempty"`
 	OSRelease      string         `db:"os_release"`
 	Sha256Sum      string         `db:"sha256_sum"`
 	RepositoryName string         `db:"repository_name"`
 	WorkerID       sql.NullString `db:"worker_id"`
 	BatchName      sql.NullString `db:"batch_name"`
 	UserEmail      sql.NullString `db:"user_email"`
+	CommitURI      string         `db:"commit_uri"`
+	CommitHash     string         `db:"commit_hash"`
 }
 
 func (e *Entry) GetID() string {
@@ -47,8 +49,11 @@ func (e *Entry) ToPB() *mothershippb.Entry {
 		CreateTime: timestamppb.New(e.CreateTime),
 		OsRelease:  e.OSRelease,
 		Sha256Sum:  e.Sha256Sum,
+		Repository: e.RepositoryName,
 		WorkerId:   base.SqlNullString(e.WorkerID),
 		Batch:      base.SqlNullString(e.BatchName),
 		UserEmail:  base.SqlNullString(e.UserEmail),
+		CommitUri:  e.CommitURI,
+		CommitHash: e.CommitHash,
 	}
 }

@@ -70,4 +70,10 @@ message Entry {
   // If this field is not set, the package was archived by a
   // worker instead of a user.
   google.protobuf.StringValue user_email = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // URI to view commit
+  string commit_uri = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Commit hash of the resulting import
+  string commit_hash = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
