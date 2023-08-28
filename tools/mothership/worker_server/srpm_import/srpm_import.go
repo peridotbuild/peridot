@@ -39,9 +39,17 @@ import (
 var elDistRegex = regexp.MustCompile(`el\d+`)
 
 type State struct {
+	// tempDir is the temporary directory where the SRPM is extracted to.
 	tempDir string
 
+	// rpm is the SRPM.
 	rpm *rpmutils.Rpm
+
+	// authorName is the name of the author of the commit.
+	authorName string
+
+	// authorEmail is the email of the author of the commit.
+	authorEmail string
 
 	// lookasideBlobs is a map of blob names to their SHA256 hashes.
 	lookasideBlobs map[string]string
@@ -102,6 +110,8 @@ func FromFile(path string, keys ...*openpgp.Entity) (*State, error) {
 
 	state := &State{
 		rpm:            rpm,
+		authorName:     "Mship Bot",
+		authorEmail:    "no-reply+mshipbot@resf.org",
 		lookasideBlobs: make(map[string]string),
 	}
 	// Create a temporary directory.
@@ -125,6 +135,11 @@ func (s *State) Close() error {
 
 func (s *State) GetDir() string {
 	return s.tempDir
+}
+
+func (s *State) SetAuthor(name, email string) {
+	s.authorName = name
+	s.authorEmail = email
 }
 
 // determineLookasideBlobs determines which blobs need to be uploaded to the
@@ -433,10 +448,11 @@ func (s *State) populateTargetRepo(repo *git.Repository, targetFS billy.Filesyst
 	if err != nil {
 		return errors.Wrap(err, "failed to get NEVRA")
 	}
-	_, err = wt.Commit("import "+nevra.String(), &git.CommitOptions{
+	importStr := fmt.Sprintf("import %s-%s-%s", nevra.Name, nevra.Version, nevra.Release)
+	hash, err := wt.Commit(importStr, &git.CommitOptions{
 		Author: &object.Signature{
-			Name:  "Mship Bot",
-			Email: "no-reply+mshipbot@resf.org",
+			Name:  s.authorName,
+			Email: s.authorEmail,
 			When:  time.Now(),
 		},
 	})
@@ -452,12 +468,13 @@ func (s *State) populateTargetRepo(repo *git.Repository, targetFS billy.Filesyst
 		return errors.Wrap(err, "failed to determine dist tag")
 	}
 	tag := fmt.Sprintf("imports/%s/%s-%s-%s", dist, nevra.Name, nevra.Version, nevra.Release)
-	_, err = repo.CreateTag(tag, plumbing.NewHash("HEAD"), &git.CreateTagOptions{
+	_, err = repo.CreateTag(tag, hash, &git.CreateTagOptions{
 		Tagger: &object.Signature{
-			Name:  "Mship Bot",
-			Email: "no-reply+mshipbot@resf.org",
+			Name:  s.authorName,
+			Email: s.authorEmail,
 			When:  time.Now(),
 		},
+		Message: tag,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create tag")
@@ -492,7 +509,17 @@ func (s *State) Import(opts *git.CloneOptions, storer storage2.Storer, targetFS 
 	}
 
 	// Push the target repository.
-	err = s.pushTargetRepo(repo, &git.PushOptions{})
+	nevra, err := s.rpm.Header.GetNEVRA()
+	if err != nil {
+		return errors.Wrap(err, "failed to get NEVRA")
+	}
+	dist := elDistRegex.FindString(nevra.Release)
+	err = s.pushTargetRepo(repo, &git.PushOptions{
+		RefSpecs: []config.RefSpec{
+			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", dist)),
+			config.RefSpec(fmt.Sprintf("refs/tags/imports/%s/*:refs/tags/imports/%[1]s/*", dist)),
+		},
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed to push target repo")
 	}
