@@ -168,6 +168,15 @@ func (f *Forge) GetRemote() string {
 	return fmt.Sprintf("https://github.com/%s", f.organization)
 }
 
+func (f *Forge) GetCommitViewerURL(repo string, commit string) string {
+	return fmt.Sprintf(
+		"https://github.com/%s/%s/commit/%s",
+		f.organization,
+		repo,
+		commit,
+	)
+}
+
 func (f *Forge) EnsureRepositoryExists(auth *forge.Authenticator, repo string) error {
 	// Cast AuthMethod to BasicAuth
 	basicAuth := auth.AuthMethod.(*transport_http.BasicAuth)
