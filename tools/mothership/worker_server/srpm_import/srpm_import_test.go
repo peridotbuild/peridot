@@ -34,7 +34,7 @@ import (
 )
 
 func TestFromFile(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	require.Nil(t, s.Close())
@@ -47,7 +47,7 @@ func TestFromFile_SignatureOK(t *testing.T) {
 	testKey, err := openpgp.ReadArmoredKeyRing(keyF)
 	require.Nil(t, err)
 
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", testKey...)
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false, testKey...)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	require.Nil(t, s.Close())
@@ -60,14 +60,14 @@ func TestFromFile_SignatureFail(t *testing.T) {
 	testKey, err := openpgp.ReadArmoredKeyRing(keyF)
 	require.Nil(t, err)
 
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", testKey...)
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false, testKey...)
 	require.NotNil(t, err)
 	require.Nil(t, s)
 	require.Equal(t, "failed to verify RPM: keyid 15af5dac6d745a60 not found", err.Error())
 }
 
 func TestDetermineLookasideBlobs_Empty(t *testing.T) {
-	s, err := FromFile("testdata/basesystem-11-5.el8.src.rpm")
+	s, err := FromFile("testdata/basesystem-11-5.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -78,7 +78,7 @@ func TestDetermineLookasideBlobs_Empty(t *testing.T) {
 }
 
 func TestDetermineLookasideBlobs_NotEmpty_Tarball(t *testing.T) {
-	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm")
+	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -89,7 +89,7 @@ func TestDetermineLookasideBlobs_NotEmpty_Tarball(t *testing.T) {
 }
 
 func TestUploadLookaside_Empty(t *testing.T) {
-	s, err := FromFile("testdata/basesystem-11-5.el8.src.rpm")
+	s, err := FromFile("testdata/basesystem-11-5.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -108,7 +108,7 @@ func TestUploadLookaside_Empty(t *testing.T) {
 }
 
 func TestUploadLookaside_NotEmpty(t *testing.T) {
-	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm")
+	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -126,7 +126,7 @@ func TestUploadLookaside_NotEmpty(t *testing.T) {
 }
 
 func TestUploadLookaside_NotEmpty_OnlyOnceForHash(t *testing.T) {
-	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm")
+	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -155,7 +155,7 @@ func TestUploadLookaside_NotEmpty_OnlyOnceForHash(t *testing.T) {
 }
 
 func TestWriteMetadataFile(t *testing.T) {
-	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm")
+	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -192,7 +192,7 @@ func TestWriteMetadataFile(t *testing.T) {
 }
 
 func TestExpandLayout(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -223,7 +223,7 @@ func TestExpandLayout(t *testing.T) {
 }
 
 func TestWriteMetadataExpandLayout(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -265,7 +265,7 @@ func TestWriteMetadataExpandLayout(t *testing.T) {
 }
 
 func TestGetRepo_New(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -281,9 +281,121 @@ func TestGetRepo_New(t *testing.T) {
 	opts := &git.CloneOptions{
 		URL: "file://" + tempDir,
 	}
-	repo, err := s.getRepo(opts, storer, fs)
+	repo, branch, err := s.getRepo(opts, storer, fs, "")
 	require.Nil(t, err)
 	require.NotNil(t, repo)
+	require.Equal(t, "el-8", branch)
+
+	// Verify empty
+	objIter, err := repo.CommitObjects()
+	require.Nil(t, err)
+	_, err = objIter.Next()
+	require.Equal(t, io.EOF, err)
+}
+
+func TestGetRepo_OSRelease(t *testing.T) {
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
+	require.Nil(t, err)
+	require.NotNil(t, s)
+	defer func() {
+		require.Nil(t, s.Close())
+	}()
+
+	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
+	require.Nil(t, err)
+	defer os.RemoveAll(tempDir)
+
+	storer := memory.NewStorage()
+	fs := memfs.New()
+	opts := &git.CloneOptions{
+		URL: "file://" + tempDir,
+	}
+	repo, branch, err := s.getRepo(opts, storer, fs, "Rocky Linux release 8.8 (Green Obsidian)")
+	require.Nil(t, err)
+	require.NotNil(t, repo)
+	require.Equal(t, "el-8.8", branch)
+
+	// Verify empty
+	objIter, err := repo.CommitObjects()
+	require.Nil(t, err)
+	_, err = objIter.Next()
+	require.Equal(t, io.EOF, err)
+}
+
+func TestGetRepo_OSRelease_Error(t *testing.T) {
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
+	require.Nil(t, err)
+	require.NotNil(t, s)
+	defer func() {
+		require.Nil(t, s.Close())
+	}()
+
+	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
+	require.Nil(t, err)
+	defer os.RemoveAll(tempDir)
+
+	storer := memory.NewStorage()
+	fs := memfs.New()
+	opts := &git.CloneOptions{
+		URL: "file://" + tempDir,
+	}
+	repo, branch, err := s.getRepo(opts, storer, fs, "X invalid 1.1")
+	require.NotNil(t, err)
+	require.Nil(t, repo)
+	require.Equal(t, "", branch)
+	require.Equal(t, "invalid OS release X invalid 1.1", err.Error())
+}
+
+func TestGetRepo_New_Rolling(t *testing.T) {
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", true)
+	require.Nil(t, err)
+	require.NotNil(t, s)
+	defer func() {
+		require.Nil(t, s.Close())
+	}()
+
+	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
+	require.Nil(t, err)
+	defer os.RemoveAll(tempDir)
+
+	storer := memory.NewStorage()
+	fs := memfs.New()
+	opts := &git.CloneOptions{
+		URL: "file://" + tempDir,
+	}
+	repo, branch, err := s.getRepo(opts, storer, fs, "")
+	require.Nil(t, err)
+	require.NotNil(t, repo)
+	require.Equal(t, "el8", branch)
+
+	// Verify empty
+	objIter, err := repo.CommitObjects()
+	require.Nil(t, err)
+	_, err = objIter.Next()
+	require.Equal(t, io.EOF, err)
+}
+
+func TestGetRepo_OSRelease_Rolling(t *testing.T) {
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", true)
+	require.Nil(t, err)
+	require.NotNil(t, s)
+	defer func() {
+		require.Nil(t, s.Close())
+	}()
+
+	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
+	require.Nil(t, err)
+	defer os.RemoveAll(tempDir)
+
+	storer := memory.NewStorage()
+	fs := memfs.New()
+	opts := &git.CloneOptions{
+		URL: "file://" + tempDir,
+	}
+	repo, branch, err := s.getRepo(opts, storer, fs, "Rocky Linux release 8.8 (Green Obsidian)")
+	require.Nil(t, err)
+	require.NotNil(t, repo)
+	require.Equal(t, "el8", branch)
 
 	// Verify empty
 	objIter, err := repo.CommitObjects()
@@ -293,7 +405,7 @@ func TestGetRepo_New(t *testing.T) {
 }
 
 func TestGetRepo_Existing(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -324,7 +436,7 @@ func TestGetRepo_Existing(t *testing.T) {
 	filesystemTemp2 := filesystem.NewStorage(dot2, cache.NewObjectLRUDefault())
 
 	repo, err := git.InitWithOptions(filesystemTemp2, osfs2, git.InitOptions{
-		DefaultBranch: "refs/heads/el8",
+		DefaultBranch: "refs/heads/el-8",
 	})
 	require.Nil(t, err)
 	_, err = repo.CreateRemote(&config.RemoteConfig{
@@ -351,7 +463,7 @@ func TestGetRepo_Existing(t *testing.T) {
 	})
 	require.Nil(t, err)
 	err = repo.Push(&git.PushOptions{
-		RefSpecs: []config.RefSpec{"refs/heads/el8:refs/heads/el8"},
+		RefSpecs: []config.RefSpec{"refs/heads/el-8:refs/heads/el-8"},
 	})
 	require.Nil(t, err)
 
@@ -360,9 +472,10 @@ func TestGetRepo_Existing(t *testing.T) {
 	opts := &git.CloneOptions{
 		URL: "file://" + tempDir,
 	}
-	repo, err = s.getRepo(opts, storer, fs)
+	repo, branch, err := s.getRepo(opts, storer, fs, "")
 	require.Nil(t, err)
 	require.NotNil(t, repo)
+	require.Equal(t, "el-8", branch)
 
 	// Verify commit
 	objIter, err := repo.CommitObjects()
@@ -373,7 +486,7 @@ func TestGetRepo_Existing(t *testing.T) {
 }
 
 func TestCleanTargetRepo_Existing(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -404,7 +517,7 @@ func TestCleanTargetRepo_Existing(t *testing.T) {
 	filesystemTemp2 := filesystem.NewStorage(dot2, cache.NewObjectLRUDefault())
 
 	repo, err := git.InitWithOptions(filesystemTemp2, osfs2, git.InitOptions{
-		DefaultBranch: "refs/heads/el8",
+		DefaultBranch: "refs/heads/el-8",
 	})
 	require.Nil(t, err)
 	_, err = repo.CreateRemote(&config.RemoteConfig{
@@ -431,7 +544,7 @@ func TestCleanTargetRepo_Existing(t *testing.T) {
 	})
 	require.Nil(t, err)
 	err = repo.Push(&git.PushOptions{
-		RefSpecs: []config.RefSpec{"refs/heads/el8:refs/heads/el8"},
+		RefSpecs: []config.RefSpec{"refs/heads/el-8:refs/heads/el-8"},
 	})
 	require.Nil(t, err)
 
@@ -440,9 +553,10 @@ func TestCleanTargetRepo_Existing(t *testing.T) {
 	opts := &git.CloneOptions{
 		URL: "file://" + tempDir,
 	}
-	repo, err = s.getRepo(opts, storer, fs)
+	repo, branch, err := s.getRepo(opts, storer, fs, "")
 	require.Nil(t, err)
 	require.NotNil(t, repo)
+	require.Equal(t, "el-8", branch)
 
 	wt, err := repo.Worktree()
 	require.Nil(t, err)
@@ -464,7 +578,7 @@ func TestCleanTargetRepo_Existing(t *testing.T) {
 }
 
 func TestPopulateTargetRepo_New(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -480,9 +594,10 @@ func TestPopulateTargetRepo_New(t *testing.T) {
 	opts := &git.CloneOptions{
 		URL: "file://" + tempDir,
 	}
-	repo, err := s.getRepo(opts, storer, fs)
+	repo, branch, err := s.getRepo(opts, storer, fs, "")
 	require.Nil(t, err)
 	require.NotNil(t, repo)
+	require.Equal(t, "el-8", branch)
 
 	// Verify empty
 	objIter, err := repo.CommitObjects()
@@ -492,7 +607,7 @@ func TestPopulateTargetRepo_New(t *testing.T) {
 
 	// Populate repo
 	inMemory := storage_memory.New(osfs.New("/"))
-	require.Nil(t, s.populateTargetRepo(repo, fs, inMemory))
+	require.Nil(t, s.populateTargetRepo(repo, fs, inMemory, branch))
 
 	// Verify commit
 	objIter, err = repo.CommitObjects()
@@ -506,7 +621,7 @@ func TestPopulateTargetRepo_New(t *testing.T) {
 	require.Nil(t, err)
 	tag, err := tagIter.Next()
 	require.Nil(t, err)
-	require.Equal(t, "imports/el8/efi-rpm-macros-3-3.el8", tag.Name().Short())
+	require.Equal(t, "imports/el-8/efi-rpm-macros-3-3.el8", tag.Name().Short())
 
 	// Verify metadata
 	f, err := fs.Open(".efi-rpm-macros.metadata")
@@ -536,7 +651,7 @@ func TestPopulateTargetRepo_New(t *testing.T) {
 }
 
 func TestPopulateTargetRepo_Existing(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -567,7 +682,7 @@ func TestPopulateTargetRepo_Existing(t *testing.T) {
 	filesystemTemp2 := filesystem.NewStorage(dot2, cache.NewObjectLRUDefault())
 
 	repo, err := git.InitWithOptions(filesystemTemp2, osfs2, git.InitOptions{
-		DefaultBranch: "refs/heads/el8",
+		DefaultBranch: "refs/heads/el-8",
 	})
 	require.Nil(t, err)
 	_, err = repo.CreateRemote(&config.RemoteConfig{
@@ -598,7 +713,7 @@ func TestPopulateTargetRepo_Existing(t *testing.T) {
 	})
 	require.Nil(t, err)
 	err = repo.Push(&git.PushOptions{
-		RefSpecs: []config.RefSpec{"refs/heads/el8:refs/heads/el8"},
+		RefSpecs: []config.RefSpec{"refs/heads/el-8:refs/heads/el-8"},
 	})
 	require.Nil(t, err)
 
@@ -607,7 +722,7 @@ func TestPopulateTargetRepo_Existing(t *testing.T) {
 	opts := &git.CloneOptions{
 		URL: tempDir,
 	}
-	repo, err = s.getRepo(opts, storer, fs)
+	repo, branch, err := s.getRepo(opts, storer, fs, "")
 	require.Nil(t, err)
 	require.NotNil(t, repo)
 
@@ -620,7 +735,7 @@ func TestPopulateTargetRepo_Existing(t *testing.T) {
 
 	// Populate repo
 	inMemory := storage_memory.New(osfs.New("/"))
-	require.Nil(t, s.populateTargetRepo(repo, fs, inMemory))
+	require.Nil(t, s.populateTargetRepo(repo, fs, inMemory, branch))
 
 	// Verify commit (second one)
 	var sortedCommits []*object.Commit
@@ -643,7 +758,7 @@ func TestPopulateTargetRepo_Existing(t *testing.T) {
 	require.Nil(t, err)
 	tag, err := tagIter.Next()
 	require.Nil(t, err)
-	require.Equal(t, "imports/el8/efi-rpm-macros-3-3.el8", tag.Name().Short())
+	require.Equal(t, "imports/el-8/efi-rpm-macros-3-3.el8", tag.Name().Short())
 
 	// Verify metadata
 	f, err = fs.Open(".efi-rpm-macros.metadata")
@@ -673,7 +788,7 @@ func TestPopulateTargetRepo_Existing(t *testing.T) {
 }
 
 func TestPushTargetRepo(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 	require.NotNil(t, s)
 	defer func() {
@@ -743,7 +858,7 @@ func TestPushTargetRepo(t *testing.T) {
 }
 
 func TestImport1_New(t *testing.T) {
-	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm")
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
 
 	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
@@ -765,7 +880,90 @@ func TestImport1_New(t *testing.T) {
 	storer := memory.NewStorage()
 	fs := memfs.New()
 	lookaside := storage_memory.New(osfs.New("/"))
-	_, err = s.Import(opts, storer, fs, lookaside)
+	_, err = s.Import(opts, storer, fs, lookaside, "")
+	require.Nil(t, err)
+
+	// Open repo
+	repo, err := git.PlainOpen(tempDir)
+	require.Nil(t, err)
+	// Switch to el8 branch
+	w, err := repo.Worktree()
+	require.Nil(t, err)
+	err = w.Checkout(&git.CheckoutOptions{
+		Branch: "refs/heads/el-8",
+	})
+	require.Nil(t, err)
+
+	// Verify commit
+	objIter, err := repo.CommitObjects()
+	require.Nil(t, err)
+	obj, err := objIter.Next()
+	require.Nil(t, err)
+	require.Equal(t, "import efi-rpm-macros-3-3.el8", obj.Message)
+
+	// Verify tag
+	tagIter, err := repo.Tags()
+	require.Nil(t, err)
+	tag, err := tagIter.Next()
+	require.Nil(t, err)
+	require.Equal(t, "imports/el-8/efi-rpm-macros-3-3.el8", tag.Name().Short())
+
+	// Verify metadata
+	f, err := fs.Open(".efi-rpm-macros.metadata")
+	require.Nil(t, err)
+	buf, err := io.ReadAll(f)
+	require.Nil(t, err)
+	require.Equal(t, "f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86 SOURCES/efi-rpm-macros-3.tar.bz2\n", string(buf))
+
+	// Verify layout
+	ls, err := fs.ReadDir(".")
+	require.Nil(t, err)
+	require.Equal(t, 4, len(ls))
+	require.Equal(t, ".efi-rpm-macros.metadata", ls[0].Name())
+	require.Equal(t, ".gitignore", ls[1].Name())
+	require.Equal(t, "SOURCES", ls[2].Name())
+	require.Equal(t, "SPECS", ls[3].Name())
+
+	ls, err = fs.ReadDir("SOURCES")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(ls))
+	require.Equal(t, "0001-macros.efi-srpm-make-all-of-our-macros-always-expand.patch", ls[0].Name())
+
+	ls, err = fs.ReadDir("SPECS")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(ls))
+	require.Equal(t, "efi-rpm-macros.spec", ls[0].Name())
+
+	// Verify lookaside
+	ok, err := lookaside.Exists("f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86")
+	require.Nil(t, err)
+	require.True(t, ok)
+}
+
+func TestImport1_New_Rolling(t *testing.T) {
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", true)
+	require.Nil(t, err)
+
+	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
+	require.Nil(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create a bare repo in tempDir
+	osfsTemp := osfs.New(tempDir)
+	dot, err := osfsTemp.Chroot(".git")
+	require.Nil(t, err)
+	filesystemTemp := filesystem.NewStorage(dot, cache.NewObjectLRUDefault())
+	require.Nil(t, filesystemTemp.Init())
+	_, err = git.Init(filesystemTemp, nil)
+	require.Nil(t, err)
+
+	opts := &git.CloneOptions{
+		URL: tempDir,
+	}
+	storer := memory.NewStorage()
+	fs := memfs.New()
+	lookaside := storage_memory.New(osfs.New("/"))
+	_, err = s.Import(opts, storer, fs, lookaside, "")
 	require.Nil(t, err)
 
 	// Open repo
@@ -826,7 +1024,7 @@ func TestImport1_New(t *testing.T) {
 }
 
 func TestImport2_New(t *testing.T) {
-	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm")
+	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm", true)
 	require.Nil(t, err)
 
 	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
@@ -847,7 +1045,7 @@ func TestImport2_New(t *testing.T) {
 	storer := memory.NewStorage()
 	fs := memfs.New()
 	lookaside := storage_memory.New(osfs.New("/"))
-	_, err = s.Import(opts, storer, fs, lookaside)
+	_, err = s.Import(opts, storer, fs, lookaside, "")
 	require.Nil(t, err)
 
 	// Open repo

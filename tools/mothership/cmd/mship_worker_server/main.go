@@ -89,7 +89,13 @@ func run(ctx *cli.Context) error {
 	}
 
 	w := worker.New(temporalClient, ctx.String("temporal-task-queue"), worker.Options{})
-	workerServer := mothership_worker_server.New(db, storage, gpgKeys, remoteForge)
+	workerServer := mothership_worker_server.New(
+		db,
+		storage,
+		gpgKeys,
+		remoteForge,
+		ctx.Bool("import-rolling-release"),
+	)
 
 	// Register workflows
 	w.RegisterWorkflow(mothership_worker_server.ProcessRPMWorkflow)
@@ -106,12 +112,18 @@ func main() {
 	base.ChangeDefaultForEnvVar(base.EnvVarTemporalTaskQueue, "mship_worker_server")
 
 	flags := base.WithDefaultCliFlagsTemporal(base.WithStorageFlags()...)
-	flags = append(flags, &cli.StringSliceFlag{
-		Name:    "allowed-gpg-keys",
-		Usage:   "Armored GPG keys that we verify SRPMs with. Must be base64 encoded",
-		EnvVars: []string{"ALLOWED_GPG_KEYS"},
-	})
 	flags = append(flags, []cli.Flag{
+		&cli.StringSliceFlag{
+			Name:    "allowed-gpg-keys",
+			Usage:   "Armored GPG keys that we verify SRPMs with. Must be base64 encoded",
+			EnvVars: []string{"ALLOWED_GPG_KEYS"},
+		},
+		&cli.BoolFlag{
+			Name:    "import-rolling-release",
+			Usage:   "Whether to import packages in rolling release mode",
+			EnvVars: []string{"IMPORT_ROLLING_RELEASE"},
+			Value:   false,
+		},
 		&cli.StringFlag{
 			Name: "git-provider",
 			Action: func(ctx *cli.Context, s string) error {

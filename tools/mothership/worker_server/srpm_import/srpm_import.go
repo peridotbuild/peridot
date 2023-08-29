@@ -36,7 +36,10 @@ import (
 	"time"
 )
 
-var elDistRegex = regexp.MustCompile(`el\d+`)
+var (
+	elDistRegex  = regexp.MustCompile(`el\d+`)
+	releaseRegex = regexp.MustCompile(`.*release (\d+\.\d+).*`)
+)
 
 type State struct {
 	// tempDir is the temporary directory where the SRPM is extracted to.
@@ -53,6 +56,11 @@ type State struct {
 
 	// lookasideBlobs is a map of blob names to their SHA256 hashes.
 	lookasideBlobs map[string]string
+
+	// rolling determines how the branch is named.
+	// if true, the branch is named "elX" where X is the major release
+	// if false, the branch is named "el-X.Y" where X.Y is the full release
+	rolling bool
 }
 
 // copyFromOS copies specified file from OS filesystem to target filesystem.
@@ -82,7 +90,7 @@ func copyFromOS(targetFS billy.Filesystem, path string, targetPath string) error
 
 // FromFile creates a new State from an SRPM file.
 // The SRPM file is extracted to a temporary directory.
-func FromFile(path string, keys ...*openpgp.Entity) (*State, error) {
+func FromFile(path string, rolling bool, keys ...*openpgp.Entity) (*State, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open file")
@@ -113,6 +121,7 @@ func FromFile(path string, keys ...*openpgp.Entity) (*State, error) {
 		authorName:     "Mship Bot",
 		authorEmail:    "no-reply+mshipbot@resf.org",
 		lookasideBlobs: make(map[string]string),
+		rolling:        rolling,
 	}
 	// Create a temporary directory.
 	state.tempDir, err = os.MkdirTemp("", "srpm_import-*")
@@ -317,21 +326,48 @@ func (s *State) expandLayout(targetFS billy.Filesystem) error {
 
 // getRepo returns the target repository for the SRPM.
 // This is where the payload is uploaded to.
-func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS billy.Filesystem) (*git.Repository, error) {
-	// Determine dist tag
-	nevra, err := s.rpm.Header.GetNEVRA()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get NEVRA")
-	}
+func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS billy.Filesystem, osRelease string) (*git.Repository, string, error) {
+	// Determine branch
+	// If the OS release is not specified, then we use the dist tag
+	var branch string
+	if osRelease == "" {
+		// Determine dist tag
+		nevra, err := s.rpm.Header.GetNEVRA()
+		if err != nil {
+			return nil, "", errors.Wrap(err, "failed to get NEVRA")
+		}
 
-	// The dist tag will be used as the branch
-	dist := elDistRegex.FindString(nevra.Release)
-	if dist == "" {
-		return nil, errors.Wrap(err, "failed to determine dist tag")
+		// The dist tag will be used as the branch
+		dist := elDistRegex.FindString(nevra.Release)
+		if dist == "" {
+			return nil, "", errors.Wrap(err, "failed to determine dist tag")
+		}
+
+		if s.rolling {
+			branch = dist
+		} else {
+			branch = "el-" + dist[2:]
+		}
+	} else {
+		// Determine branch from OS release
+		if !releaseRegex.MatchString(osRelease) {
+			return nil, "", fmt.Errorf("invalid OS release %s", osRelease)
+		}
+		ver := releaseRegex.FindStringSubmatch(osRelease)[1]
+
+		if s.rolling {
+			dist := elDistRegex.FindString("el" + ver)
+			if dist == "" {
+				return nil, "", errors.New("failed to determine dist tag")
+			}
+			branch = dist
+		} else {
+			branch = "el-" + ver
+		}
 	}
 
 	// Set branch to dist tag
-	opts.ReferenceName = plumbing.NewBranchReferenceName(dist)
+	opts.ReferenceName = plumbing.NewBranchReferenceName(branch)
 	opts.SingleBranch = true
 
 	// Clone the repository, to the target filesystem.
@@ -339,11 +375,11 @@ func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS
 	// If the repo doesn't exist, then we init only
 	repo, err := git.Init(storer, targetFS)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to init repo")
+		return nil, "", errors.Wrap(err, "failed to init repo")
 	}
 	wt, err := repo.Worktree()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get worktree")
+		return nil, "", errors.Wrap(err, "failed to get worktree")
 	}
 
 	// Create a new remote
@@ -351,11 +387,11 @@ func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS
 		Name: "origin",
 		URLs: []string{opts.URL},
 		Fetch: []config.RefSpec{
-			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", dist)),
+			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", branch)),
 		},
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create remote")
+		return nil, "", errors.Wrap(err, "failed to create remote")
 	}
 
 	// Fetch the remote
@@ -363,26 +399,26 @@ func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS
 		Auth:       opts.Auth,
 		RemoteName: "origin",
 		RefSpecs: []config.RefSpec{
-			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", dist)),
+			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", branch)),
 		},
 	})
 
 	// Checkout the branch
-	refName := plumbing.NewBranchReferenceName(dist)
+	refName := plumbing.NewBranchReferenceName(branch)
 
 	if err != nil {
 		h := plumbing.NewSymbolicReference(plumbing.HEAD, refName)
 		if err := repo.Storer.CheckAndSetReference(h, nil); err != nil {
-			return nil, errors.Wrap(err, "failed to checkout branch")
+			return nil, "", errors.Wrap(err, "failed to checkout branch")
 		}
 	} else {
 		err = wt.Checkout(&git.CheckoutOptions{
-			Branch: plumbing.NewBranchReferenceName(dist),
+			Branch: plumbing.NewBranchReferenceName(branch),
 			Force:  true,
 		})
 	}
 
-	return repo, nil
+	return repo, branch, nil
 }
 
 // cleanTargetRepo deletes all files in the target repository.
@@ -419,7 +455,7 @@ func (s *State) cleanTargetRepo(wt *git.Worktree, root string) error {
 // 4. Write the metadata file.
 // 5. Expand the layout of the SRPM.
 // 6. Commit the changes to the target repository.
-func (s *State) populateTargetRepo(repo *git.Repository, targetFS billy.Filesystem, lookaside storage.Storage) error {
+func (s *State) populateTargetRepo(repo *git.Repository, targetFS billy.Filesystem, lookaside storage.Storage, branch string) error {
 	// Clean the target repository.
 	wt, err := repo.Worktree()
 	if err != nil {
@@ -481,11 +517,7 @@ func (s *State) populateTargetRepo(repo *git.Repository, targetFS billy.Filesyst
 	// Create a tag
 	// The tag should follow the following format:
 	//   imports/<branch>/<nvra>
-	dist := elDistRegex.FindString(nevra.Release)
-	if dist == "" {
-		return errors.Wrap(err, "failed to determine dist tag")
-	}
-	tag := fmt.Sprintf("imports/%s/%s-%s-%s", dist, nevra.Name, nevra.Version, nevra.Release)
+	tag := fmt.Sprintf("imports/%s/%s-%s-%s", branch, nevra.Name, nevra.Version, nevra.Release)
 	_, err = repo.CreateTag(tag, hash, &git.CreateTagOptions{
 		Tagger: &object.Signature{
 			Name:  s.authorName,
@@ -513,31 +545,26 @@ func (s *State) pushTargetRepo(repo *git.Repository, opts *git.PushOptions) erro
 }
 
 // Import imports the SRPM into the target repository.
-func (s *State) Import(opts *git.CloneOptions, storer storage2.Storer, targetFS billy.Filesystem, lookaside storage.Storage) (*object.Commit, error) {
+func (s *State) Import(opts *git.CloneOptions, storer storage2.Storer, targetFS billy.Filesystem, lookaside storage.Storage, osRelease string) (*object.Commit, error) {
 	// Get the target repository.
-	repo, err := s.getRepo(opts, storer, targetFS)
+	repo, branch, err := s.getRepo(opts, storer, targetFS, osRelease)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get repo")
 	}
 
 	// Populate the target repository.
-	err = s.populateTargetRepo(repo, targetFS, lookaside)
+	err = s.populateTargetRepo(repo, targetFS, lookaside, branch)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to populate target repo")
 	}
 
 	// Push the target repository.
-	nevra, err := s.rpm.Header.GetNEVRA()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get NEVRA")
-	}
-	dist := elDistRegex.FindString(nevra.Release)
 	err = s.pushTargetRepo(repo, &git.PushOptions{
 		Force: true,
 		Auth:  opts.Auth,
 		RefSpecs: []config.RefSpec{
-			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", dist)),
-			config.RefSpec(fmt.Sprintf("refs/tags/imports/%s/*:refs/tags/imports/%[1]s/*", dist)),
+			config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%[1]s", branch)),
+			config.RefSpec(fmt.Sprintf("refs/tags/imports/%s/*:refs/tags/imports/%[1]s/*", branch)),
 		},
 	})
 	if err != nil {

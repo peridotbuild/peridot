@@ -88,7 +88,7 @@ func (w *Worker) VerifyResourceExists(uri string) error {
 
 // ImportRPM imports an RPM into the database.
 // This is a Temporal activity.
-func (w *Worker) ImportRPM(uri string, checksumSha256 string) (*mothershippb.ImportRPMResponse, error) {
+func (w *Worker) ImportRPM(uri string, checksumSha256 string, osRelease string) (*mothershippb.ImportRPMResponse, error) {
 	tempDir, err := os.MkdirTemp("", "mothership-worker-server-import-rpm-*")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create temporary directory")
@@ -151,7 +151,7 @@ func (w *Worker) ImportRPM(uri string, checksumSha256 string) (*mothershippb.Imp
 	}
 
 	// Then do an import
-	srpmState, err := srpm_import.FromFile(filepath.Join(tempDir, "resource.rpm"), w.gpgKeys...)
+	srpmState, err := srpm_import.FromFile(filepath.Join(tempDir, "resource.rpm"), w.rolling, w.gpgKeys...)
 	if err != nil {
 		if strings.Contains(err.Error(), "failed to verify RPM") {
 			return nil, temporal.NewNonRetryableApplicationError(
@@ -170,7 +170,7 @@ func (w *Worker) ImportRPM(uri string, checksumSha256 string) (*mothershippb.Imp
 	}
 	storer := memory.NewStorage()
 	fs := memfs.New()
-	commit, err := srpmState.Import(cloneOpts, storer, fs, w.storage)
+	commit, err := srpmState.Import(cloneOpts, storer, fs, w.storage, osRelease)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to import SRPM")
 	}

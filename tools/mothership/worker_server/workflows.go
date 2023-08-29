@@ -57,7 +57,7 @@ func ProcessRPMWorkflow(ctx workflow.Context, args *mothershippb.ProcessRPMArgs)
 		},
 	})
 	var importRpmRes mothershippb.ImportRPMResponse
-	err = workflow.ExecuteActivity(ctx, w.ImportRPM, args.Request.RpmUri, args.Request.Checksum).Get(ctx, &importRpmRes)
+	err = workflow.ExecuteActivity(ctx, w.ImportRPM, args.Request.RpmUri, args.Request.Checksum, args.Request.OsRelease).Get(ctx, &importRpmRes)
 	if err != nil {
 		return nil, err
 	}
