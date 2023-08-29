@@ -1,0 +1,7 @@
+# We don't really care about BUILD files in language stats
+# They are also reported as Starlark and skew the stats
+**/BUILD linguist-vendored
+*/ linguist-vendored
+BUILD linguist-vendored
+
+vendor/** linguist-vendored
