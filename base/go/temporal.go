@@ -36,9 +36,9 @@ func NewTemporalClient(host string, namespace string, opts client.Options) (clie
 		}
 	}
 
-	LogInfof("Connecting to Temporal at %s", host)
-
 	opts.HostPort = host
+
+	LogInfof("Using Temporal namespace %s", namespace)
 
 	// Register namespace (ignore error if already exists)
 	nscl, err := client.NewNamespaceClient(opts)
@@ -58,6 +58,8 @@ func NewTemporalClient(host string, namespace string, opts client.Options) (clie
 
 	// Set namespace in opts
 	opts.Namespace = namespace
+
+	LogInfof("Connecting to Temporal at %s", host)
 
 	// Dial Temporal
 	cl, err := client.Dial(opts)

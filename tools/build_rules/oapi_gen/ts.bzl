@@ -18,17 +18,8 @@ def _oapi_gen_ts_sdk_impl(ctx):
 
     Converts an OpenAPI spec to a TypeScript SDK using openapi-generator.
     """
+    java_runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
     openapi = ctx.file.openapi
-
-    # java_binary returns the jar and a wrapper binary that runs it.
-    # we need the wrapper binary
-    oapi_cli_outputs = ctx.files._oapi_bin
-    oapi_cli = ""
-    for output in oapi_cli_outputs:
-        if output.path.endswith(".jar"):
-            continue
-        oapi_cli = output.path
-        break
 
     # Run openapi-generator. With typescript we can just export a directory
     # containing the generated code.
@@ -39,18 +30,22 @@ def _oapi_gen_ts_sdk_impl(ctx):
         template = ctx.file._oapi_converter,
         output = gen,
         substitutions = {
-            "{{generator_cli_bin}}": oapi_cli,
+            "{{generator_cli_jar}}": ctx.file._oapi_jar.path,
             "{{openapi_file}}": openapi.path,
             "{{generator}}": "typescript-fetch",
             "{{output_dir}}": output_dir.path,
+            "{{java_bin}}": java_runtime.java_executable_exec_path,
         },
         is_executable = True,
     )
 
     ctx.actions.run(
-        inputs = [openapi] + ctx.files._oapi_bin,
+        inputs = [openapi] + java_runtime.files.to_list(),
         outputs = [output_dir, index_ts],
         executable = gen,
+        env = {
+            "JAVA_HOME": java_runtime.java_home,
+        },
     )
 
     return [
@@ -67,10 +62,14 @@ oapi_gen_ts_sdk = rule(
             mandatory = True,
             doc = "The OpenAPI spec for the API, can be generated with protoc_gen_openapiv2",
         ),
-        "_oapi_bin": attr.label(
-            allow_files = True,
-            default = Label("//third_party:openapi_generator"),
-            doc = "The openapi-generator CLI binary",
+        "_jdk": attr.label(
+            default = Label("@bazel_tools//tools/jdk:current_host_java_runtime"),
+            providers = [java_common.JavaRuntimeInfo],
+        ),
+        "_oapi_jar": attr.label(
+            allow_single_file = True,
+            default = Label("//third_party:openapi-generator-cli.jar"),
+            doc = "The openapi-generator CLI jar",
         ),
         "_oapi_converter": attr.label(
             allow_single_file = True,

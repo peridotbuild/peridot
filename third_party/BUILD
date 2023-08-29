@@ -1,12 +1,13 @@
+exports_files(["openapi-generator-cli-6.6.0.jar"])
+
 java_binary(
     name = "copybara_uberjar",
     main_class = "com.google.copybara.Main",
     runtime_deps = [":copybara_deploy.jar"],
 )
 
-java_binary(
-    name = "openapi_generator",
-    main_class = "org.openapitools.codegen.OpenAPIGenerator",
+alias(
+    name = "openapi-generator-cli.jar",
+    actual = ":openapi-generator-cli-6.6.0.jar",
     visibility = ["//visibility:public"],
-    runtime_deps = [":openapi-generator-cli-6.6.0.jar"],
 )

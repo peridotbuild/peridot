@@ -16,9 +16,11 @@
 
 set -euo pipefail
 
-cli_bin="{{generator_cli_bin}}"
+java_bin="{{java_bin}}"
+cli_jar="{{generator_cli_jar}}"
 generator="{{generator}}"
 openapi_file="{{openapi_file}}"
 output_dir="{{output_dir}}"
 
-$cli_bin generate -i $openapi_file -g $generator -o $output_dir --skip-validate-spec > /dev/null
+# Generate the client.
+$java_bin -jar $cli_jar generate -i $openapi_file -g $generator -o $output_dir --skip-validate-spec > /dev/null
