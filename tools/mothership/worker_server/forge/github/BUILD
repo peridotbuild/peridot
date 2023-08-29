@@ -18,6 +18,7 @@ go_test(
     srcs = ["github_test.go"],
     embed = [":github"],
     deps = [
+        "//vendor/github.com/go-git/go-git/v5/plumbing/transport/http",
         "//vendor/github.com/jarcoal/httpmock",
         "//vendor/github.com/stretchr/testify/require",
     ],
