@@ -66,7 +66,10 @@ func (f *Forge) getInstallationToken(jwt string) (*installationToken, error) {
 		return nil, err
 	}
 
-	installationIdInt := respBody["id"].(float64)
+	installationIdInt, ok := respBody["id"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("id not found in response")
+	}
 	installationId := strconv.FormatFloat(installationIdInt, 'f', 0, 64)
 	appSlug := respBody["app_slug"].(string)
 
@@ -90,8 +93,13 @@ func (f *Forge) getInstallationToken(jwt string) (*installationToken, error) {
 		return nil, err
 	}
 
+	token, ok := respBody["token"].(string)
+	if !ok {
+		return nil, fmt.Errorf("token not found in response")
+	}
+
 	return &installationToken{
-		Token:   respBody["token"].(string),
+		Token:   token,
 		AppSlug: appSlug,
 	}, nil
 }
@@ -120,7 +128,10 @@ func (f *Forge) GetMeID(installation string, appSlug string) (string, error) {
 		return "", err
 	}
 
-	idInt := respBody["id"].(float64)
+	idInt, ok := respBody["id"].(float64)
+	if !ok {
+		return "", fmt.Errorf("id not found in response")
+	}
 	id := strconv.FormatFloat(idInt, 'f', 0, 64)
 
 	return id, nil
@@ -164,8 +175,8 @@ func (f *Forge) GetAuthenticator() (*forge.Authenticator, error) {
 	}, nil
 }
 
-func (f *Forge) GetRemote() string {
-	return fmt.Sprintf("https://github.com/%s", f.organization)
+func (f *Forge) GetRemote(repo string) string {
+	return fmt.Sprintf("https://github.com/%s/%s", f.organization, repo)
 }
 
 func (f *Forge) GetCommitViewerURL(repo string, commit string) string {

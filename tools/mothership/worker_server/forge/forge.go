@@ -17,7 +17,7 @@ type Authenticator struct {
 
 type Forge interface {
 	GetAuthenticator() (*Authenticator, error)
-	GetRemote() string
+	GetRemote(repo string) string
 	GetCommitViewerURL(repo string, commit string) string
 	EnsureRepositoryExists(auth *Authenticator, repo string) error
 }

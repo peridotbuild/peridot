@@ -17,7 +17,6 @@ package mothership_worker_server
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
@@ -166,7 +165,7 @@ func (w *Worker) ImportRPM(uri string, checksumSha256 string) (*mothershippb.Imp
 	srpmState.SetAuthor(authenticator.AuthorName, authenticator.AuthorEmail)
 
 	cloneOpts := &git.CloneOptions{
-		URL:  fmt.Sprintf("%s/%s", w.forge.GetRemote(), repoName),
+		URL:  w.forge.GetRemote(repoName),
 		Auth: authenticator.AuthMethod,
 	}
 	storer := memory.NewStorage()
