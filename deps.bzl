@@ -1265,6 +1265,12 @@ def go_dependencies():
         sum = "h1:JyZjdMQu9Kl/wLXe9xA6s1X+tF6BWsQPFGJMEeCfWzE=",
         version = "v0.2.0",
     )
+    go_repository(
+        name = "com_github_jarcoal_httpmock",
+        importpath = "github.com/jarcoal/httpmock",
+        sum = "h1:iUx3whfZWVf3jT01hQTO/Eo5sAYtB2/rqaUuOtpInww=",
+        version = "v1.3.1",
+    )
 
     go_repository(
         name = "com_github_jaschaephraim_lrserver",
@@ -1577,6 +1583,13 @@ def go_dependencies():
         sum = "h1:mmDVorXM7PCGKw94cs5zkfA9PSy5pEvNWRP0ET0TIVo=",
         version = "v1.0.4",
     )
+    go_repository(
+        name = "com_github_maxatome_go_testdeep",
+        importpath = "github.com/maxatome/go-testdeep",
+        sum = "h1:Ql7Go8Tg0C1D/uMMX59LAoYK7LffeJQ6X2T04nTH68g=",
+        version = "v1.12.0",
+    )
+
     go_repository(
         name = "com_github_microsoft_go_winio",
         importpath = "github.com/Microsoft/go-winio",

@@ -726,6 +726,10 @@ github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
+# github.com/jarcoal/httpmock v1.3.1
+## explicit; go 1.18
+github.com/jarcoal/httpmock
+github.com/jarcoal/httpmock/internal
 # github.com/jaschaephraim/lrserver v0.0.0-20171129202958-50d19f603f71
 ## explicit
 github.com/jaschaephraim/lrserver

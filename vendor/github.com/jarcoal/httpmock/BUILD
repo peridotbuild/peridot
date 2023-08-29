@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "httpmock",
+    srcs = [
+        "any.go",
+        "doc.go",
+        "env.go",
+        "file.go",
+        "match.go",
+        "response.go",
+        "transport.go",
+    ],
+    importmap = "go.resf.org/peridot/vendor/github.com/jarcoal/httpmock",
+    importpath = "github.com/jarcoal/httpmock",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/jarcoal/httpmock/internal"],
+)
