@@ -101,4 +101,7 @@ message Entry {
   }
   // State of the entry.
   State state = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Error message if on hold
+  string error_message = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

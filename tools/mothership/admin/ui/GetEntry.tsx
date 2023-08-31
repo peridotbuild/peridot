@@ -66,7 +66,7 @@ export const GetEntry = () => {
     }
 
     window.location.reload();
-  }
+  };
 
   return (
     <Box>
@@ -80,13 +80,15 @@ export const GetEntry = () => {
         }}
       >
         <span>entries/{params.name}</span>
-        {resource && resource.state == EntryState.OnHold && <Button
-          sx={{ ml: 'auto', textAlign: 'right' }}
-          variant="outlined"
-          onClick={rescueEntry}
-        >
-          Rescue
-        </Button>}
+        {resource && resource.state == EntryState.OnHold && (
+          <Button
+            sx={{ ml: 'auto', textAlign: 'right' }}
+            variant="outlined"
+            onClick={rescueEntry}
+          >
+            Rescue
+          </Button>
+        )}
       </Box>
       <Divider />
       <Box sx={{ p: 1.5 }}>
@@ -105,6 +107,11 @@ export const GetEntry = () => {
           ]}
         />
       </Box>
+      {resource && resource.state == EntryState.OnHold && (
+        <Box sx={{ p: 1.5 }}>
+          <code>{resource.errorMessage}</code>
+        </Box>
+      )}
     </Box>
   );
 };

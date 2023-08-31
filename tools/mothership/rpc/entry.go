@@ -20,11 +20,12 @@ import (
 	base "go.resf.org/peridot/base/go"
 	mothership_db "go.resf.org/peridot/tools/mothership/db"
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
+	enumspb "go.temporal.io/api/enums/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func (s *Server) GetEntry(_ context.Context, req *mothershippb.GetEntryRequest) (*mothershippb.Entry, error) {
+func (s *Server) GetEntry(ctx context.Context, req *mothershippb.GetEntryRequest) (*mothershippb.Entry, error) {
 	entry, err := base.Q[mothership_db.Entry](s.db).F("name", req.Name).GetOrNil()
 	if err != nil {
 		base.LogErrorf("failed to get entry: %v", err)
@@ -35,7 +36,31 @@ func (s *Server) GetEntry(_ context.Context, req *mothershippb.GetEntryRequest) 
 		return nil, status.Error(codes.NotFound, "entry not found")
 	}
 
-	return entry.ToPB(), nil
+	pb := entry.ToPB()
+
+	// If on hold, let's query temporal for more info.
+	if entry.State == mothershippb.Entry_ON_HOLD {
+		events := s.temporal.GetWorkflowHistory(ctx, "operations/"+entry.Sha256Sum, "", false, enumspb.HISTORY_EVENT_FILTER_TYPE_ALL_EVENT)
+		// We only need to find the latest ImportRPM event.
+		// Return the error from that event.
+		pb.ErrorMessage = "Unknown error"
+		for events.HasNext() {
+			event, err := events.Next()
+			if err != nil {
+				base.LogErrorf("failed to get next event: %v", err)
+				continue
+			}
+			failedAttrs := event.GetActivityTaskFailedEventAttributes()
+			if failedAttrs == nil {
+				continue
+			}
+
+			pb.ErrorMessage = failedAttrs.Failure.Message
+			break
+		}
+	}
+
+	return pb, nil
 }
 
 func (s *Server) ListEntries(_ context.Context, req *mothershippb.ListEntriesRequest) (*mothershippb.ListEntriesResponse, error) {
