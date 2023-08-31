@@ -27,6 +27,7 @@ go_library(
         "//tools/mothership/ui",
         "//vendor/github.com/grpc-ecosystem/grpc-gateway/v2/runtime",
         "//vendor/github.com/urfave/cli/v2:cli",
+        "//vendor/go.temporal.io/sdk/client",
     ],
 )
 

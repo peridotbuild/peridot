@@ -17,6 +17,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "rpc",
     srcs = [
+        "rescue.go",
         "rpc.go",
         "worker.go",
     ],
@@ -26,7 +27,9 @@ go_library(
         "//base/go",
         "//tools/mothership/db",
         "//tools/mothership/proto/admin/v1:pb",
+        "//tools/mothership/proto/v1:pb",
         "//vendor/go.ciq.dev/pika",
+        "//vendor/go.temporal.io/sdk/client",
         "@go_googleapis//google/rpc:errdetails_go_proto",
         "@org_golang_google_grpc//:go_default_library",
         "@org_golang_google_grpc//codes",

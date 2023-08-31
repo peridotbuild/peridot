@@ -16,7 +16,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "srpm_import",
-    srcs = ["srpm_import.go"],
+    srcs = [
+        "srpm_import.go",
+        "srpmproc_compat.go",
+    ],
     importpath = "go.resf.org/peridot/tools/mothership/worker_server/srpm_import",
     visibility = ["//visibility:public"],
     deps = [
@@ -28,8 +31,13 @@ go_library(
         "//vendor/github.com/go-git/go-git/v5/plumbing/object",
         "//vendor/github.com/go-git/go-git/v5/storage",
         "//vendor/github.com/pkg/errors",
+        "//vendor/github.com/rocky-linux/srpmproc/pb",
+        "//vendor/github.com/rocky-linux/srpmproc/pkg/data",
+        "//vendor/github.com/rocky-linux/srpmproc/pkg/directives",
+        "//vendor/github.com/rocky-linux/srpmproc/pkg/misc",
         "//vendor/github.com/sassoftware/go-rpmutils",
         "//vendor/golang.org/x/crypto/openpgp",
+        "@org_golang_google_protobuf//encoding/prototext",
     ],
 )
 

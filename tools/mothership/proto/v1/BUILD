@@ -27,6 +27,7 @@ proto_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "@com_google_protobuf//:empty_proto",
         "@com_google_protobuf//:timestamp_proto",
         "@com_google_protobuf//:wrappers_proto",
         "@go_googleapis//google/api:annotations_proto",
@@ -51,8 +52,8 @@ go_proto_library(
     proto = ":mothershippb_proto",
     visibility = ["//visibility:public"],
     deps = [
+        "//third_party/googleapis/google/longrunning:longrunning_go_proto",
         "@go_googleapis//google/api:annotations_go_proto",
-        "@go_googleapis//google/longrunning:longrunning_go_proto",
         "@org_golang_google_genproto//googleapis/api/annotations",
     ],
 )

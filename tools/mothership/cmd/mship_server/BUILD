@@ -41,5 +41,6 @@ go_library(
         "//base/go",
         "//tools/mothership/rpc",
         "//vendor/github.com/urfave/cli/v2:cli",
+        "//vendor/go.temporal.io/sdk/client",
     ],
 )

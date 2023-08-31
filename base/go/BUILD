@@ -46,6 +46,7 @@ go_library(
         "//vendor/go.ciq.dev/pika",
         "//vendor/go.temporal.io/api/workflowservice/v1:workflowservice",
         "//vendor/go.temporal.io/sdk/client",
+        "//vendor/go.temporal.io/sdk/interceptor",
         "@org_golang_google_grpc//:go_default_library",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//credentials",

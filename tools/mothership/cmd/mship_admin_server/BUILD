@@ -23,6 +23,7 @@ go_library(
         "//base/go",
         "//tools/mothership/admin/rpc",
         "//vendor/github.com/urfave/cli/v2:cli",
+        "//vendor/go.temporal.io/sdk/client",
     ],
 )
 
