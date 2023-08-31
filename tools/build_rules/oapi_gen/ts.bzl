@@ -40,7 +40,7 @@ def _oapi_gen_ts_sdk_impl(ctx):
     )
 
     ctx.actions.run(
-        inputs = [openapi] + java_runtime.files.to_list(),
+        inputs = [openapi, ctx.file._oapi_jar] + java_runtime.files.to_list(),
         outputs = [output_dir, index_ts],
         executable = gen,
         env = {
@@ -68,7 +68,7 @@ oapi_gen_ts_sdk = rule(
         ),
         "_oapi_jar": attr.label(
             allow_single_file = True,
-            default = Label("//third_party:openapi-generator-cli.jar"),
+            default = Label("//third_party:openapi-generator-cli-6.6.0.jar"),
             doc = "The openapi-generator CLI jar",
         ),
         "_oapi_converter": attr.label(
