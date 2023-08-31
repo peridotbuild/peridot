@@ -35,16 +35,19 @@ message Batch {
   // Custom ID of the batch. Optional
   string batch_id = 2;
 
+  // Worker ID that created the batch.
+  string worker_id = 3;
+
   // Output only. Timestamp when the batch was created.
-  google.protobuf.Timestamp create_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the batch was last updated.
-  google.protobuf.Timestamp update_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Timestamp when the batch was sealed.
   // Batches are automatically sealed after an hour of inactivity.
-  google.protobuf.Timestamp seal_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp seal_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Output only. Bugtracker URI of the batch.
-  google.protobuf.StringValue bugtracker_uri = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.StringValue bugtracker_uri = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

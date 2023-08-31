@@ -24,14 +24,17 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import { Theme } from '@mui/material/styles';
 
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import EngineeringIcon from '@mui/icons-material/Engineering';
-import ListAltIcon from '@mui/icons-material/ListAlt';
+import ImportExportIcon from '@mui/icons-material/ImportExport';
 
-import { Workers } from './Workers';
 import { Drawer } from 'base/ts/mui/Drawer';
+
 import { CreateWorker } from 'tools/mothership/admin/ui/CreateWorker';
 import { GetWorker } from 'tools/mothership/admin/ui/GetWorker';
+
+import { Entries } from './Entries';
+import { GetEntry } from './GetEntry';
+import { Workers } from './Workers';
 
 export const App = () => {
   return (
@@ -60,6 +63,7 @@ export const App = () => {
           {
             links: [
               { text: 'Workers', href: '/workers', icon: <EngineeringIcon /> },
+              { text: 'Entries', href: '/entries', icon: <ImportExportIcon /> },
             ],
           },
         ]}
@@ -72,6 +76,10 @@ export const App = () => {
             <Route index element={<Workers />} />
             <Route path="create" element={<CreateWorker />} />
             <Route path=":name" element={<GetWorker />} />
+          </Route>
+          <Route path="/entries">
+            <Route index element={<Entries />} />
+            <Route path=":name" element={<GetEntry />} />
           </Route>
         </Routes>
       </Box>

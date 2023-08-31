@@ -15,6 +15,13 @@
  */
 
 import * as mshipAdmin from 'bazel-bin/tools/mothership/proto/admin/v1/mshipadminpb_ts_proto_gen';
+import * as srpmArchiver from 'bazel-bin/tools/mothership/proto/v1/mothershippb_ts_proto_gen';
+
+const archiverCfg = new srpmArchiver.Configuration({
+  basePath: '/api',
+})
+
+export const srpmArchiverApi = new srpmArchiver.SrpmArchiverApi(archiverCfg);
 
 const cfg = new mshipAdmin.Configuration({
   basePath: '/admin/api',
