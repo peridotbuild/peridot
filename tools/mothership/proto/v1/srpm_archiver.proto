@@ -20,6 +20,7 @@ import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
 import "google/longrunning/operations.proto";
+import "google/protobuf/empty.proto";
 import "tools/mothership/proto/v1/batch.proto";
 import "tools/mothership/proto/v1/entry.proto";
 import "tools/mothership/proto/v1/process_rpm.proto";
@@ -88,9 +89,12 @@ service SrpmArchiver {
   // If after 2 hours the SRPM is not processed, the worker can assume that
   // the SRPM is lost and can be re-uploaded. It that case, the entry will be
   // re-assigned to the worker.
+  // If a checksum can't be leased because it's already being processed,
+  // AlreadyExists error will be returned.
+  // The worker MUST stop processing the SRPM in that case.
   rpc SubmitEntry(SubmitEntryRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/entries:submitEntry"
+      post: "/v1/actions:submitEntry"
       body: "*"
     };
     option (google.longrunning.operation_info) = {
@@ -101,12 +105,21 @@ service SrpmArchiver {
 
   // WorkerUploadObject is used by workers to upload objects to the
   // object storage service.
-  // Returns 409 (Conflict) if the SRPM already exists. This should indicate to the
-  // worker that they should not continue processing the SRPM.
+  // Returns AlreadyExists if the SRPM already exists.
+  // This doesn't necessarily mean that the worker should stop processing,
+  // especially if it acquired a lease to process this particular SRPM.
   rpc WorkerUploadObject(stream WorkerUploadObjectRequest) returns (WorkerUploadObjectResponse) {
     option (google.api.http) = {
-      post: "/v1/srpms:workerUploadObject"
+      post: "/v1/actions:workerUploadObject"
       body: "chunk"
+    };
+  }
+
+  // WorkerPing is used by workers to ping the server.
+  // This is used to check if the worker is still alive.
+  rpc WorkerPing(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/actions:workerPing"
     };
   }
 }
@@ -223,10 +236,6 @@ message SubmitEntryRequest {
   // Process request for RPM.
   // This request is sent to the worker to process the RPM.
   ProcessRPMRequest process_rpm_request = 1 [(google.api.field_behavior) = REQUIRED];
-
-  // The name of the batch to submit the entry to.
-  // For example: "batches/1234".
-  string batch = 2;
 }
 
 // Request message for WorkerUploadObject method.

@@ -25,13 +25,19 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	storage2 "github.com/go-git/go-git/v5/storage"
 	"github.com/pkg/errors"
+	srpmprocpb "github.com/rocky-linux/srpmproc/pb"
+	"github.com/rocky-linux/srpmproc/pkg/data"
+	"github.com/rocky-linux/srpmproc/pkg/directives"
 	"github.com/sassoftware/go-rpmutils"
 	"go.resf.org/peridot/base/go/storage"
 	"golang.org/x/crypto/openpgp"
+	"google.golang.org/protobuf/encoding/prototext"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -249,6 +255,10 @@ func (s *State) writeMetadataFile(targetFS billy.Filesystem) error {
 	}
 
 	metadataFile := fmt.Sprintf(".%s.metadata", name[0])
+
+	// Delete the file if it exists
+	_ = targetFS.Remove(metadataFile)
+
 	f, err := targetFS.Create(metadataFile)
 	if err != nil {
 		return errors.Wrap(err, "failed to open metadata file")
@@ -430,6 +440,11 @@ func (s *State) cleanTargetRepo(wt *git.Worktree, root string) error {
 	}
 
 	for _, f := range ls {
+		// Don't delete the PATCHES directory
+		if f.Name() == "PATCHES" && f.IsDir() {
+			continue
+		}
+
 		// If it's a directory, then recurse into it.
 		if f.IsDir() {
 			err := s.cleanTargetRepo(wt, filepath.Join(root, f.Name()))
@@ -491,6 +506,12 @@ func (s *State) populateTargetRepo(repo *git.Repository, targetFS billy.Filesyst
 		return errors.Wrap(err, "failed to expand layout")
 	}
 
+	// If the target FS has patches, apply the directives
+	err = s.patchTargetRepo(repo, lookaside)
+	if err != nil {
+		return errors.Wrap(err, "failed to patch target repo")
+	}
+
 	// Commit the changes to the target repository.
 	_, err = wt.Add(".")
 	if err != nil {
@@ -539,6 +560,120 @@ func (s *State) pushTargetRepo(repo *git.Repository, opts *git.PushOptions) erro
 	err := repo.Push(opts)
 	if err != nil {
 		return errors.Wrap(err, "failed to push repo")
+	}
+
+	return nil
+}
+
+func (s *State) patchTargetRepo(repo *git.Repository, lookaside storage.Storage) error {
+	// We can re-use srpmproc as we should stay compatible with it
+	// Instead of OpenPatch, we'll look for patches in the targetFS
+	// todo(mustafa): RESF still uses OpenPatch, so we'll need to change that
+	wt, err := repo.Worktree()
+	if err != nil {
+		return errors.Wrap(err, "failed to get worktree")
+	}
+
+	nevra, err := s.rpm.Header.GetNEVRA()
+	if err != nil {
+		return errors.Wrap(err, "failed to get NEVRA")
+	}
+
+	dist := elDistRegex.FindString(nevra.Release)
+	if dist == "" {
+		return errors.Wrap(err, "failed to determine dist tag")
+	}
+	distNum, err := strconv.Atoi(dist[2:])
+	if err != nil {
+		return errors.Wrap(err, "failed to parse dist tag")
+	}
+
+	pd := &data.ProcessData{
+		ImportBranchPrefix: "el",
+		Version:            distNum,
+		BlobStorage:        &srpmprocBlobCompat{lookaside},
+		Importer:           &srpmprocImportModeCompat{},
+		Log:                log.New(os.Stderr, "", 0),
+	}
+	md := &data.ModeData{
+		SourcesToIgnore: []*data.IgnoredSource{},
+	}
+
+	// Look in the PATCHES/ directory for any .cfg files
+	patchesLs, err := wt.Filesystem.ReadDir("PATCHES")
+	if err != nil {
+		return errors.Wrap(err, "failed to read PATCHES directory")
+	}
+
+	for _, f := range patchesLs {
+		// Skip directories
+		if f.IsDir() {
+			continue
+		}
+
+		// Skip non-cfg files
+		if !strings.HasSuffix(f.Name(), ".cfg") {
+			continue
+		}
+
+		// Open the file
+		file, err := wt.Filesystem.Open(filepath.Join("PATCHES", f.Name()))
+		if err != nil {
+			return errors.Wrap(err, "failed to open file")
+		}
+
+		// Process the file
+		directivesBytes, err := io.ReadAll(file)
+		if err != nil {
+			return errors.Wrap(err, "failed to read file")
+		}
+
+		var cfg srpmprocpb.Cfg
+		err = prototext.Unmarshal(directivesBytes, &cfg)
+		if err != nil {
+			return errors.Wrap(err, "failed to unmarshal directives")
+		}
+
+		errs := directives.Apply(&cfg, pd, md, wt, wt)
+		// If there are errors, then we should return a reduced error
+		if len(errs) > 0 {
+			var retErr error
+			for _, err := range errs {
+				retErr = errors.Wrap(retErr, err.Error())
+			}
+			return retErr
+		}
+	}
+
+	// Add sources to ignore to lookasideBlobs
+	for _, source := range md.SourcesToIgnore {
+		// Get the hash of the source
+		hash, err := func() (string, error) {
+			hash := sha256.New()
+			file, err := wt.Filesystem.Open(source.Name)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to open file")
+			}
+			defer file.Close()
+
+			_, err = io.Copy(hash, file)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to copy file")
+			}
+
+			return hex.EncodeToString(hash.Sum(nil)), nil
+		}()
+		if err != nil {
+			return err
+		}
+
+		s.lookasideBlobs[source.Name] = hash
+	}
+
+	// Re-write the metadata file
+	err = s.writeMetadataFile(wt.Filesystem)
+	if err != nil {
+		return errors.Wrap(err, "failed to write metadata file")
 	}
 
 	return nil

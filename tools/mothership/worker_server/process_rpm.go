@@ -22,6 +22,8 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/pkg/errors"
 	"github.com/sassoftware/go-rpmutils"
+	base "go.resf.org/peridot/base/go"
+	mothership_db "go.resf.org/peridot/tools/mothership/db"
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
 	"go.resf.org/peridot/tools/mothership/worker_server/srpm_import"
 	"go.temporal.io/sdk/temporal"
@@ -81,6 +83,81 @@ func (w *Worker) VerifyResourceExists(uri string) error {
 		// The parent workflow should handle the retry arrangements up to 2 hours
 		// per the spec.
 		return errors.New("resource does not exist")
+	}
+
+	return nil
+}
+
+// SetEntryIDFromRPM sets the entry ID from the RPM.
+// This is a Temporal activity.
+func (w *Worker) SetEntryIDFromRPM(entry string, uri string, checksumSha256 string) error {
+	ent, err := base.Q[mothership_db.Entry](w.db).F("name", entry).GetOrNil()
+	if err != nil {
+		return errors.Wrap(err, "failed to get entry")
+	}
+	if ent == nil {
+		return errors.New("entry does not exist")
+	}
+
+	tempDir, err := os.MkdirTemp("", "mothership-worker-server-import-rpm-*")
+	if err != nil {
+		return errors.Wrap(err, "failed to create temporary directory")
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Parse uri
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse resource URI")
+	}
+
+	// Download the resource to the temporary directory
+	err = w.storage.Download(parsed.Path, filepath.Join(tempDir, "resource.rpm"))
+	if err != nil {
+		return errors.Wrap(err, "failed to download resource")
+	}
+
+	// Verify checksum
+	hash := sha256.New()
+	f, err := os.Open(filepath.Join(tempDir, "resource.rpm"))
+	if err != nil {
+		return errors.Wrap(err, "failed to open resource")
+	}
+	defer f.Close()
+	if _, err := io.Copy(hash, f); err != nil {
+		return errors.Wrap(err, "failed to hash resource")
+	}
+	if hex.EncodeToString(hash.Sum(nil)) != checksumSha256 {
+		return errors.New("checksum does not match")
+	}
+
+	// Read the RPM headers
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return errors.Wrap(err, "failed to seek resource")
+	}
+	rpm, err := rpmutils.ReadRpm(f)
+	if err != nil {
+		return errors.Wrap(err, "failed to read RPM headers")
+	}
+
+	nevra, err := rpm.Header.GetNEVRA()
+	if err != nil {
+		return errors.Wrap(err, "failed to get RPM NEVRA")
+	}
+
+	// Set entry ID
+	ent.EntryID = nevra.String()
+	// Remove everything after last dot for EntryID
+	// This is because we're going to replace arch with src
+	// RPM currently sets the Arch for SRPMs to the arch of the build machine
+	ent.EntryID = ent.EntryID[:strings.LastIndex(ent.EntryID, ".")]
+	ent.EntryID = ent.EntryID + ".src"
+	ent.Sha256Sum = checksumSha256
+
+	// Update entry
+	if err := base.Q[mothership_db.Entry](w.db).U(ent); err != nil {
+		return errors.Wrap(err, "failed to update entry")
 	}
 
 	return nil

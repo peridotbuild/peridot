@@ -17,17 +17,23 @@ package mothership_rpc
 import (
 	base "go.resf.org/peridot/base/go"
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
+	"go.temporal.io/sdk/client"
+	"google.golang.org/genproto/googleapis/longrunning"
 	"google.golang.org/grpc"
 )
 
 type Server struct {
 	base.GRPCServer
-	mothershippb.UnimplementedSrpmArchiverServer
 
-	db *base.DB
+	mothershippb.UnimplementedSrpmArchiverServer
+	longrunning.UnimplementedOperationsServer
+
+	db       *base.DB
+	temporal client.Client
 }
 
-func NewServer(db *base.DB, opts ...base.GRPCServerOption) (*Server, error) {
+func NewServer(db *base.DB, temporalClient client.Client, opts ...base.GRPCServerOption) (*Server, error) {
+	opts = append(opts, base.WithServeMuxAdditionalHeaders("x-mship-worker-secret"))
 	grpcServer, err := base.NewGRPCServer(opts...)
 	if err != nil {
 		return nil, err
@@ -36,14 +42,17 @@ func NewServer(db *base.DB, opts ...base.GRPCServerOption) (*Server, error) {
 	return &Server{
 		GRPCServer: *grpcServer,
 		db:         db,
+		temporal:   temporalClient,
 	}, nil
 }
 
 func (s *Server) Start() error {
 	s.RegisterService(func(server *grpc.Server) {
+		longrunning.RegisterOperationsServer(server, s)
 		mothershippb.RegisterSrpmArchiverServer(server, s)
 	})
 	if err := s.GatewayEndpoints(
+		longrunning.RegisterOperationsHandler,
 		mothershippb.RegisterSrpmArchiverHandler,
 	); err != nil {
 		return err

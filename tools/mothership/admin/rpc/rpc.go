@@ -17,6 +17,7 @@ package mothershipadmin_rpc
 import (
 	base "go.resf.org/peridot/base/go"
 	mshipadminpb "go.resf.org/peridot/tools/mothership/admin/pb"
+	"go.temporal.io/sdk/client"
 	"google.golang.org/grpc"
 )
 
@@ -24,10 +25,11 @@ type Server struct {
 	base.GRPCServer
 	mshipadminpb.UnimplementedMshipAdminServer
 
-	db *base.DB
+	db       *base.DB
+	temporal client.Client
 }
 
-func NewServer(db *base.DB, oidcInterceptorDetails *base.OidcInterceptorDetails, opts ...base.GRPCServerOption) (*Server, error) {
+func NewServer(db *base.DB, temporalClient client.Client, oidcInterceptorDetails *base.OidcInterceptorDetails, opts ...base.GRPCServerOption) (*Server, error) {
 	oidcInterceptor, err := base.OidcGrpcInterceptor(oidcInterceptorDetails)
 	if err != nil {
 		return nil, err
@@ -42,6 +44,7 @@ func NewServer(db *base.DB, oidcInterceptorDetails *base.OidcInterceptorDetails,
 	return &Server{
 		GRPCServer: *grpcServer,
 		db:         db,
+		temporal:   temporalClient,
 	}, nil
 }
 

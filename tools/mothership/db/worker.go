@@ -23,7 +23,8 @@ import (
 )
 
 type Worker struct {
-	PikaTableName string `pika:"workers"`
+	PikaTableName      string `pika:"workers"`
+	PikaDefaultOrderBy string `pika:"-create_time"`
 
 	Name            string       `db:"name"`
 	CreateTime      time.Time    `db:"create_time" pika:"omitempty"`
