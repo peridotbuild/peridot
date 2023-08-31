@@ -92,7 +92,36 @@ var defaultCliFlagsNoAuth = append(defaultCliFlagsDatabaseOnly, []cli.Flag{
 	},
 }...)
 
+var defaultCliFlagsNoAuthTemporal = append(defaultCliFlagsTemporal, []cli.Flag{
+	&cli.IntFlag{
+		Name:    "grpc-port",
+		Usage:   "gRPC port",
+		EnvVars: []string{string(EnvVarGRPCPort)},
+		Value:   8080,
+	},
+	&cli.IntFlag{
+		Name:    "gateway-port",
+		Usage:   "gRPC gateway port",
+		EnvVars: []string{string(EnvVarGatewayPort)},
+		Value:   8081,
+	},
+}...)
+
 var defaultCliFlags = append(defaultCliFlagsNoAuth, []cli.Flag{
+	&cli.StringFlag{
+		Name:    "oidc-issuer",
+		Usage:   "OIDC issuer",
+		EnvVars: []string{string(EnvVarFrontendOIDCIssuer)},
+		Value:   "https://accounts.rockylinux.org/auth/realms/rocky",
+	},
+	&cli.StringFlag{
+		Name:    "required-oidc-group",
+		Usage:   "OIDC group that is required to access the frontend",
+		EnvVars: []string{string(EnvVarFrontendRequiredOIDCGroup)},
+	},
+}...)
+
+var defaultCliFlagsTemporalClient = append(defaultCliFlagsNoAuthTemporal, []cli.Flag{
 	&cli.StringFlag{
 		Name:    "oidc-issuer",
 		Usage:   "OIDC issuer",
@@ -187,9 +216,19 @@ func WithDefaultCliFlags(flags ...cli.Flag) []cli.Flag {
 	return append(defaultCliFlags, flags...)
 }
 
+// WithDefaultCliFlagsTemporalClient adds the default cli flags to the app.
+func WithDefaultCliFlagsTemporalClient(flags ...cli.Flag) []cli.Flag {
+	return append(defaultCliFlagsTemporalClient, flags...)
+}
+
 // WithDefaultCliFlagsNoAuth adds the default cli flags to the app.
 func WithDefaultCliFlagsNoAuth(flags ...cli.Flag) []cli.Flag {
 	return append(defaultCliFlagsNoAuth, flags...)
+}
+
+// WithDefaultCliFlagsNoAuthTemporal adds the default cli flags to the app.
+func WithDefaultCliFlagsNoAuthTemporal(flags ...cli.Flag) []cli.Flag {
+	return append(defaultCliFlagsNoAuthTemporal, flags...)
 }
 
 // WithDefaultCliFlagsTemporal adds the default cli flags to the app.
@@ -264,7 +303,12 @@ func GetDBFromFlags(ctx *cli.Context) *DB {
 
 // GetTemporalClientFromFlags gets the temporal client from the cli flags.
 func GetTemporalClientFromFlags(ctx *cli.Context, opts client.Options) (client.Client, error) {
-	return NewTemporalClient(ctx.String("temporal-address"), ctx.String("temporal-namespace"), opts)
+	return NewTemporalClient(
+		ctx.String("temporal-address"),
+		ctx.String("temporal-namespace"),
+		ctx.String("temporal-task-queue"),
+		opts,
+	)
 }
 
 // ChangeDefaultForEnvVar changes the default value of a flag based on an environment variable.

@@ -20,13 +20,35 @@ import (
 	"github.com/pkg/errors"
 	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/interceptor"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"strings"
 	"time"
 )
 
-func NewTemporalClient(host string, namespace string, opts client.Options) (client.Client, error) {
+type temporalTQInterceptor struct {
+	interceptor.ClientInterceptorBase
+	interceptor.ClientOutboundInterceptorBase
+
+	taskQueue string
+}
+
+func (tqi *temporalTQInterceptor) InterceptClient(next interceptor.ClientOutboundInterceptor) interceptor.ClientOutboundInterceptor {
+	return &temporalTQInterceptor{
+		ClientOutboundInterceptorBase: interceptor.ClientOutboundInterceptorBase{
+			Next: next,
+		},
+		taskQueue: tqi.taskQueue,
+	}
+}
+
+func (tqi *temporalTQInterceptor) ExecuteWorkflow(ctx context.Context, in *interceptor.ClientExecuteWorkflowInput) (client.WorkflowRun, error) {
+	in.Options.TaskQueue = tqi.taskQueue
+	return tqi.Next.ExecuteWorkflow(ctx, in)
+}
+
+func NewTemporalClient(host string, namespace string, taskQueue string, opts client.Options) (client.Client, error) {
 	// If host contains :443, then use TLS
 	if strings.Contains(host, ":443") {
 		opts.ConnectionOptions = client.ConnectionOptions{
@@ -58,6 +80,14 @@ func NewTemporalClient(host string, namespace string, opts client.Options) (clie
 
 	// Set namespace in opts
 	opts.Namespace = namespace
+
+	// Set interceptor to set task queue
+	if opts.Interceptors == nil {
+		opts.Interceptors = []interceptor.ClientInterceptor{}
+	}
+	opts.Interceptors = append(opts.Interceptors, &temporalTQInterceptor{
+		taskQueue: taskQueue,
+	})
 
 	LogInfof("Connecting to Temporal at %s", host)
 
