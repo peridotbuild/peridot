@@ -216,6 +216,9 @@ github.com/beorn7/perks/quantile
 # github.com/blang/semver/v4 v4.0.0
 ## explicit; go 1.14
 github.com/blang/semver/v4
+# github.com/bluekeyes/go-gitdiff v0.5.0
+## explicit; go 1.13
+github.com/bluekeyes/go-gitdiff/gitdiff
 # github.com/bmatcuk/doublestar/v4 v4.6.0
 ## explicit; go 1.16
 github.com/bmatcuk/doublestar/v4
@@ -932,6 +935,13 @@ github.com/robfig/cron
 # github.com/robfig/cron/v3 v3.0.1
 ## explicit; go 1.12
 github.com/robfig/cron/v3
+# github.com/rocky-linux/srpmproc v0.5.0
+## explicit; go 1.18
+github.com/rocky-linux/srpmproc/pb
+github.com/rocky-linux/srpmproc/pkg/blob
+github.com/rocky-linux/srpmproc/pkg/data
+github.com/rocky-linux/srpmproc/pkg/directives
+github.com/rocky-linux/srpmproc/pkg/misc
 # github.com/russellhaering/goxmldsig v1.4.0
 ## explicit; go 1.15
 github.com/russellhaering/goxmldsig
@@ -1270,6 +1280,7 @@ go.temporal.io/api/workflowservicemock/v1
 go.temporal.io/sdk/activity
 go.temporal.io/sdk/client
 go.temporal.io/sdk/converter
+go.temporal.io/sdk/interceptor
 go.temporal.io/sdk/internal
 go.temporal.io/sdk/internal/common
 go.temporal.io/sdk/internal/common/backoff
@@ -1918,3 +1929,4 @@ sigs.k8s.io/yaml
 # go.resf.org/peridot/tools/mothership/pb => ./bazel-bin/tools/mothership/proto/v1/mothershippb_go_proto_/go.resf.org/peridot/tools/mothership/pb
 # go.resf.org/peridot/third_party/bazel/src/main/protobuf => ./bazel-bin/third_party/bazel/src/main/protobuf/blaze_query_go_proto_/go.resf.org/peridot/third_party/bazel/src/main/protobuf
 # go.resf.org/peridot/tools/mothership/admin/pb => ./bazel-bin/tools/mothership/proto/admin/v1/mshipadminpb_go_proto_/go.resf.org/peridot/tools/mothership/admin/pb
+# google.golang.org/genproto/googleapis/longrunning => ./bazel-bin/third_party/googleapis/google/longrunning/longrunning_go_proto_/google.golang.org/genproto/googleapis/longrunning

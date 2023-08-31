@@ -26,6 +26,7 @@ require (
 	github.com/jarcoal/httpmock v1.3.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
+	github.com/rocky-linux/srpmproc v0.5.0
 	github.com/sassoftware/go-rpmutils v0.2.0
 	github.com/stretchr/testify v1.8.4
 	github.com/temporalio/temporalite v0.3.1-0.20230117200252-2df426ad3426
@@ -43,6 +44,7 @@ require (
 	golang.org/x/crypto v0.12.0
 	golang.org/x/mod v0.12.0
 	golang.org/x/oauth2 v0.11.0
+	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d
 	google.golang.org/grpc v1.57.0
 	google.golang.org/protobuf v1.31.0
@@ -82,6 +84,7 @@ require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/bluekeyes/go-gitdiff v0.5.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.6.0 // indirect
 	github.com/bufbuild/protocompile v0.6.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -258,7 +261,6 @@ require (
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/api v0.138.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
@@ -289,3 +291,5 @@ replace go.resf.org/peridot/tools/mothership/pb => ./bazel-bin/tools/mothership/
 replace go.resf.org/peridot/third_party/bazel/src/main/protobuf => ./bazel-bin/third_party/bazel/src/main/protobuf/blaze_query_go_proto_/go.resf.org/peridot/third_party/bazel/src/main/protobuf
 
 replace go.resf.org/peridot/tools/mothership/admin/pb => ./bazel-bin/tools/mothership/proto/admin/v1/mshipadminpb_go_proto_/go.resf.org/peridot/tools/mothership/admin/pb
+
+replace google.golang.org/genproto/googleapis/longrunning => ./bazel-bin/third_party/googleapis/google/longrunning/longrunning_go_proto_/google.golang.org/genproto/googleapis/longrunning

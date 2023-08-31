@@ -220,6 +220,12 @@ def go_dependencies():
         sum = "h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=",
         version = "v4.0.0",
     )
+    go_repository(
+        name = "com_github_bluekeyes_go_gitdiff",
+        importpath = "github.com/bluekeyes/go-gitdiff",
+        sum = "h1:AXrIoy/VEA9Baz2lhwMlpdzDJ/sKof6C9yTt1oqw4hQ=",
+        version = "v0.5.0",
+    )
 
     go_repository(
         name = "com_github_bmatcuk_doublestar_v4",
@@ -1215,6 +1221,13 @@ def go_dependencies():
         version = "v0.5.1",
     )
     go_repository(
+        name = "com_github_hashicorp_hcl",
+        importpath = "github.com/hashicorp/hcl",
+        sum = "h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=",
+        version = "v1.0.0",
+    )
+
+    go_repository(
         name = "com_github_hashicorp_hcl_v2",
         importpath = "github.com/hashicorp/hcl/v2",
         sum = "h1:z1XvSUyXd1HP10U4lrLg5e0JMVz6CPaJvAgxM0KNZVY=",
@@ -1622,6 +1635,13 @@ def go_dependencies():
         version = "v1.2.0",
     )
     go_repository(
+        name = "com_github_mitchellh_go_homedir",
+        importpath = "github.com/mitchellh/go-homedir",
+        sum = "h1:lukF9ziXFxDFPkA1vsr5zpc1XuPDn/wFntq5mG+4E0Y=",
+        version = "v1.1.0",
+    )
+
+    go_repository(
         name = "com_github_mitchellh_go_wordwrap",
         importpath = "github.com/mitchellh/go-wordwrap",
         sum = "h1:TLuKupo69TCn6TQSyGxwI1EblZZEsQ0vMlAFQflz0v0=",
@@ -1962,6 +1982,12 @@ def go_dependencies():
         sum = "h1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=",
         version = "v3.0.1",
     )
+    go_repository(
+        name = "com_github_rocky_linux_srpmproc",
+        importpath = "github.com/rocky-linux/srpmproc",
+        sum = "h1:rVCtpFyrYI7kAj5XOCZEB4ZcBMfh/E2Vt01AxwJsfpE=",
+        version = "v0.5.0",
+    )
 
     go_repository(
         name = "com_github_rogpeppe_fastuuid",
@@ -2099,6 +2125,12 @@ def go_dependencies():
         sum = "h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=",
         version = "v0.0.0-20180118202830-f09979ecbc72",
     )
+    go_repository(
+        name = "com_github_spf13_afero",
+        importpath = "github.com/spf13/afero",
+        sum = "h1:m8/z1t7/fwjysjQRYbP0RD+bUIF/8tJwPdEZsI83ACI=",
+        version = "v1.1.2",
+    )
 
     go_repository(
         name = "com_github_spf13_cast",
@@ -2113,6 +2145,12 @@ def go_dependencies():
         sum = "h1:hyqWnYt1ZQShIddO5kBpj3vu05/++x6tJ6dg8EC572I=",
         version = "v1.7.0",
     )
+    go_repository(
+        name = "com_github_spf13_jwalterweatherman",
+        importpath = "github.com/spf13/jwalterweatherman",
+        sum = "h1:XHEdyB+EcvlqZamSM4ZOMGlc93t6AcsBEu9Gc1vn7yk=",
+        version = "v1.0.0",
+    )
 
     go_repository(
         name = "com_github_spf13_pflag",
@@ -2120,6 +2158,13 @@ def go_dependencies():
         sum = "h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=",
         version = "v1.0.5",
     )
+    go_repository(
+        name = "com_github_spf13_viper",
+        importpath = "github.com/spf13/viper",
+        sum = "h1:xVKxvI7ouOI5I+U9s2eeiUfMaWBVoXA3AWskkrqK0VM=",
+        version = "v1.7.0",
+    )
+
     go_repository(
         name = "com_github_stefanberger_go_pkcs11uri",
         importpath = "github.com/stefanberger/go-pkcs11uri",
@@ -2146,6 +2191,13 @@ def go_dependencies():
         sum = "h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=",
         version = "v1.8.4",
     )
+    go_repository(
+        name = "com_github_subosito_gotenv",
+        importpath = "github.com/subosito/gotenv",
+        sum = "h1:Slr1R9HxAlEKefgq5jn9U+DnETlIUa6HfgEzj0g5d7s=",
+        version = "v1.2.0",
+    )
+
     go_repository(
         name = "com_github_syndtr_gocapability",
         importpath = "github.com/syndtr/gocapability",
@@ -3196,6 +3248,12 @@ def go_dependencies():
         importpath = "gopkg.in/inf.v0",
         sum = "h1:73M5CoZyi3ZLMOyDlQh031Cx6N9NDJ2Vvfl76EDAgDc=",
         version = "v0.9.1",
+    )
+    go_repository(
+        name = "in_gopkg_ini_v1",
+        importpath = "gopkg.in/ini.v1",
+        sum = "h1:AQvPpx3LzTDM0AjnIRlVFwFFGC+npRopjZxLJj6gdno=",
+        version = "v1.51.0",
     )
 
     go_repository(
