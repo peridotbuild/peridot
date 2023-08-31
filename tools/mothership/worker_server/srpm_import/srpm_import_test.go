@@ -787,6 +787,62 @@ func TestPopulateTargetRepo_Existing(t *testing.T) {
 	require.Equal(t, "efi-rpm-macros.spec", ls[0].Name())
 }
 
+func TestPatchTargetRepo(t *testing.T) {
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
+	require.Nil(t, err)
+	require.NotNil(t, s)
+	defer func() {
+		require.Nil(t, s.Close())
+	}()
+
+	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
+	require.Nil(t, err)
+	defer os.RemoveAll(tempDir)
+
+	storer := memory.NewStorage()
+	fs := memfs.New()
+	opts := &git.CloneOptions{
+		URL: "file://" + tempDir,
+	}
+	repo, branch, err := s.getRepo(opts, storer, fs, "")
+	require.Nil(t, err)
+	require.NotNil(t, repo)
+	require.Equal(t, "el-8", branch)
+
+	// Verify empty
+	objIter, err := repo.CommitObjects()
+	require.Nil(t, err)
+	_, err = objIter.Next()
+	require.Equal(t, io.EOF, err)
+
+	wt, err := repo.Worktree()
+	require.Nil(t, err)
+
+	f, err := wt.Filesystem.Create("PATCHES/test.cfg")
+	require.Nil(t, err)
+	_, err = f.Write([]byte(`
+spec_change {
+  changelog {
+    author_name: "Mustafa Gezen"
+    author_email: "mustafa@rockylinux.org"
+    message: "test patch1"
+  }
+}
+`))
+	require.Nil(t, err)
+
+	// Populate repo, this will also run patchTargetRepo
+	inMemory := storage_memory.New(osfs.New("/"))
+	require.Nil(t, s.populateTargetRepo(repo, fs, inMemory, branch))
+
+	// Verify spec file contains "test patch1"
+	f, err = fs.Open("SPECS/efi-rpm-macros.spec")
+	require.Nil(t, err)
+	buf, err := io.ReadAll(f)
+	require.Nil(t, err)
+	require.Contains(t, string(buf), "test patch1")
+}
+
 func TestPushTargetRepo(t *testing.T) {
 	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
@@ -819,7 +875,7 @@ func TestPushTargetRepo(t *testing.T) {
 	filesystemTemp2 := filesystem.NewStorage(dot2, cache.NewObjectLRUDefault())
 
 	repo, err := git.InitWithOptions(filesystemTemp2, osfs2, git.InitOptions{
-		DefaultBranch: "refs/heads/el8",
+		DefaultBranch: "refs/heads/el-8",
 	})
 	require.Nil(t, err)
 	_, err = repo.CreateRemote(&config.RemoteConfig{
@@ -846,7 +902,7 @@ func TestPushTargetRepo(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Nil(t, s.pushTargetRepo(repo, &git.PushOptions{
-		RefSpecs: []config.RefSpec{"refs/heads/el8:refs/heads/el8"},
+		RefSpecs: []config.RefSpec{"refs/heads/el-8:refs/heads/el-8"},
 	}))
 
 	// Verify testfile is still there
@@ -1024,7 +1080,7 @@ func TestImport1_New_Rolling(t *testing.T) {
 }
 
 func TestImport2_New(t *testing.T) {
-	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm", true)
+	s, err := FromFile("testdata/bash-4.4.20-4.el8_6.src.rpm", false)
 	require.Nil(t, err)
 
 	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
@@ -1055,7 +1111,7 @@ func TestImport2_New(t *testing.T) {
 	w, err := repo.Worktree()
 	require.Nil(t, err)
 	err = w.Checkout(&git.CheckoutOptions{
-		Branch: "refs/heads/el8",
+		Branch: "refs/heads/el-8",
 	})
 	require.Nil(t, err)
 
@@ -1071,7 +1127,7 @@ func TestImport2_New(t *testing.T) {
 	require.Nil(t, err)
 	tag, err := tagIter.Next()
 	require.Nil(t, err)
-	require.Equal(t, "imports/el8/bash-4.4.20-4.el8_6", tag.Name().Short())
+	require.Equal(t, "imports/el-8/bash-4.4.20-4.el8_6", tag.Name().Short())
 
 	// Verify metadata
 	f, err := fs.Open(".bash.metadata")
