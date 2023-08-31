@@ -34,6 +34,8 @@ exports_files([".swcrc"])
 # gazelle:exclude vendor.go
 # gazelle:go_grpc_compilers @io_bazel_rules_go//proto:go_grpc,//:go_gen_grpc_gateway
 # gazelle:resolve go github.com/bazelbuild/bazel-watcher/internal/ibazel/profiler //third_party/github.com/bazelbuild/bazel-watcher/internal/ibazel/profiler
+# gazelle:resolve go google.golang.org/genproto/googleapis/longrunning //third_party/googleapis/google/longrunning:longrunning_go_proto
+# gazelle:resolve proto go google/longrunning/operations.proto //third_party/googleapis/google/longrunning:longrunning_go_proto
 # gazelle:resolve proto proto google/api/annotations.proto @googleapis//google/api:annotations_proto
 # gazelle:resolve proto go google/api/annotations.proto  @org_golang_google_genproto//googleapis/api/annotations
 gazelle(name = "gazelle")

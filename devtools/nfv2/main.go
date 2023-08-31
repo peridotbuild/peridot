@@ -65,7 +65,7 @@ func main() {
 		base.LogFatalf("could not change directory: %v", err)
 	}
 
-	queryProto := callBazel("query", "kind(go_proto_library, //... - //vendor/... - //third_party/... + //third_party/bazel/...)", "--output", "proto")
+	queryProto := callBazel("query", "kind(go_proto_library, //... - //vendor/... - //third_party/... + //third_party/bazel/... + //third_party/googleapis/google/longrunning/...)", "--output", "proto")
 
 	var query blaze_query.QueryResult
 	err = proto.Unmarshal(queryProto, &query)
