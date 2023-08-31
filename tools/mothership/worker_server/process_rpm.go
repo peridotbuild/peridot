@@ -17,6 +17,7 @@ package mothership_worker_server
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
@@ -147,12 +148,7 @@ func (w *Worker) SetEntryIDFromRPM(entry string, uri string, checksumSha256 stri
 	}
 
 	// Set entry ID
-	ent.EntryID = nevra.String()
-	// Remove everything after last dot for EntryID
-	// This is because we're going to replace arch with src
-	// RPM currently sets the Arch for SRPMs to the arch of the build machine
-	ent.EntryID = ent.EntryID[:strings.LastIndex(ent.EntryID, ".")]
-	ent.EntryID = ent.EntryID + ".src"
+	ent.EntryID = fmt.Sprintf("%s-%s-%s.src", nevra.Name, nevra.Version, nevra.Release)
 	ent.Sha256Sum = checksumSha256
 
 	// Update entry

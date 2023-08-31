@@ -163,7 +163,7 @@ func ProcessRPMWorkflow(ctx workflow.Context, args *mothershippb.ProcessRPMArgs)
 	}
 
 	// On defer, if the workflow is not completed, then we'll set the entry state
-	// to cancelled.
+	// to failed.
 	defer func() {
 		if entry.State == mothershippb.Entry_ARCHIVED {
 			return
@@ -177,7 +177,7 @@ func ProcessRPMWorkflow(ctx workflow.Context, args *mothershippb.ProcessRPMArgs)
 				MaximumAttempts: 0,
 			},
 		})
-		_ = workflow.ExecuteActivity(ctx, w.SetEntryState, entry.Name, mothershippb.Entry_CANCELLED, nil).Get(ctx, nil)
+		_ = workflow.ExecuteActivity(ctx, w.SetEntryState, entry.Name, mothershippb.Entry_FAILED, nil).Get(ctx, nil)
 	}()
 
 	// Set the entry name to the RPM NVR

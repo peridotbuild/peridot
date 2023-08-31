@@ -98,6 +98,10 @@ message Entry {
     // cancelled the entry.
     // This entry CAN'T be rescued.
     CANCELLED = 4;
+
+    // Failed to archive the entry.
+    // This entry CAN'T be rescued.
+    FAILED = 5;
   }
   // State of the entry.
   State state = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
