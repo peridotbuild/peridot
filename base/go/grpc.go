@@ -49,6 +49,9 @@ type GRPCServer struct {
 	gatewayPort        int
 	noGrpcGateway      bool
 	noMetrics          bool
+
+	// ServeMuxOptions
+	additionalHeaders map[string]bool
 }
 
 type GrpcEndpointRegister func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn) error
@@ -138,12 +141,46 @@ func WithNoMetrics() GRPCServerOption {
 	}
 }
 
-func DefaultServeMuxOptions() []runtime.ServeMuxOption {
+// WithServeMuxAdditionalHeaders sets additional headers for the gRPC-gateway. (incoming)
+func WithServeMuxAdditionalHeaders(headers ...string) GRPCServerOption {
+	return func(opts *GRPCServer) {
+		if opts.additionalHeaders == nil {
+			opts.additionalHeaders = make(map[string]bool)
+		}
+		for _, header := range headers {
+			opts.additionalHeaders[header] = true
+		}
+	}
+}
+
+func DefaultServeMuxOptions(s ...GRPCServer) []runtime.ServeMuxOption {
+	additionalHeaders := make(map[string]bool)
+
+	// We only make the arg a spread operator so that we can use the same function
+	// for both the default and the user-defined options.
+	// It can only ever be one GRPCServer
+	if len(s) > 0 {
+		if len(s) > 1 {
+			LogFatalf("DefaultServeMuxOptions: too many arguments")
+		}
+
+		opts := s[0]
+		if opts.additionalHeaders != nil {
+			for header := range opts.additionalHeaders {
+				additionalHeaders[header] = true
+			}
+		}
+	}
+
 	return []runtime.ServeMuxOption{
 		runtime.WithIncomingHeaderMatcher(func(s string) (string, bool) {
 			switch strings.ToLower(s) {
 			case "authorization",
 				"cookie":
+				return s, true
+			}
+
+			if additionalHeaders[s] {
 				return s, true
 			}
 
