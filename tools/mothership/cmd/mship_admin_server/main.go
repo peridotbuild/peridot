@@ -18,6 +18,7 @@ import (
 	"github.com/urfave/cli/v2"
 	base "go.resf.org/peridot/base/go"
 	mothershipadmin_rpc "go.resf.org/peridot/tools/mothership/admin/rpc"
+	"go.temporal.io/sdk/client"
 	"os"
 )
 
@@ -27,8 +28,14 @@ func run(ctx *cli.Context) error {
 		return err
 	}
 
+	temporalClient, err := base.GetTemporalClientFromFlags(ctx, client.Options{})
+	if err != nil {
+		return err
+	}
+
 	s, err := mothershipadmin_rpc.NewServer(
 		base.GetDBFromFlags(ctx),
+		temporalClient,
 		oidcInterceptorDetails,
 		base.FlagsToGRPCServerOptions(ctx)...,
 	)
@@ -46,7 +53,7 @@ func main() {
 	app := &cli.App{
 		Name:   "mship_admin_server",
 		Action: run,
-		Flags:  base.WithDefaultCliFlags(),
+		Flags:  base.WithDefaultCliFlagsTemporalClient(),
 	}
 
 	if err := app.Run(os.Args); err != nil {

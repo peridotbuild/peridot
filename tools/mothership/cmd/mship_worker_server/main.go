@@ -52,7 +52,7 @@ func run(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		keyRing, err := openpgp.ReadArmoredKeyRing(bytes.NewReader([]byte(decoded)))
+		keyRing, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(decoded))
 		if err != nil {
 			return err
 		}

@@ -30,6 +30,7 @@ import (
 	mship_admin_ui "go.resf.org/peridot/tools/mothership/admin/ui"
 	mothership_rpc "go.resf.org/peridot/tools/mothership/rpc"
 	mship_ui "go.resf.org/peridot/tools/mothership/ui"
+	"go.temporal.io/sdk/client"
 	"net/http"
 	"os"
 	"strings"
@@ -65,8 +66,14 @@ func setupAdminUi(ctx *cli.Context) (*base.FrontendInfo, error) {
 }
 
 func setupApi(ctx *cli.Context) (*runtime.ServeMux, error) {
+	temporalClient, err := base.GetTemporalClientFromFlags(ctx, client.Options{})
+	if err != nil {
+		return nil, err
+	}
+
 	s, err := mothership_rpc.NewServer(
 		base.GetDBFromFlags(ctx),
+		temporalClient,
 		base.WithGRPCPort(apiGrpcPort),
 		base.WithNoGRPCGateway(),
 		base.WithNoMetrics(),
@@ -91,8 +98,14 @@ func setupAdminApi(ctx *cli.Context) (*runtime.ServeMux, error) {
 	}
 	oidcInterceptorDetails.Group = "authors"
 
+	temporalClient, err := base.GetTemporalClientFromFlags(ctx, client.Options{})
+	if err != nil {
+		return nil, err
+	}
+
 	s, err := mothershipadmin_rpc.NewServer(
 		base.GetDBFromFlags(ctx),
+		temporalClient,
 		oidcInterceptorDetails,
 		base.WithGRPCPort(adminApiGrpcPort),
 		base.WithNoGRPCGateway(),
@@ -152,14 +165,15 @@ func run(ctx *cli.Context) error {
 
 func main() {
 	base.ChangeDefaultDatabaseURL("mothership")
+	base.ChangeDefaultForEnvVar(base.EnvVarTemporalTaskQueue, "mship_worker_server")
 
 	app := &cli.App{
 		Name:   "mship_dev",
 		Action: run,
-		Flags:  base.WithDefaultCliFlagsNoAuth(base.WithDefaultFrontendCliFlags()...),
+		Flags:  base.WithDefaultCliFlagsNoAuthTemporal(base.WithDefaultFrontendCliFlags()...),
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		base.LogFatalf("failed to start mship_ui: %v", err)
+		base.LogFatalf("failed to start mship_dev: %v", err)
 	}
 }
