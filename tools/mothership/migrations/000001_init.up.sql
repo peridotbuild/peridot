@@ -24,26 +24,28 @@ CREATE TABLE workers
 CREATE TABLE entries
 (
   name            VARCHAR(255) PRIMARY KEY,
-  entry_id        VARCHAR(255) UNIQUE NOT NULL,
-  create_time     TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
-  os_release      TEXT                NOT NULL,
-  sha256_sum      VARCHAR(255)        NOT NULL,
-  repository_name VARCHAR(255)        NOT NULL,
+  entry_id        VARCHAR(255) NOT NULL,
+  create_time     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  os_release      TEXT         NOT NULL,
+  sha256_sum      VARCHAR(255) NOT NULL,
+  repository_name VARCHAR(255) NOT NULL,
   worker_id       VARCHAR(255) REFERENCES workers (worker_id),
   batch_name      VARCHAR(255),
   user_email      TEXT,
-  commit_uri      TEXT                NOT NULL,
-  commit_hash     TEXT                NOT NULL
+  commit_uri      TEXT         NOT NULL,
+  commit_hash     TEXT         NOT NULL,
+  state           NUMERIC      NOT NULL
 );
 
 CREATE TABLE batches
 (
   name           VARCHAR(255) PRIMARY KEY,
   batch_id       VARCHAR(255) UNIQUE,
-  create_time    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  update_time    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  create_time    TIMESTAMPTZ                         NOT NULL DEFAULT NOW(),
+  update_time    TIMESTAMPTZ                         NOT NULL DEFAULT NOW(),
   seal_time      TIMESTAMPTZ,
-  bugtracker_url TEXT
+  worker_id      TEXT REFERENCES workers (worker_id) NOT NULL,
+  bugtracker_uri TEXT
 );
 
 CREATE TABLE bugtracker_configs

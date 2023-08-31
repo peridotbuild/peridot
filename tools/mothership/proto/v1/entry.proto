@@ -76,4 +76,29 @@ message Entry {
 
   // Commit hash of the resulting import
   string commit_hash = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Valid states of an entry.
+  enum State {
+    // Default value. This value is unused.
+    STATE_UNSPECIFIED = 0;
+
+    // The entry is being archived.
+    ARCHIVING = 1;
+
+    // The entry has been archived.
+    ARCHIVED = 2;
+
+    // One or more errors occurred while archiving the entry.
+    // Usually related to patches failing to apply.
+    // The entry will be placed "on hold" until the admin API
+    // receives the "rescue" call
+    ON_HOLD = 3;
+
+    // Error occurred while archiving the entry and an admin
+    // cancelled the entry.
+    // This entry CAN'T be rescued.
+    CANCELLED = 4;
+  }
+  // State of the entry.
+  State state = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

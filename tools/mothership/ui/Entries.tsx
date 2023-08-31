@@ -36,6 +36,7 @@ export const Entries = () => {
         { key: 'name', label: 'Entry Name' },
         { key: 'entryId', label: 'Entry ID' },
         { key: 'createTime', label: 'Created' },
+        { key: 'state', label: 'State' },
       ]}
     />
   );

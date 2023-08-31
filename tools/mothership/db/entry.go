@@ -23,19 +23,21 @@ import (
 )
 
 type Entry struct {
-	PikaTableName string `pika:"entries"`
+	PikaTableName      string `pika:"entries"`
+	PikaDefaultOrderBy string `pika:"-create_time"`
 
-	Name           string         `db:"name"`
-	EntryID        string         `db:"entry_id"`
-	CreateTime     time.Time      `db:"create_time" pika:"omitempty"`
-	OSRelease      string         `db:"os_release"`
-	Sha256Sum      string         `db:"sha256_sum"`
-	RepositoryName string         `db:"repository_name"`
-	WorkerID       sql.NullString `db:"worker_id"`
-	BatchName      sql.NullString `db:"batch_name"`
-	UserEmail      sql.NullString `db:"user_email"`
-	CommitURI      string         `db:"commit_uri"`
-	CommitHash     string         `db:"commit_hash"`
+	Name           string                   `db:"name"`
+	EntryID        string                   `db:"entry_id"`
+	CreateTime     time.Time                `db:"create_time" pika:"omitempty"`
+	OSRelease      string                   `db:"os_release"`
+	Sha256Sum      string                   `db:"sha256_sum"`
+	RepositoryName string                   `db:"repository_name"`
+	WorkerID       sql.NullString           `db:"worker_id"`
+	BatchName      sql.NullString           `db:"batch_name"`
+	UserEmail      sql.NullString           `db:"user_email"`
+	CommitURI      string                   `db:"commit_uri"`
+	CommitHash     string                   `db:"commit_hash"`
+	State          mothershippb.Entry_State `db:"state"`
 }
 
 func (e *Entry) GetID() string {
@@ -55,5 +57,6 @@ func (e *Entry) ToPB() *mothershippb.Entry {
 		UserEmail:  base.SqlNullString(e.UserEmail),
 		CommitUri:  e.CommitURI,
 		CommitHash: e.CommitHash,
+		State:      e.State,
 	}
 }

@@ -20,14 +20,15 @@ import (
 	base "go.resf.org/peridot/base/go"
 	mothership_db "go.resf.org/peridot/tools/mothership/db"
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
+	"go.temporal.io/sdk/temporal"
+	"time"
 )
 
-func (w *Worker) CreateEntry(args *mothershippb.ProcessRPMArgs, importRpmRes *mothershippb.ImportRPMResponse) (*mothershippb.Entry, error) {
+func (w *Worker) CreateEntry(args *mothershippb.ProcessRPMArgs) (*mothershippb.Entry, error) {
 	req := args.Request
 	internalReq := args.InternalRequest
 	entry := mothership_db.Entry{
 		Name:           base.NameGen("entries"),
-		EntryID:        importRpmRes.Nevra,
 		OSRelease:      req.OsRelease,
 		Sha256Sum:      req.Checksum,
 		RepositoryName: req.Repository,
@@ -35,8 +36,7 @@ func (w *Worker) CreateEntry(args *mothershippb.ProcessRPMArgs, importRpmRes *mo
 			String: internalReq.WorkerId,
 			Valid:  true,
 		},
-		CommitURI:  importRpmRes.CommitUri,
-		CommitHash: importRpmRes.CommitHash,
+		State: mothershippb.Entry_ARCHIVING,
 	}
 	if req.Batch != "" {
 		entry.BatchName = sql.NullString{
@@ -51,4 +51,51 @@ func (w *Worker) CreateEntry(args *mothershippb.ProcessRPMArgs, importRpmRes *mo
 	}
 
 	return entry.ToPB(), nil
+}
+
+func (w *Worker) SetEntryState(entry string, state mothershippb.Entry_State, importRpmRes *mothershippb.ImportRPMResponse) (*mothershippb.Entry, error) {
+	ent, err := base.Q[mothership_db.Entry](w.db).F("name", entry).GetOrNil()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get entry")
+	}
+	if ent == nil {
+		return nil, temporal.NewNonRetryableApplicationError(
+			"entry does not exist",
+			"entryDoesNotExist",
+			errors.New("entry does not exist"),
+		)
+	}
+
+	ent.State = state
+	if importRpmRes != nil {
+		ent.CommitURI = importRpmRes.CommitUri
+		ent.CommitHash = importRpmRes.CommitHash
+	}
+
+	if err := base.Q[mothership_db.Entry](w.db).U(ent); err != nil {
+		return nil, errors.Wrap(err, "failed to update entry")
+	}
+
+	return ent.ToPB(), nil
+}
+
+func (w *Worker) SetWorkerLastCheckinTime(workerID string) error {
+	wrk, err := base.Q[mothership_db.Worker](w.db).F("worker_id", workerID).GetOrNil()
+	if err != nil {
+		return errors.Wrap(err, "failed to get worker")
+	}
+	if wrk == nil {
+		return temporal.NewNonRetryableApplicationError(
+			"worker does not exist",
+			"workerDoesNotExist",
+			errors.New("worker does not exist"),
+		)
+	}
+
+	wrk.LastCheckinTime = sql.NullTime{
+		Time:  time.Now(),
+		Valid: true,
+	}
+
+	return base.Q[mothership_db.Worker](w.db).U(wrk)
 }

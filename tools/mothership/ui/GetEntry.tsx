@@ -75,6 +75,7 @@ export const GetEntry = () => {
             { key: 'workerId', label: 'Worker ID' },
             { key: 'commitUri', label: 'Commit URI', linkToSelf: true },
             { key: 'commitHash', label: 'Commit Hash' },
+            { key: 'state', label: 'State' },
           ]}
         />
       </Box>
