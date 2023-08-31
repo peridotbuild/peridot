@@ -35,5 +35,6 @@ func New(db *base.DB, storage storage.Storage, gpgKeys openpgp.EntityList, forge
 		storage: storage,
 		gpgKeys: gpgKeys,
 		forge:   forge,
+		rolling: rolling,
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	base "go.resf.org/peridot/base/go"
 	"go.resf.org/peridot/tools/mothership/migrations"
+	"go.temporal.io/sdk/client"
 	"google.golang.org/grpc/metadata"
 	"os"
 	"testing"
@@ -31,6 +32,10 @@ var (
 	s        *Server
 	userInfo base.UserInfo
 )
+
+type fakeTemporalClient struct {
+	client.Client
+}
 
 func TestMain(m *testing.M) {
 	// Create temporary file
@@ -80,7 +85,7 @@ func TestMain(m *testing.M) {
 		Provider: provider,
 		Group:    "",
 	}
-	s, err = NewServer(db, interceptorDetails)
+	s, err = NewServer(db, &fakeTemporalClient{}, interceptorDetails)
 	if err != nil {
 		panic(err)
 	}
