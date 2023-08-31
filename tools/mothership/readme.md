@@ -1,5 +1,6 @@
 <p align="center">
   <picture>
+    <source srcset="ui/mship_gopher.png" media="(prefers-color-scheme: dark)" height="150">
     <img src="ui/mship_gopher_dark.png" alt="Mship" height="150">
   </picture>
 </p>
