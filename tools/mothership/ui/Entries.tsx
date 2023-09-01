@@ -27,9 +27,11 @@ import { reqap } from 'base/ts/reqap';
 export const Entries = () => {
   return (
     <ResourceTable<V1Entry>
-      load={(pageSize: number, pageToken?: string) => reqap(srpmArchiverApi.listEntries({
-        pageSize: pageSize,
-        pageToken: pageToken,
+      defaultFilter={'state="ARCHIVED"'}
+      load={(pageSize: number, pageToken?: string, filter?: string) => reqap(srpmArchiverApi.listEntries({
+        pageSize,
+        pageToken,
+        filter,
       }))}
       transform={((response: V1ListEntriesResponse) => response.entries || [])}
       fields={[

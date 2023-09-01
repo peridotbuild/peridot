@@ -30,10 +30,11 @@ import LinearProgress from '@mui/material/LinearProgress';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
+import TextField from '@mui/material/TextField';
+import InputLabel from '@mui/material/InputLabel';
 
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import InputLabel from '@mui/material/InputLabel';
 
 import { StandardResource } from '../resource';
 
@@ -45,8 +46,11 @@ export interface ResourceTableField {
 export interface ResourceTableProps<T> {
   fields: ResourceTableField[];
 
+  // Default filter to start with
+  defaultFilter?: string;
+
   // load is usually the OpenAPI SDK function that loads the resource.
-  load(pageSize: number, pageToken?: string): Promise<any>;
+  load(pageSize: number, pageToken?: string, filter?: string): Promise<any>;
 
   // transform can be used to transform the response from the load function.
   // usually for List functions, the response is usually wrapped in a
@@ -80,6 +84,14 @@ export function ResourceTable<T extends StandardResource>(
     initRowsPerPage = 25;
   }
 
+  let qFilter = search.get('q');
+  let initFilter: string | undefined = undefined;
+  if (qFilter === null) {
+    initFilter = props.defaultFilter;
+  } else {
+    initFilter = qFilter;
+  }
+
   const [pageToken, setPageToken] = React.useState<string | undefined>(pt);
   const [nextPageToken, setNextPageToken] = React.useState<string | undefined>(
     undefined,
@@ -89,6 +101,7 @@ export function ResourceTable<T extends StandardResource>(
   const [rowsPerPage, setRowsPerPage] = React.useState<number>(initRowsPerPage);
   const [rows, setRows] = React.useState<T[] | undefined>(undefined);
   const [loading, setLoading] = React.useState<boolean>(false);
+  const [filter, setFilter] = React.useState<string | undefined>(initFilter);
 
   const updateSearch = (replace = false) => {
     const search = new URLSearchParams(location.search);
@@ -102,6 +115,12 @@ export function ResourceTable<T extends StandardResource>(
       search.set('pth', btoa(JSON.stringify(pageTokenHistory)));
     } else {
       search.delete('pth');
+    }
+
+    if (filter) {
+      search.set('q', filter);
+    } else {
+      search.set('q', '');
     }
 
     // Compare search and only update if different
@@ -121,36 +140,48 @@ export function ResourceTable<T extends StandardResource>(
   }, []);
 
   // Update state when query parameters change
+  // Create a timeout to prevent too many updates
+  const searchTimeout = React.useRef<number | undefined>(undefined);
   React.useEffect(() => {
-    const pt = search.get('pt') || undefined;
-    const pth = search.get('pth');
-    let initPageTokenHistory: string[] = [];
-    if (pth) {
-      try {
-        initPageTokenHistory = JSON.parse(atob(pth));
-      } catch (e) {}
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
     }
-    let initRowsPerPage = parseInt(search.get('rpp') || '25') || 25;
-    if (!allowedPageSizes.includes(initRowsPerPage)) {
-      initRowsPerPage = 25;
-    }
-    if (pageToken !== pt) {
-      setPageToken(pt);
-    }
-    if (rowsPerPage !== initRowsPerPage) {
-      setRowsPerPage(initRowsPerPage);
-    }
-    if (
-      JSON.stringify(pageTokenHistory) !== JSON.stringify(initPageTokenHistory)
-    ) {
-      setPageTokenHistory(initPageTokenHistory);
-    }
+    searchTimeout.current = setTimeout(() => {
+      const pt = search.get('pt') || undefined;
+      const pth = search.get('pth');
+      let initPageTokenHistory: string[] = [];
+      if (pth) {
+        try {
+          initPageTokenHistory = JSON.parse(atob(pth));
+        } catch (e) {}
+      }
+      let initRowsPerPage = parseInt(search.get('rpp') || '25') || 25;
+      if (!allowedPageSizes.includes(initRowsPerPage)) {
+        initRowsPerPage = 25;
+      }
+      if (pageToken !== pt) {
+        setPageToken(pt);
+      }
+      if (rowsPerPage !== initRowsPerPage) {
+        setRowsPerPage(initRowsPerPage);
+      }
+      if (
+        JSON.stringify(pageTokenHistory) !== JSON.stringify(initPageTokenHistory)
+      ) {
+        setPageTokenHistory(initPageTokenHistory);
+      }
+
+      const q = search.get('q') || undefined;
+      if (filter !== q) {
+        setFilter(q);
+      }
+    }, 500);
   }, [search]);
 
   // Update the query parameters when any of the pagination state changes
   React.useEffect(() => {
     updateSearch();
-  }, [pageToken, pageTokenHistory]);
+  }, [pageToken, pageTokenHistory, filter]);
 
   // Rows per page changing means we need to reset the page token history
   React.useEffect(() => {
@@ -167,26 +198,42 @@ export function ResourceTable<T extends StandardResource>(
     setSearch(search);
   }, [rowsPerPage]);
 
+  const fetchResource = async () => {
+    setLoading(true);
+    const [res, err] = await props.load(rowsPerPage, pageToken, filter);
+    setLoading(false);
+    if (err) {
+      console.log(err);
+      return;
+    }
+
+    setNextPageToken(res.nextPageToken);
+
+    if (props.transform) {
+      setRows(props.transform(res));
+    } else {
+      setRows(res);
+    }
+  };
+
   // Load the resource using useEffect
   React.useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const [res, err] = await props.load(rowsPerPage, pageToken);
-      setLoading(false);
-      if (err) {
-        console.log(err);
-        return;
-      }
-
-      setNextPageToken(res.nextPageToken);
-
-      if (props.transform) {
-        setRows(props.transform(res));
-      } else {
-        setRows(res);
-      }
-    })().then();
+    fetchResource().then();
   }, [pageToken, rowsPerPage]);
+
+  // For filter, we're going to wait for the user to stop typing for 500ms
+  // before we actually fetch the resource.
+  // This is to prevent the resource from being fetched too many times.
+  const timeout = React.useRef<number | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (timeout.current) {
+      clearTimeout(timeout.current);
+    }
+    timeout.current = setTimeout(() => {
+      fetchResource().then();
+    }, 500);
+  }, [filter]);
 
   // Create table header
   const header = props.fields.map((field) => {
@@ -212,6 +259,30 @@ export function ResourceTable<T extends StandardResource>(
       })}
     </TableRow>
   ));
+
+  // Create a search box for filter input
+  // This can be disabled if the request does not support filtering
+  const searchBox = (
+    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, width: '100%' }}>
+      <TextField
+        sx={{ mr: 2, flexGrow: 1 }}
+        label="Filter"
+        variant="outlined"
+        size="small"
+        value={filter}
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFilter(event.target.value)}
+      />
+      <Button
+        variant="contained"
+        onClick={() => {
+          setFilter('');
+          setPageToken(undefined);
+        }}
+      >
+        Clear
+      </Button>
+    </Box>
+  );
 
   // Should show previous button if history is not empty
   let showPrevious = false;
@@ -259,6 +330,7 @@ export function ResourceTable<T extends StandardResource>(
 
   return (
     <>
+      {searchBox}
       <TableContainer component={Paper} elevation={2}>
         {loading && <LinearProgress />}
         <Table>
