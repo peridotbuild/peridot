@@ -18,12 +18,15 @@ import (
 	base "go.resf.org/peridot/base/go"
 	mshipadminpb "go.resf.org/peridot/tools/mothership/admin/pb"
 	"go.temporal.io/sdk/client"
+	"google.golang.org/genproto/googleapis/longrunning"
 	"google.golang.org/grpc"
 )
 
 type Server struct {
 	base.GRPCServer
+
 	mshipadminpb.UnimplementedMshipAdminServer
+	longrunning.UnimplementedOperationsServer
 
 	db       *base.DB
 	temporal client.Client
@@ -50,9 +53,11 @@ func NewServer(db *base.DB, temporalClient client.Client, oidcInterceptorDetails
 
 func (s *Server) Start() error {
 	s.RegisterService(func(server *grpc.Server) {
+		longrunning.RegisterOperationsServer(server, s)
 		mshipadminpb.RegisterMshipAdminServer(server, s)
 	})
 	if err := s.GatewayEndpoints(
+		longrunning.RegisterOperationsHandler,
 		mshipadminpb.RegisterMshipAdminHandler,
 	); err != nil {
 		return err

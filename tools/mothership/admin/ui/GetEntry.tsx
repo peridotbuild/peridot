@@ -68,6 +68,21 @@ export const GetEntry = () => {
     window.location.reload();
   };
 
+  // Retract the entry (call API)
+  const retractEntry = async () => {
+    const [res, err] = await reqap(
+      mshipAdminApi.retractEntry({
+        name: `entries/${params.name}`,
+      }),
+    );
+
+    if (err) {
+      return;
+    }
+
+    window.location.reload();
+  };
+
   return (
     <Box>
       <Box
@@ -87,6 +102,16 @@ export const GetEntry = () => {
             onClick={rescueEntry}
           >
             Rescue
+          </Button>
+        )}
+        {resource && resource.state == EntryState.Archived && (
+          <Button
+            sx={{ ml: 'auto', textAlign: 'right' }}
+            variant="outlined"
+            color="error"
+            onClick={retractEntry}
+          >
+            Retract
           </Button>
         )}
       </Box>

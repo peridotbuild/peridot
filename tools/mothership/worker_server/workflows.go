@@ -15,6 +15,7 @@
 package mothership_worker_server
 
 import (
+	mshipadminpb "go.resf.org/peridot/tools/mothership/admin/pb"
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -51,6 +52,7 @@ func processRPMPostHold(ctx workflow.Context, entry *mothershippb.Entry, args *m
 		})
 		selector.AddReceive(signalChan, func(c workflow.ReceiveChannel, more bool) {
 			c.Receive(ctx, nil)
+			err = nil
 		})
 
 		// Set state to on hold
@@ -60,7 +62,7 @@ func processRPMPostHold(ctx workflow.Context, entry *mothershippb.Entry, args *m
 				MaximumAttempts: 0,
 			},
 		})
-		err = workflow.ExecuteActivity(ctx, w.SetEntryState, entry.Name, mothershippb.Entry_ON_HOLD, nil).Get(ctx, nil)
+		err = workflow.ExecuteActivity(ctx, w.SetEntryState, entry.Name, mothershippb.Entry_ON_HOLD, nil).Get(ctx, entry)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +81,7 @@ func processRPMPostHold(ctx workflow.Context, entry *mothershippb.Entry, args *m
 					MaximumAttempts: 0,
 				},
 			})
-			_ = workflow.ExecuteActivity(ctx, w.SetEntryState, entry.Name, mothershippb.Entry_CANCELLED, nil).Get(ctx, nil)
+			_ = workflow.ExecuteActivity(ctx, w.SetEntryState, entry.Name, mothershippb.Entry_CANCELLED, nil).Get(ctx, entry)
 			return nil, err
 		}
 
@@ -90,7 +92,7 @@ func processRPMPostHold(ctx workflow.Context, entry *mothershippb.Entry, args *m
 				MaximumAttempts: 0,
 			},
 		})
-		err = workflow.ExecuteActivity(ctx, w.SetEntryState, entry.Name, mothershippb.Entry_ARCHIVING, nil).Get(ctx, nil)
+		err = workflow.ExecuteActivity(ctx, w.SetEntryState, entry.Name, mothershippb.Entry_ARCHIVING, nil).Get(ctx, entry)
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +167,7 @@ func ProcessRPMWorkflow(ctx workflow.Context, args *mothershippb.ProcessRPMArgs)
 	// On defer, if the workflow is not completed, then we'll set the entry state
 	// to failed.
 	defer func() {
-		if entry.State == mothershippb.Entry_ARCHIVED {
+		if entry.State == mothershippb.Entry_ARCHIVED || entry.State == mothershippb.Entry_CANCELLED {
 			return
 		}
 
@@ -184,11 +186,39 @@ func ProcessRPMWorkflow(ctx workflow.Context, args *mothershippb.ProcessRPMArgs)
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: 45 * time.Second,
 	})
-	err = workflow.ExecuteActivity(ctx, w.SetEntryIDFromRPM, entry.Name, args.Request.RpmUri, args.Request.Checksum).Get(ctx, nil)
+	err = workflow.ExecuteActivity(ctx, w.SetEntryIDFromRPM, entry.Name, args.Request.RpmUri, args.Request.Checksum).Get(ctx, &entry)
 	if err != nil {
 		return nil, err
 	}
 
 	// Process the RPM.
 	return processRPMPostHold(ctx, &entry, args)
+}
+
+// RetractEntryWorkflow retracts an entry.
+// Should be used when an entry debranding is not considered fully complete. (Contains upstream trademarks for example)
+// This will forcefully remove the commit from the git repository and set the entry state to RETRACTED.
+// The same source (for the specific entry) can be re-imported by the client, either by calling DuplicateEntry or
+// calling SubmitEntry with the same SRPM URI.
+func RetractEntryWorkflow(ctx workflow.Context, name string) (*mshipadminpb.RetractEntryResponse, error) {
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 60 * time.Second,
+	})
+
+	var res mshipadminpb.RetractEntryResponse
+	err := workflow.ExecuteActivity(ctx, w.RetractEntry, name).Get(ctx, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the entry state to retracted
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 25 * time.Second,
+	})
+	err = workflow.ExecuteActivity(ctx, w.SetEntryState, name, mothershippb.Entry_RETRACTED, nil).Get(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res, nil
 }

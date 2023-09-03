@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 	}
 	defer os.RemoveAll(dir)
 
-	scripts, err := base.EmbedFSToOSFS(dir, migrations.UpSQLs, ".")
+	scripts, err := base.EmbedFSToOSFS(dir, mothership_migrations.UpSQLs, ".")
 	if err != nil {
 		panic(err)
 	}

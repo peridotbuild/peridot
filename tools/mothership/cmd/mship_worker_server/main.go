@@ -99,6 +99,7 @@ func run(ctx *cli.Context) error {
 
 	// Register workflows
 	w.RegisterWorkflow(mothership_worker_server.ProcessRPMWorkflow)
+	w.RegisterWorkflow(mothership_worker_server.RetractEntryWorkflow)
 
 	// Register activities
 	w.RegisterActivity(workerServer)

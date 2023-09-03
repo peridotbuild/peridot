@@ -19,7 +19,9 @@ package peridot.tools.mothership.admin.v1;
 import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "google/api/field_behavior.proto";
+import "google/longrunning/operations.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 import "tools/mothership/proto/admin/v1/worker.proto";
 
 option java_multiple_files = true;
@@ -72,6 +74,20 @@ service MshipAdmin {
       post: "/v1/{name=entries/*}:rescueImport"
     };
     option (google.api.method_signature) = "name";
+  }
+
+  // Retract the entry
+  // To be able to retract an entry, the entry must be in the `ARCHIVED` state.
+  // This will allow an NVR to be re-imported.
+  rpc RetractEntry(RetractEntryRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{name=entries/*}:retract"
+    };
+    option (google.api.method_signature) = "name";
+    option (google.longrunning.operation_info) = {
+      response_type: "RetractEntryResponse"
+      metadata_type: "RetractEntryMetadata"
+    };
   }
 }
 
@@ -133,4 +149,25 @@ message DeleteWorkerRequest {
 message RescueEntryImportRequest {
   // Required. The name of the entry to rescue.
   string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// RetractEntryRequest is the request message for RetractEntry.
+message RetractEntryRequest {
+  // Required. The name of the entry to retract.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// RetractEntryResponse is the response message for RetractEntry.
+message RetractEntryResponse {
+  // The name of the entry that was retracted.
+  string name = 1;
+}
+
+// RetractEntryMetadata is the metadata message for RetractEntry.
+message RetractEntryMetadata {
+  // The time at which the workflow started
+  google.protobuf.Timestamp start_time = 1;
+
+  // The time at which the workflow finished
+  google.protobuf.Timestamp end_time = 2;
 }

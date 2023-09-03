@@ -67,6 +67,17 @@ func (s *Server) SubmitEntry(ctx context.Context, req *mothershippb.SubmitEntryR
 		return nil, err
 	}
 
+	// Now make sure the entry doesn't already exist in the ARCHIVED state.
+	// If it does, return an error. It should be retracted first.
+	entry, err := base.Q[mothership_db.Entry](s.db).F("sha256_sum", req.ProcessRpmRequest.Checksum).GetOrNil()
+	if err != nil {
+		base.LogErrorf("failed to get entry: %v", err)
+		return nil, status.Error(codes.Internal, "failed to get entry")
+	}
+	if entry != nil && entry.State == mothershippb.Entry_ARCHIVED {
+		return nil, status.Error(codes.AlreadyExists, "entry already exists, you must retract the entry before submitting again")
+	}
+
 	startWorkflowOpts := client.StartWorkflowOptions{
 		ID:                                       "operations/" + req.ProcessRpmRequest.Checksum,
 		WorkflowExecutionErrorWhenAlreadyStarted: true,
