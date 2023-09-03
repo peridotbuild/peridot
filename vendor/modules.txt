@@ -987,6 +987,7 @@ github.com/stretchr/objx
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
+github.com/stretchr/testify/suite
 # github.com/temporalio/ringpop-go v0.0.0-20230606200434-b5c079f412d3
 ## explicit; go 1.11
 github.com/temporalio/ringpop-go
@@ -1292,6 +1293,7 @@ go.temporal.io/sdk/internal/common/util
 go.temporal.io/sdk/internal/log
 go.temporal.io/sdk/log
 go.temporal.io/sdk/temporal
+go.temporal.io/sdk/testsuite
 go.temporal.io/sdk/worker
 go.temporal.io/sdk/workflow
 # go.temporal.io/server v1.19.1
