@@ -37,7 +37,10 @@ type Entry struct {
 	UserEmail      sql.NullString           `db:"user_email"`
 	CommitURI      string                   `db:"commit_uri"`
 	CommitHash     string                   `db:"commit_hash"`
+	CommitBranch   string                   `db:"commit_branch"`
+	CommitTag      string                   `db:"commit_tag"`
 	State          mothershippb.Entry_State `db:"state"`
+	PackageName    string                   `db:"package_name"`
 }
 
 func (e *Entry) GetID() string {
@@ -46,17 +49,20 @@ func (e *Entry) GetID() string {
 
 func (e *Entry) ToPB() *mothershippb.Entry {
 	return &mothershippb.Entry{
-		Name:       e.Name,
-		EntryId:    e.EntryID,
-		CreateTime: timestamppb.New(e.CreateTime),
-		OsRelease:  e.OSRelease,
-		Sha256Sum:  e.Sha256Sum,
-		Repository: e.RepositoryName,
-		WorkerId:   base.SqlNullString(e.WorkerID),
-		Batch:      base.SqlNullString(e.BatchName),
-		UserEmail:  base.SqlNullString(e.UserEmail),
-		CommitUri:  e.CommitURI,
-		CommitHash: e.CommitHash,
-		State:      e.State,
+		Name:         e.Name,
+		EntryId:      e.EntryID,
+		CreateTime:   timestamppb.New(e.CreateTime),
+		OsRelease:    e.OSRelease,
+		Sha256Sum:    e.Sha256Sum,
+		Repository:   e.RepositoryName,
+		WorkerId:     base.SqlNullString(e.WorkerID),
+		Batch:        base.SqlNullString(e.BatchName),
+		UserEmail:    base.SqlNullString(e.UserEmail),
+		CommitUri:    e.CommitURI,
+		CommitHash:   e.CommitHash,
+		CommitBranch: e.CommitBranch,
+		CommitTag:    e.CommitTag,
+		State:        e.State,
+		Pkg:          e.PackageName,
 	}
 }

@@ -89,7 +89,17 @@ message ImportRPMResponse {
   // Commit URI of the imported RPM
   string commit_uri = 2 [(google.api.field_behavior) = REQUIRED];
 
+  // Commit branch of the imported RPM
+  string commit_branch = 3 [(google.api.field_behavior) = REQUIRED];
+
+  // Commit tag of the imported RPM
+  string commit_tag = 4 [(google.api.field_behavior) = REQUIRED];
+
   // NEVRA of the imported RPM
   // e.g. rpm-1.0.0-1.el8.x86_64
-  string nevra = 3 [(google.api.field_behavior) = REQUIRED];
+  string nevra = 5 [(google.api.field_behavior) = REQUIRED];
+
+  // Package name of the imported RPM
+  // e.g. rpm
+  string pkg = 6 [(google.api.field_behavior) = REQUIRED];
 }

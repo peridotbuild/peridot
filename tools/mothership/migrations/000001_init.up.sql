@@ -34,7 +34,10 @@ CREATE TABLE entries
   user_email      TEXT,
   commit_uri      TEXT         NOT NULL,
   commit_hash     TEXT         NOT NULL,
-  state           NUMERIC      NOT NULL
+  commit_branch   TEXT         NOT NULL,
+  commit_tag      TEXT         NOT NULL,
+  state           NUMERIC      NOT NULL,
+  package_name    TEXT         NOT NULL
 );
 
 CREATE TABLE batches

@@ -77,6 +77,12 @@ message Entry {
   // Commit hash of the resulting import
   string commit_hash = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Commit branch of the resulting import
+  string commit_branch = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Commit tag of the resulting import
+  string commit_tag = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Valid states of an entry.
   enum State {
     // Default value. This value is unused.
@@ -102,10 +108,18 @@ message Entry {
     // Failed to archive the entry.
     // This entry CAN'T be rescued.
     FAILED = 5;
+
+    // Retracted. This entry CAN'T be rescued.
+    // Another import may have happened, retraction is usually done
+    // if debranding was not complete but successful.
+    RETRACTED = 6;
   }
   // State of the entry.
-  State state = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  State state = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Name of the package being archived.
+  string pkg = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Error message if on hold
-  string error_message = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string error_message = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

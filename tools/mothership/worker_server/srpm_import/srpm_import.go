@@ -69,6 +69,17 @@ type State struct {
 	rolling bool
 }
 
+type ImportOutput struct {
+	// Commit is the commit object
+	Commit *object.Commit
+
+	// Branch is the branch name
+	Branch string
+
+	// Tag is the tag name
+	Tag string
+}
+
 // copyFromOS copies specified file from OS filesystem to target filesystem.
 func copyFromOS(targetFS billy.Filesystem, path string, targetPath string) error {
 	// Open file from OS filesystem.
@@ -680,7 +691,12 @@ func (s *State) patchTargetRepo(repo *git.Repository, lookaside storage.Storage)
 }
 
 // Import imports the SRPM into the target repository.
-func (s *State) Import(opts *git.CloneOptions, storer storage2.Storer, targetFS billy.Filesystem, lookaside storage.Storage, osRelease string) (*object.Commit, error) {
+func (s *State) Import(opts *git.CloneOptions, storer storage2.Storer, targetFS billy.Filesystem, lookaside storage.Storage, osRelease string) (*ImportOutput, error) {
+	nevra, err := s.rpm.Header.GetNEVRA()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get NEVRA")
+	}
+
 	// Get the target repository.
 	repo, branch, err := s.getRepo(opts, storer, targetFS, osRelease)
 	if err != nil {
@@ -718,5 +734,11 @@ func (s *State) Import(opts *git.CloneOptions, storer storage2.Storer, targetFS 
 		return nil, errors.Wrap(err, "failed to get commit object")
 	}
 
-	return commit, nil
+	tag := fmt.Sprintf("imports/%s/%s-%s-%s", branch, nevra.Name, nevra.Version, nevra.Release)
+
+	return &ImportOutput{
+		Commit: commit,
+		Branch: branch,
+		Tag:    tag,
+	}, nil
 }
