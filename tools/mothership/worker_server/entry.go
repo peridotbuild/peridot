@@ -26,7 +26,6 @@ import (
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
 	"go.temporal.io/sdk/temporal"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -78,19 +77,9 @@ func (w *Worker) SetEntryIDFromRPM(entry string, uri string, checksumSha256 stri
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Parse uri
-	parsed, err := url.Parse(uri)
+	object, err := getObjectPath(uri)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse resource URI")
-	}
-
-	// Download the resource to the temporary directory
-	// S3 for example must include bucket, while memory:// does not.
-	// So memory://test.rpm would be parsed as host=test.rpm, path="".
-	// While s3://mship/test.rpm would be parsed as host=mship, path=test.rpm.
-	object := parsed.Path
-	if object == "" {
-		object = parsed.Host
+		return nil, err
 	}
 
 	err = w.storage.Download(object, filepath.Join(tempDir, "resource.rpm"))

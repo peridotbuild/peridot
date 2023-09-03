@@ -125,7 +125,7 @@ func TestWorker_SetEntryState(t *testing.T) {
 
 	importRpmRes := &mothershippb.ImportRPMResponse{
 		CommitHash:   "123",
-		CommitUri:    "https://forge.resf.org/peridot/efi-rpm-macros/commit/123",
+		CommitUri:    "https://testforge.resf.org/peridot/efi-rpm-macros/commit/123",
 		CommitBranch: "el-8.8",
 		CommitTag:    "imports/el-8.8/efi-rpm-macros-3-3.el8",
 		Nevra:        "efi-rpm-macros-0:3-3.el8.aarch64",
@@ -136,7 +136,7 @@ func TestWorker_SetEntryState(t *testing.T) {
 	require.NotNil(t, entry)
 	require.Equal(t, mothershippb.Entry_ARCHIVED, entry.State)
 	require.Equal(t, "123", entry.CommitHash)
-	require.Equal(t, "https://forge.resf.org/peridot/efi-rpm-macros/commit/123", entry.CommitUri)
+	require.Equal(t, "https://testforge.resf.org/peridot/efi-rpm-macros/commit/123", entry.CommitUri)
 	require.Equal(t, "el-8.8", entry.CommitBranch)
 	require.Equal(t, "imports/el-8.8/efi-rpm-macros-3-3.el8", entry.CommitTag)
 	require.Equal(t, "efi-rpm-macros", entry.Pkg)

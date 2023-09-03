@@ -26,7 +26,6 @@ import (
 	"go.resf.org/peridot/tools/mothership/worker_server/srpm_import"
 	"go.temporal.io/sdk/temporal"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,24 +47,9 @@ func (w *Worker) VerifyResourceExists(uri string) error {
 		)
 	}
 
-	// Get object name from URI.
-	// Check if object exists.
-	// If not, return error.
-	parsed, err := url.Parse(uri)
+	object, err := getObjectPath(uri)
 	if err != nil {
-		return temporal.NewNonRetryableApplicationError(
-			"could not parse resource URI",
-			"couldNotParseResourceURI",
-			errors.Wrap(err, "failed to parse resource URI"),
-		)
-	}
-
-	// S3 for example must include bucket, while memory:// does not.
-	// So memory://test.rpm would be parsed as host=test.rpm, path="".
-	// While s3://mship/test.rpm would be parsed as host=mship, path=test.rpm.
-	object := parsed.Path
-	if object == "" {
-		object = parsed.Host
+		return err
 	}
 
 	exists, err := w.storage.Exists(object)
@@ -94,13 +78,13 @@ func (w *Worker) ImportRPM(uri string, checksumSha256 string, osRelease string) 
 	defer os.RemoveAll(tempDir)
 
 	// Parse uri
-	parsed, err := url.Parse(uri)
+	object, err := getObjectPath(uri)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse resource URI")
+		return nil, err
 	}
 
 	// Download the resource to the temporary directory
-	err = w.storage.Download(parsed.Path, filepath.Join(tempDir, "resource.rpm"))
+	err = w.storage.Download(object, filepath.Join(tempDir, "resource.rpm"))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to download resource")
 	}
