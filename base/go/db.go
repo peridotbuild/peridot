@@ -78,7 +78,7 @@ func NameGen(prefix string) string {
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func Q[T any](db *DB) *innerDB[T] {
+func Q[T any](db *DB) Pika[T] {
 	return &innerDB[T]{pika.Q[T](db.PostgreSQL), db}
 }
 
