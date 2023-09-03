@@ -18,6 +18,7 @@ import (
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/stretchr/testify/require"
 	"go.resf.org/peridot/base/go/storage"
+	"os"
 	"testing"
 )
 
@@ -44,6 +45,31 @@ func TestInMemory_Download_Found(t *testing.T) {
 	require.Equal(t, []byte("bar"), buf)
 }
 
+func TestInMemory_Download_Found_OnFS(t *testing.T) {
+	fs := memfs.New()
+	{
+		f, _ := fs.OpenFile("foo", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		_, err := f.Write([]byte("bar"))
+		require.Nil(t, err)
+		require.Nil(t, f.Close())
+	}
+	im := New(fs)
+
+	err := im.Download("foo", "foo")
+	require.Nil(t, err)
+
+	_, err = fs.Stat("foo")
+	require.Nil(t, err)
+
+	f, err := fs.Open("foo")
+	require.Nil(t, err)
+
+	buf := make([]byte, 3)
+	_, err = f.Read(buf)
+	require.Nil(t, err)
+	require.Equal(t, []byte("bar"), buf)
+}
+
 func TestInMemory_Download_NotFound(t *testing.T) {
 	fs := memfs.New()
 	im := New(fs)
@@ -55,6 +81,20 @@ func TestInMemory_Get_Found(t *testing.T) {
 	fs := memfs.New()
 	im := New(fs)
 	im.blobs["foo"] = []byte("bar")
+	blob, err := im.Get("foo")
+	require.Nil(t, err)
+	require.Equal(t, []byte("bar"), blob)
+}
+
+func TestInMemory_Get_Found_OnFS(t *testing.T) {
+	fs := memfs.New()
+	{
+		f, _ := fs.OpenFile("foo", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		_, err := f.Write([]byte("bar"))
+		require.Nil(t, err)
+		require.Nil(t, f.Close())
+	}
+	im := New(fs)
 	blob, err := im.Get("foo")
 	require.Nil(t, err)
 	require.Equal(t, []byte("bar"), blob)
@@ -115,6 +155,20 @@ func TestInMemory_Exists_Found(t *testing.T) {
 	fs := memfs.New()
 	im := New(fs)
 	im.blobs["foo"] = []byte("bar")
+	ok, err := im.Exists("foo")
+	require.Nil(t, err)
+	require.True(t, ok)
+}
+
+func TestInMemory_Exists_Found_OnFS(t *testing.T) {
+	fs := memfs.New()
+	{
+		f, _ := fs.OpenFile("foo", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		_, err := f.Write([]byte("bar"))
+		require.Nil(t, err)
+		require.Nil(t, f.Close())
+	}
+	im := New(fs)
 	ok, err := im.Exists("foo")
 	require.Nil(t, err)
 	require.True(t, ok)
