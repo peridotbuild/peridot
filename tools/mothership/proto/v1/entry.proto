@@ -109,10 +109,13 @@ message Entry {
     // This entry CAN'T be rescued.
     FAILED = 5;
 
+    // Retracting the entry.
+    RETRACTING = 6;
+
     // Retracted. This entry CAN'T be rescued.
     // Another import may have happened, retraction is usually done
     // if debranding was not complete but successful.
-    RETRACTED = 6;
+    RETRACTED = 7;
   }
   // State of the entry.
   State state = 14 [(google.api.field_behavior) = OUTPUT_ONLY];

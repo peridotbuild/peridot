@@ -76,7 +76,7 @@ func TestWorker_ImportRPM_Existing(t *testing.T) {
 
 	remote := testW.forge.GetRemote("basesystem")
 
-	repo, err := getRepo(remote)
+	repo, err := getRepo(remote, nil)
 	require.Nil(t, err)
 
 	commitIter, err := repo.CommitObjects()

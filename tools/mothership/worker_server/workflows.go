@@ -201,12 +201,40 @@ func ProcessRPMWorkflow(ctx workflow.Context, args *mothershippb.ProcessRPMArgs)
 // The same source (for the specific entry) can be re-imported by the client, either by calling DuplicateEntry or
 // calling SubmitEntry with the same SRPM URI.
 func RetractEntryWorkflow(ctx workflow.Context, name string) (*mshipadminpb.RetractEntryResponse, error) {
+	// Set entry state to retracting
+	var entry mothershippb.Entry
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 25 * time.Second,
+	})
+	err := workflow.ExecuteActivity(ctx, w.SetEntryState, name, mothershippb.Entry_RETRACTING, nil).Get(ctx, &entry)
+	if err != nil {
+		return nil, err
+	}
+
+	// Deferring this activity will set the entry state to ARCHIVED if the workflow
+	// is not completed.
+	defer func() {
+		if entry.State == mothershippb.Entry_RETRACTED {
+			return
+		}
+
+		// This is because the entry is still archived, but the commit was not
+		// retracted.
+		ctx, cancel := workflow.NewDisconnectedContext(ctx)
+		defer cancel()
+		ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+			StartToCloseTimeout: 25 * time.Second,
+		})
+		_ = workflow.ExecuteActivity(ctx, w.SetEntryState, name, mothershippb.Entry_ARCHIVED, nil).Get(ctx, nil)
+	}()
+
+	// Retract commit
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: 60 * time.Second,
 	})
 
 	var res mshipadminpb.RetractEntryResponse
-	err := workflow.ExecuteActivity(ctx, w.RetractEntry, name).Get(ctx, &res)
+	err = workflow.ExecuteActivity(ctx, w.RetractEntry, name).Get(ctx, &res)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +243,7 @@ func RetractEntryWorkflow(ctx workflow.Context, name string) (*mshipadminpb.Retr
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: 25 * time.Second,
 	})
-	err = workflow.ExecuteActivity(ctx, w.SetEntryState, name, mothershippb.Entry_RETRACTED, nil).Get(ctx, nil)
+	err = workflow.ExecuteActivity(ctx, w.SetEntryState, name, mothershippb.Entry_RETRACTED, nil).Get(ctx, &entry)
 	if err != nil {
 		return nil, err
 	}

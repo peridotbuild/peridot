@@ -39,6 +39,8 @@ go_library(
         "//vendor/github.com/go-git/go-git/v5:go-git",
         "//vendor/github.com/go-git/go-git/v5/config",
         "//vendor/github.com/go-git/go-git/v5/plumbing",
+        "//vendor/github.com/go-git/go-git/v5/plumbing/object",
+        "//vendor/github.com/go-git/go-git/v5/plumbing/transport",
         "//vendor/github.com/go-git/go-git/v5/storage/memory",
         "//vendor/github.com/pkg/errors",
         "//vendor/github.com/sassoftware/go-rpmutils",
