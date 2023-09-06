@@ -100,7 +100,11 @@ func (w *Worker) ImportRPM(uri string, checksumSha256 string, osRelease string) 
 		return nil, errors.Wrap(err, "failed to hash resource")
 	}
 	if hex.EncodeToString(hash.Sum(nil)) != checksumSha256 {
-		return nil, errors.New("checksum does not match")
+		return nil, temporal.NewNonRetryableApplicationError(
+			"checksum does not match",
+			"checksumDoesNotMatch",
+			errors.New("client submitted a checksum that does not match the resource"),
+		)
 	}
 
 	// Read the RPM headers
