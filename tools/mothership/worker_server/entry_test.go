@@ -201,3 +201,32 @@ func TestWorker_SetWorkerLastCheckinTime_NotFound(t *testing.T) {
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "worker does not exist")
 }
+
+func TestWorker_DeleteEntry(t *testing.T) {
+	require.Nil(t, q[mothership_db.Entry]().Delete())
+	defer func() {
+		require.Nil(t, q[mothership_db.Entry]().Delete())
+	}()
+
+	args := &mothershippb.ProcessRPMArgs{
+		Request: &mothershippb.ProcessRPMRequest{
+			RpmUri:     "memory://efi-rpm-macros-3-3.el8.src.rpm",
+			OsRelease:  "Rocky Linux release 8.8 (Green Obsidian)",
+			Checksum:   "518a9418fec1deaeb4c636615d8d81fb60146883c431ea15ab1127893d075d28",
+			Repository: "BaseOS",
+		},
+		InternalRequest: &mothershippb.ProcessRPMInternalRequest{
+			WorkerId: "test-worker",
+		},
+	}
+	entry, err := testW.CreateEntry(args)
+	require.Nil(t, err)
+	require.NotNil(t, entry)
+
+	err = testW.DeleteEntry(entry.Name)
+	require.Nil(t, err)
+
+	c, err := q[mothership_db.Entry]().F("name", entry.Name).Count()
+	require.Nil(t, err)
+	require.Equal(t, c, 0)
+}
