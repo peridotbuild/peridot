@@ -179,6 +179,12 @@ func ProcessRPMWorkflow(ctx workflow.Context, args *mothershippb.ProcessRPMArgs)
 				MaximumAttempts: 0,
 			},
 		})
+
+		// Check if entry has EntryID set, if not then we can just delete the entry
+		if entry.EntryId == "" {
+			_ = workflow.ExecuteActivity(ctx, w.DeleteEntry, entry.Name).Get(ctx, nil)
+			return
+		}
 		_ = workflow.ExecuteActivity(ctx, w.SetEntryState, entry.Name, mothershippb.Entry_FAILED, nil).Get(ctx, nil)
 	}()
 
