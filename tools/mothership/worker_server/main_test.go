@@ -42,6 +42,7 @@ var (
 	//go:embed testdata/RPM-GPG-KEY-Rocky-8
 	rocky8GpgKey []byte
 	inmf         *inMemoryForge
+	tempDirForge string
 )
 
 type UnitTestSuite struct {
@@ -133,7 +134,7 @@ func TestMain(m *testing.M) {
 
 	gpgKeys = append(gpgKeys, keyRing...)
 
-	tempDirForge, err := os.MkdirTemp("", "test-forge-*")
+	tempDirForge, err = os.MkdirTemp("", "test-forge-*")
 	if err != nil {
 		panic(err)
 	}
