@@ -98,7 +98,11 @@ func (w *Worker) SetEntryIDFromRPM(entry string, uri string, checksumSha256 stri
 		return nil, errors.Wrap(err, "failed to hash resource")
 	}
 	if hex.EncodeToString(hash.Sum(nil)) != checksumSha256 {
-		return nil, errors.New("checksum does not match")
+		return nil, temporal.NewNonRetryableApplicationError(
+			"checksum does not match",
+			"checksumDoesNotMatch",
+			errors.New("client submitted a checksum that does not match the resource"),
+		)
 	}
 
 	// Read the RPM headers
@@ -176,4 +180,16 @@ func (w *Worker) SetWorkerLastCheckinTime(workerID string) error {
 	}
 
 	return base.Q[mothership_db.Worker](w.db).U(wrk)
+}
+
+func (w *Worker) DeleteEntry(name string) error {
+	err := base.Q[mothership_db.Entry](w.db).F("name", name).Delete()
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return errors.Wrap(err, "failed to delete entry")
+	}
+
+	return nil
 }
