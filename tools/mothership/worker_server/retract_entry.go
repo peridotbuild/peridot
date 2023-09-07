@@ -27,6 +27,7 @@ import (
 	base "go.resf.org/peridot/base/go"
 	mshipadminpb "go.resf.org/peridot/tools/mothership/admin/pb"
 	mothership_db "go.resf.org/peridot/tools/mothership/db"
+	"go.resf.org/peridot/tools/mothership/worker_server/forge"
 	"go.temporal.io/sdk/temporal"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -151,7 +152,7 @@ func clonePatchesToTemporaryFS(currentFS billy.Filesystem) (billy.Filesystem, er
 	return fs, nil
 }
 
-func resetRepoToPoint(repo *git.Repository, commit string) error {
+func resetRepoToPoint(repo *git.Repository, authenticator *forge.Authenticator, commit string) error {
 	wt, err := repo.Worktree()
 	if err != nil {
 		return errors.Wrap(err, "failed to get worktree")
@@ -263,9 +264,9 @@ func resetRepoToPoint(repo *git.Repository, commit string) error {
 
 		// Create the commit
 		_, err = wt.Commit(commitMsg, &git.CommitOptions{
-			Committer: &object.Signature{
-				Name:  targetCommit.Author.Name,
-				Email: targetCommit.Author.Email,
+			Author: &object.Signature{
+				Name:  authenticator.AuthorName,
+				Email: authenticator.AuthorEmail,
 				When:  time.Now(),
 			},
 		})
@@ -322,7 +323,7 @@ func (w *Worker) RetractEntry(name string) (*mshipadminpb.RetractEntryResponse, 
 	}
 
 	// Reset the repo to the commit before the commit we want to revert
-	err = resetRepoToPoint(repo, entry.CommitHash)
+	err = resetRepoToPoint(repo, auth, entry.CommitHash)
 	if err != nil {
 		base.LogErrorf("failed to reset repo: %v", err)
 		return nil, status.Error(codes.Internal, "failed to reset repo")

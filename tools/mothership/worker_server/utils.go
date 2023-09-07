@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"go.temporal.io/sdk/temporal"
 	"net/url"
+	"strings"
 )
 
 func getObjectPath(uri string) (string, error) {
@@ -22,7 +23,7 @@ func getObjectPath(uri string) (string, error) {
 	// S3 for example must include bucket, while memory:// does not.
 	// So memory://test.rpm would be parsed as host=test.rpm, path="".
 	// While s3://mship/test.rpm would be parsed as host=mship, path=test.rpm.
-	object := parsed.Path
+	object := strings.TrimPrefix(parsed.Path, "/")
 	if object == "" {
 		object = parsed.Host
 	}

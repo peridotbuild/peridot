@@ -44,7 +44,10 @@ go_library(
 go_test(
     name = "srpm_import_test",
     size = "small",
-    srcs = ["srpm_import_test.go"],
+    srcs = [
+        "srpm_import_test.go",
+        "srpmproc_compat_test.go",
+    ],
     data = glob(["testdata/**"]),
     embed = [":srpm_import"],
     deps = [

@@ -19,8 +19,10 @@ import (
 	"errors"
 	"github.com/stretchr/testify/mock"
 	base "go.resf.org/peridot/base/go"
+	mshipadminpb "go.resf.org/peridot/tools/mothership/admin/pb"
 	mothership_db "go.resf.org/peridot/tools/mothership/db"
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
+	"go.temporal.io/sdk/temporal"
 	"time"
 )
 
@@ -244,6 +246,80 @@ func (s *UnitTestSuite) TestProcessRPMWorkflow_OnHold_Error() {
 	}
 	s.env.ExecuteWorkflow(ProcessRPMWorkflow, args)
 
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
+func (s *UnitTestSuite) TestProcessRPMWorkflow_Error_DeleteEntry() {
+	s.env.OnActivity(testW.VerifyResourceExists, "memory://efi-rpm-macros-3-3.el8.src.rpm").Return(nil)
+	s.env.OnActivity(testW.SetWorkerLastCheckinTime, mock.Anything).Return(nil)
+
+	entry := (&mothership_db.Entry{
+		Name:           base.NameGen("entries"),
+		CreateTime:     time.Now(),
+		OSRelease:      "Rocky Linux release 8.8 (Green Obsidian)",
+		Sha256Sum:      "518a9418fec1deaeb4c636615d8d81fb60146883c431ea15ab1127893d075d28",
+		RepositoryName: "BaseOS",
+		WorkerID: sql.NullString{
+			String: "test-worker",
+			Valid:  true,
+		},
+		State: mothershippb.Entry_ARCHIVING,
+	}).ToPB()
+	s.env.OnActivity(testW.CreateEntry, mock.Anything).Return(entry, nil)
+
+	checksumErr := temporal.NewNonRetryableApplicationError(
+		"checksum does not match",
+		"checksumDoesNotMatch",
+		errors.New("client submitted a checksum that does not match the resource"),
+	)
+	s.env.OnActivity(testW.SetEntryIDFromRPM, entry.Name, "memory://efi-rpm-macros-3-3.el8.src.rpm", entry.Sha256Sum).Return(nil, checksumErr)
+
+	s.env.OnActivity(testW.DeleteEntry, entry.Name).Return(nil)
+
+	args := &mothershippb.ProcessRPMArgs{
+		Request: &mothershippb.ProcessRPMRequest{
+			RpmUri:     "memory://efi-rpm-macros-3-3.el8.src.rpm",
+			OsRelease:  "Rocky Linux release 8.8 (Green Obsidian)",
+			Checksum:   entry.Sha256Sum,
+			Repository: "BaseOS",
+		},
+		InternalRequest: &mothershippb.ProcessRPMInternalRequest{
+			WorkerId: "test-worker",
+		},
+	}
+	s.env.ExecuteWorkflow(ProcessRPMWorkflow, args)
+
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
+func (s *UnitTestSuite) TestRetractEntryWorkflow_Success() {
+	entry := base.NameGen("entries")
+	s.env.OnActivity(testW.SetEntryState, entry, mothershippb.Entry_RETRACTING, mock.Anything).Return(nil, nil)
+
+	res := &mshipadminpb.RetractEntryResponse{
+		Name: entry,
+	}
+	s.env.OnActivity(testW.RetractEntry, entry).Return(res, nil)
+
+	s.env.OnActivity(testW.SetEntryState, entry, mothershippb.Entry_RETRACTED, mock.Anything).Return(nil, nil)
+
+	s.env.ExecuteWorkflow(RetractEntryWorkflow, entry)
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+}
+
+func (s *UnitTestSuite) TestRetractEntryWorkflow_Failed_RevertToArchived() {
+	entry := base.NameGen("entries")
+	s.env.OnActivity(testW.SetEntryState, entry, mothershippb.Entry_RETRACTING, mock.Anything).Return(nil, nil)
+
+	anyErr := errors.New("any error")
+	s.env.OnActivity(testW.RetractEntry, entry).Return(nil, anyErr)
+
+	s.env.OnActivity(testW.SetEntryState, entry, mothershippb.Entry_ARCHIVED, mock.Anything).Return(nil, nil)
+
+	s.env.ExecuteWorkflow(RetractEntryWorkflow, entry)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }

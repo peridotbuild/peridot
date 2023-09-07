@@ -21,6 +21,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/cache"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/filesystem"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,7 @@ import (
 	storage_memory "go.resf.org/peridot/base/go/storage/memory"
 	mothership_db "go.resf.org/peridot/tools/mothership/db"
 	mothershippb "go.resf.org/peridot/tools/mothership/pb"
+	"go.resf.org/peridot/tools/mothership/worker_server/forge"
 	"go.resf.org/peridot/tools/mothership/worker_server/srpm_import"
 	"io"
 	"os"
@@ -193,7 +195,11 @@ func TestResetRepoToPoint_TwoCommits(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	err = resetRepoToPoint(repo, secondImport.Commit.Hash.String())
+	err = resetRepoToPoint(
+		repo,
+		&forge.Authenticator{AuthorName: "test", AuthorEmail: "test@rockylinux.org"},
+		secondImport.Commit.Hash.String(),
+	)
 	require.Nil(t, err)
 
 	// Check that only the first commit exists
@@ -202,6 +208,99 @@ func TestResetRepoToPoint_TwoCommits(t *testing.T) {
 	commit, err := log.Next()
 	require.Nil(t, err)
 	require.NotNil(t, commit)
+	require.Equal(t, firstImport.Commit.Hash.String(), commit.Hash.String())
+	commit, err = log.Next()
+	require.NotNil(t, err)
+	require.Equal(t, "EOF", err.Error())
+	require.Nil(t, commit)
+}
+
+func TestResetRepoToPoint_TwoCommits_CommitAfterRetractPoint(t *testing.T) {
+	s, err := srpm_import.FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
+	require.Nil(t, err)
+
+	tempDir, err := os.MkdirTemp("", "peridot-srpm-import-test-*")
+	require.Nil(t, err)
+
+	// Create a bare repo in tempDir
+	osfsTemp := osfs.New(tempDir)
+	dot, err := osfsTemp.Chroot(".git")
+	require.Nil(t, err)
+	filesystemTemp := filesystem.NewStorage(dot, cache.NewObjectLRUDefault())
+	require.Nil(t, filesystemTemp.Init())
+	_, err = git.Init(filesystemTemp, nil)
+	require.Nil(t, err)
+
+	opts := &git.CloneOptions{
+		URL: tempDir,
+	}
+	storer := memory.NewStorage()
+	fs := memfs.New()
+	lookaside := storage_memory.New(osfs.New("/"))
+	firstImport, err := s.Import(opts, storer, fs, lookaside, "")
+	require.Nil(t, err)
+
+	storer2 := memory.NewStorage()
+	fs2 := memfs.New()
+	secondImport, err := s.Import(opts, storer2, fs2, lookaside, "")
+	require.Nil(t, err)
+
+	repo, err := getRepo("file://"+tempDir, nil)
+	require.Nil(t, err)
+
+	// Get wt and checkout the correct branch
+	wt, err := repo.Worktree()
+	require.Nil(t, err)
+	err = wt.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(secondImport.Branch),
+		Force:  true,
+	})
+	require.Nil(t, err)
+
+	// Create a commit after the commit we want to reset to
+	f, err := wt.Filesystem.Create("PATCHES/test.cfg")
+	require.Nil(t, err)
+	_, err = f.Write([]byte("lookaside: { file: \"test.png\" }"))
+	require.Nil(t, err)
+	err = f.Close()
+	require.Nil(t, err)
+
+	_, err = wt.Add("PATCHES/test.cfg")
+	require.Nil(t, err)
+
+	stableTime := time.Now()
+	_, err = wt.Commit("test commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Mustafa Gezen",
+			Email: "mustafa@rockylinux.org",
+			When:  stableTime,
+		},
+	})
+	require.Nil(t, err)
+
+	err = resetRepoToPoint(
+		repo,
+		&forge.Authenticator{AuthorName: "test", AuthorEmail: "test@rockylinux.org"},
+		secondImport.Commit.Hash.String(),
+	)
+	require.Nil(t, err)
+
+	// Check that only the first commit exists
+	log, err := repo.Log(&git.LogOptions{})
+	require.Nil(t, err)
+	commit, err := log.Next()
+	require.Nil(t, err)
+	require.NotNil(t, commit)
+	msg := `Retract "import efi-rpm-macros-3-3.el8"
+
+Fast-forwarded following commits:
+test commit
+
+Co-authored-by: Mustafa Gezen <mustafa@rockylinux.org>
+`
+	require.Equal(t, msg, commit.Message)
+	commit, err = log.Next()
+	require.Nil(t, err)
 	require.Equal(t, firstImport.Commit.Hash.String(), commit.Hash.String())
 	commit, err = log.Next()
 	require.NotNil(t, err)

@@ -828,6 +828,9 @@ spec_change {
     message: "test patch1"
   }
 }
+lookaside {
+  file: "test.png"
+}
 `))
 	require.Nil(t, err)
 
