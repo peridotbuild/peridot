@@ -345,6 +345,33 @@ func (s *State) expandLayout(targetFS billy.Filesystem) error {
 	return nil
 }
 
+// getStreamSuffix adds a "-stream-X" suffix if the given RPM is a module component.
+// This is determined using Modularitylabel (5096). If the label is present, then
+// the RPM is a module component. Label format is MODULE_NAME:STREAM:VERSION:CONTEXT.
+// This function returns an empty string if the RPM is not a module component.
+func (s *State) getStreamSuffix() (string, error) {
+	// Check the modularity label
+	label, err := s.rpm.Header.GetString(5096)
+	if err != nil {
+		// If it's not present at all, it will fail with "No such entry 5096"
+		return "", nil
+	}
+
+	// If the label is empty, then the RPM is not a module component
+	if label == "" {
+		return "", nil
+	}
+
+	// Split the label
+	parts := strings.Split(label, ":")
+	if len(parts) != 4 {
+		return "", fmt.Errorf("invalid modularity label")
+	}
+
+	// Return the stream
+	return fmt.Sprintf("-stream-%s", parts[1]), nil
+}
+
 // getRepo returns the target repository for the SRPM.
 // This is where the payload is uploaded to.
 func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS billy.Filesystem, osRelease string) (*git.Repository, string, error) {
@@ -386,6 +413,13 @@ func (s *State) getRepo(opts *git.CloneOptions, storer storage2.Storer, targetFS
 			branch = "el-" + ver
 		}
 	}
+
+	// Check if module component
+	streamSuffix, err := s.getStreamSuffix()
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to get stream suffix")
+	}
+	branch += streamSuffix
 
 	// Set branch to dist tag
 	opts.ReferenceName = plumbing.NewBranchReferenceName(branch)

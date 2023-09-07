@@ -264,6 +264,24 @@ func TestWriteMetadataExpandLayout(t *testing.T) {
 	require.Equal(t, "f002f60baed7a47ca3e98b8dd7ece2f7352dac9ffab7ae3557eb56b481ce2f86 SOURCES/efi-rpm-macros-3.tar.bz2\n", string(buf))
 }
 
+func TestGetStreamSuffix(t *testing.T) {
+	s, err := FromFile("testdata/nginx-1.14.1-9.module+el8.4.0+542+81547229.src.rpm", false)
+	require.Nil(t, err)
+
+	suffix, err := s.getStreamSuffix()
+	require.Nil(t, err)
+	require.Equal(t, "-stream-1.14", suffix)
+}
+
+func TestGetStreamSuffix_NotModuleComponent(t *testing.T) {
+	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
+	require.Nil(t, err)
+
+	suffix, err := s.getStreamSuffix()
+	require.Nil(t, err)
+	require.Equal(t, "", suffix)
+}
+
 func TestGetRepo_New(t *testing.T) {
 	s, err := FromFile("testdata/efi-rpm-macros-3-3.el8.src.rpm", false)
 	require.Nil(t, err)
