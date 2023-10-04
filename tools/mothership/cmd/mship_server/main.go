@@ -40,15 +40,15 @@ func run(ctx *cli.Context) error {
 }
 
 func main() {
-	base.ChangeDefaultDatabaseURL("mothership")
-	base.ChangeDefaultForEnvVar(base.EnvVarGRPCPort, "6677")
-	base.ChangeDefaultForEnvVar(base.EnvVarGatewayPort, "6678")
-	base.ChangeDefaultForEnvVar(base.EnvVarTemporalTaskQueue, "mship_worker_server")
-
 	app := &cli.App{
 		Name:   "mship_server",
 		Action: run,
-		Flags:  base.WithDefaultCliFlagsNoAuthTemporal(),
+		Flags: base.WithFlags(
+			base.WithDatabaseFlags("mothership"),
+			base.WithTemporalFlags("", "mship_worker_server"),
+			base.WithGrpcFlags(6677),
+			base.WithGatewayFlags(6678),
+		),
 	}
 
 	if err := app.Run(os.Args); err != nil {

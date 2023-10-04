@@ -46,7 +46,7 @@ export const App = () => {
       >
         <Toolbar variant="dense">
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Mship Admin
+            Mship Admin{window.__beta__ ? ' (beta)' : ''}
           </Typography>
           <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
             <Button className="native-link" href="/admin/auth/oidc/logout" variant="primary">

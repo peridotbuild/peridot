@@ -49,6 +49,9 @@ export interface ResourceTableProps<T> {
   // Default filter to start with
   defaultFilter?: string;
 
+  // Whether to hide the filter input
+  hideFilter?: boolean;
+
   // load is usually the OpenAPI SDK function that loads the resource.
   load(pageSize: number, pageToken?: string, filter?: string): Promise<any>;
 
@@ -102,6 +105,7 @@ export function ResourceTable<T extends StandardResource>(
   const [rows, setRows] = React.useState<T[] | undefined>(undefined);
   const [loading, setLoading] = React.useState<boolean>(false);
   const [filter, setFilter] = React.useState<string | undefined>(initFilter);
+  const [filterValue, setFilterValue] = React.useState<string | undefined>(initFilter);
 
   const updateSearch = (replace = false) => {
     const search = new URLSearchParams(location.search);
@@ -219,7 +223,7 @@ export function ResourceTable<T extends StandardResource>(
   // Load the resource using useEffect
   React.useEffect(() => {
     fetchResource().then();
-  }, [pageToken, rowsPerPage]);
+  }, [filter, pageToken, rowsPerPage]);
 
   // For filter, we're going to wait for the user to stop typing for 500ms
   // before we actually fetch the resource.
@@ -231,9 +235,9 @@ export function ResourceTable<T extends StandardResource>(
       clearTimeout(timeout.current);
     }
     timeout.current = setTimeout(() => {
-      fetchResource().then();
+      setFilter(filterValue);
     }, 500);
-  }, [filter]);
+  }, [filterValue]);
 
   // Create table header
   const header = props.fields.map((field) => {
@@ -262,20 +266,21 @@ export function ResourceTable<T extends StandardResource>(
 
   // Create a search box for filter input
   // This can be disabled if the request does not support filtering
-  const searchBox = (
+  const searchBox = !props.hideFilter && (
     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, width: '100%' }}>
       <TextField
         sx={{ mr: 2, flexGrow: 1 }}
         label="Filter"
         variant="outlined"
         size="small"
-        value={filter}
-        onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFilter(event.target.value)}
+        value={filterValue}
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFilterValue(event.target.value)}
       />
       <Button
         variant="contained"
         onClick={() => {
           setFilter('');
+          setFilterValue('');
           setPageToken(undefined);
         }}
       >

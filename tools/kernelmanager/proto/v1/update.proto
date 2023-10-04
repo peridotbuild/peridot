@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package peridot.tools.kernelmanager.v1;
+
+import "google/protobuf/timestamp.proto";
+import "tools/kernelmanager/proto/v1/kernel.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "KernelProto";
+option java_package = "org.resf.peridot.tools.kernelmanager.v1";
+option go_package = "go.resf.org/peridot/tools/kernelmanager/pb;kernelmanagerpb";
+
+// Kernel update message
+message Update {
+  // Full kernel
+  Kernel kernel = 1;
+
+  // Secure Boot upload time
+  google.protobuf.Timestamp secure_boot_upload_time = 2;
+
+  // Kernel.org tarball sha256 checksum (only applicable for repacked kernels)
+  string kernel_org_tarball_sha256 = 3;
+
+  // Kernel.org tarball PGP identity (only applicable for repacked kernels)
+  string kernel_org_tarball_pgp_identity = 4;
+
+  // Kernel.org version (only applicable for repacked kernels)
+  string kernel_org_version = 5;
+
+  // Started time
+  google.protobuf.Timestamp started_time = 6;
+
+  // Finished time
+  google.protobuf.Timestamp finished_time = 7;
+}

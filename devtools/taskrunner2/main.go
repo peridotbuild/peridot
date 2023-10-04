@@ -130,11 +130,12 @@ func spawnIbazel(target string) error {
 func run(ctx *cli.Context) error {
 	// add default frontend flags if needed
 	if ctx.Bool("dev-frontend-flags") {
-		base.ChangeDefaultForEnvVar(base.EnvVarFrontendSelf, "http://localhost:9111")
-		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCIssuer, "http://127.0.0.1:5556/dex")
-		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCClientID, "local")
-		base.ChangeDefaultForEnvVar(base.EnvVarFrontendOIDCClientSecret, "local")
+		_ = os.Setenv(string(base.EnvVarFrontendSelf), "http://localhost:9111")
+		_ = os.Setenv(string(base.EnvVarFrontendOIDCIssuer), "http://127.0.0.1:5556/dex")
+		_ = os.Setenv(string(base.EnvVarFrontendOIDCClientID), "local")
+		_ = os.Setenv(string(base.EnvVarFrontendOIDCClientSecret), "local")
 	}
+	_ = os.Setenv("AWS_ENDPOINT", "http://localhost:4566")
 
 	// get current wd and make the ibazel path relative to it
 	wd, err := os.Getwd()

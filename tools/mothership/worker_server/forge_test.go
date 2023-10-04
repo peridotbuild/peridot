@@ -22,7 +22,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/cache"
 	transport_http "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/filesystem"
-	"go.resf.org/peridot/tools/mothership/worker_server/forge"
+	"go.resf.org/peridot/base/go/forge"
 	"path/filepath"
 	"time"
 )

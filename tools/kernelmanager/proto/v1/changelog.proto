@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package peridot.tools.kernelmanager.v1;
+
+import "google/protobuf/timestamp.proto";
+import "tools/kernelmanager/proto/v1/kernel.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "ChangelogProto";
+option java_package = "org.resf.peridot.tools.kernelmanager.v1";
+option go_package = "go.resf.org/peridot/tools/kernelmanager/pb;kernelmanagerpb";
+
+// Changelog entry in kernel spec
+message ChangelogEntry {
+  // Changelog entry
+  string text = 1;
+
+  // Changelog entry author
+  string author = 2;
+
+  // Changelog entry date
+  google.protobuf.Timestamp create_time = 3;
+
+  // Version of the kernel this changelog entry belongs to
+  string version = 4;
+
+  // Build ID of the kernel this changelog entry belongs to
+  string build_id = 5;
+}
+
+// Changelog for a kernel
+message Changelog {
+  // Changelog entries
+  repeated ChangelogEntry entries = 1;
+}

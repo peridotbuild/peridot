@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package base.go;
+
+option java_multiple_files = true;
+option java_outer_classname = "KvPageTokenProto";
+option java_package = "org.resf.base.go";
+option go_package = "go.resf.org/peridot/base/go/pb;basepb";
+
+// DynamoDbPageToken is the page token used for DynamoDB.
+message DynamoDbPageToken {
+  // key is the last evaluated key.
+  string last_key = 1;
+
+  // path is the last evaluated path.
+  string last_path = 2;
+}

@@ -143,6 +143,7 @@ github.com/aws/aws-sdk-go/aws/credentials/endpointcreds
 github.com/aws/aws-sdk-go/aws/credentials/processcreds
 github.com/aws/aws-sdk-go/aws/credentials/ssocreds
 github.com/aws/aws-sdk-go/aws/credentials/stscreds
+github.com/aws/aws-sdk-go/aws/crr
 github.com/aws/aws-sdk-go/aws/csm
 github.com/aws/aws-sdk-go/aws/defaults
 github.com/aws/aws-sdk-go/aws/ec2metadata
@@ -174,6 +175,7 @@ github.com/aws/aws-sdk-go/private/protocol/rest
 github.com/aws/aws-sdk-go/private/protocol/restjson
 github.com/aws/aws-sdk-go/private/protocol/restxml
 github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil
+github.com/aws/aws-sdk-go/service/dynamodb
 github.com/aws/aws-sdk-go/service/s3
 github.com/aws/aws-sdk-go/service/s3/s3iface
 github.com/aws/aws-sdk-go/service/s3/s3manager
@@ -1241,6 +1243,9 @@ go.opentelemetry.io/proto/otlp/trace/v1
 # go.resf.org/peridot/third_party/bazel/src/main/protobuf v0.0.0-00010101000000-000000000000 => ./bazel-bin/third_party/bazel/src/main/protobuf/blaze_query_go_proto_/go.resf.org/peridot/third_party/bazel/src/main/protobuf
 ## explicit
 go.resf.org/peridot/third_party/bazel/src/main/protobuf
+# go.resf.org/peridot/tools/kernelmanager/pb v0.0.0-00010101000000-000000000000 => ./bazel-bin/tools/kernelmanager/proto/v1/kernelmanagerpb_go_proto_/go.resf.org/peridot/tools/kernelmanager/pb
+## explicit
+go.resf.org/peridot/tools/kernelmanager/pb
 # go.resf.org/peridot/tools/mothership/admin/pb v0.0.0-00010101000000-000000000000 => ./bazel-bin/tools/mothership/proto/admin/v1/mshipadminpb_go_proto_/go.resf.org/peridot/tools/mothership/admin/pb
 ## explicit
 go.resf.org/peridot/tools/mothership/admin/pb
@@ -1932,3 +1937,4 @@ sigs.k8s.io/yaml
 # go.resf.org/peridot/third_party/bazel/src/main/protobuf => ./bazel-bin/third_party/bazel/src/main/protobuf/blaze_query_go_proto_/go.resf.org/peridot/third_party/bazel/src/main/protobuf
 # go.resf.org/peridot/tools/mothership/admin/pb => ./bazel-bin/tools/mothership/proto/admin/v1/mshipadminpb_go_proto_/go.resf.org/peridot/tools/mothership/admin/pb
 # google.golang.org/genproto/googleapis/longrunning => ./bazel-bin/third_party/googleapis/google/longrunning/longrunning_go_proto_/google.golang.org/genproto/googleapis/longrunning
+# go.resf.org/peridot/tools/kernelmanager/pb => ./bazel-bin/tools/kernelmanager/proto/v1/kernelmanagerpb_go_proto_/go.resf.org/peridot/tools/kernelmanager/pb

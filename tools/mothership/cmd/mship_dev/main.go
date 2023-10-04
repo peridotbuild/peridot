@@ -149,6 +149,8 @@ func run(ctx *cli.Context) error {
 
 	handler := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Header.Set("x-peridot-beta", "true")
+
 			if strings.HasPrefix(r.URL.Path, "/admin") {
 				adminInfo.MuxHandler.ServeHTTP(w, r)
 			} else {
@@ -164,13 +166,14 @@ func run(ctx *cli.Context) error {
 }
 
 func main() {
-	base.ChangeDefaultDatabaseURL("mothership")
-	base.ChangeDefaultForEnvVar(base.EnvVarTemporalTaskQueue, "mship_worker_server")
-
 	app := &cli.App{
 		Name:   "mship_dev",
 		Action: run,
-		Flags:  base.WithDefaultCliFlagsNoAuthTemporal(base.WithDefaultFrontendCliFlags()...),
+		Flags: base.WithFlags(
+			base.WithDatabaseFlags("mothership"),
+			base.WithTemporalFlags("", "mship_worker_server"),
+			base.WithFrontendAuthFlags(""),
+		),
 	}
 
 	if err := app.Run(os.Args); err != nil {

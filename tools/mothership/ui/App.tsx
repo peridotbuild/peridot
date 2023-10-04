@@ -35,7 +35,15 @@ export const App = () => {
       >
         <Toolbar variant="dense">
           <Link to="/">
-            <img src="/_ga/mship_gopher.png" height="41.5px" />
+            <img
+              alt="Mothership logo"
+              src={
+                window.__beta__
+                  ? '/_ga/mship_gopher_beta.png'
+                  : '/_ga/mship_gopher.png'
+              }
+              height="41.5px"
+            />
           </Link>
           <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
             <Button className="native-link" href="/admin" variant="primary">

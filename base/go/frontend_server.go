@@ -98,7 +98,7 @@ var frontendHtmlTemplate = `
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>{{.Title}}</title>
+    <title>{{-Title-}}</title>
 
     <link rel="icon" type="image/png" href="/_ga/favicon.png" />
 
@@ -127,6 +127,7 @@ var frontendHtmlTemplate = `
         }
     </script>
     {{end}}
+    {{-Beta-}}
     {{if .Prefix}}
     <script>window.__peridot_prefix__ = '{{.Prefix}}'.replace('\\', '');</script>
     {{end}}
@@ -144,7 +145,7 @@ var frontendUnauthenticated = `
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>{{.Title}} - Unauthenticated</title>
+    <title>{{-Title-}} - Ouch</title>
 
     <link rel="icon" type="image/png" href="/_ga/favicon.png" />
 
@@ -222,45 +223,50 @@ func (info *FrontendInfo) frontendAuthHandler(provider OidcProvider, h http.Hand
 			}
 		}
 
+		ctx := r.Context()
+
 		// get auth cookie
 		authCookie, err := r.Cookie(frontendAuthCookieKey)
 		if err != nil {
-			// redirect to login
-			http.Redirect(w, r, info.Self+"/auth/oidc/login", http.StatusFound)
-			return
-		}
-
-		// verify the token
-		userInfo, err := provider.UserInfo(r.Context(), oauth2.StaticTokenSource(&oauth2.Token{
-			AccessToken: authCookie.Value,
-			TokenType:   "Bearer",
-		}))
-		if err != nil {
-			// redirect to login
-			http.Redirect(w, r, info.Self+"/auth/oidc/login", http.StatusFound)
-			return
-		}
-
-		// Check if the user is in the group
-		var claims oidcClaims
-		err = userInfo.Claims(&claims)
-		if err != nil {
-			// redirect to login
-			http.Redirect(w, r, info.Self+"/auth/oidc/login", http.StatusFound)
-			return
-		}
-
-		groups := claims.Groups
-		if info.OIDCGroup != "" {
-			if !Contains(groups, info.OIDCGroup) {
-				// show unauthenticated page
-				info.renderUnauthorized(w, fmt.Sprintf("User is not in group %s", info.OIDCGroup))
+			// only redirect if not allowed unauthenticated
+			if !info.AllowUnauthenticated {
+				// redirect to login
+				http.Redirect(w, r, info.Self+"/auth/oidc/login", http.StatusFound)
 				return
 			}
-		}
+		} else {
+			// verify the token
+			userInfo, err := provider.UserInfo(r.Context(), oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: authCookie.Value,
+				TokenType:   "Bearer",
+			}))
+			if err != nil {
+				// redirect to login
+				http.Redirect(w, r, info.Self+"/auth/oidc/login", http.StatusFound)
+				return
+			}
 
-		// Add the user to the context
-		ctx := context.WithValue(r.Context(), "user", userInfo)
+			// Check if the user is in the group
+			var claims oidcClaims
+			err = userInfo.Claims(&claims)
+			if err != nil {
+				// redirect to login
+				http.Redirect(w, r, info.Self+"/auth/oidc/login", http.StatusFound)
+				return
+			}
+
+			groups := claims.Groups
+			if info.OIDCGroup != "" {
+				if !Contains(groups, info.OIDCGroup) {
+					// show unauthenticated page
+					info.renderUnauthorized(w, fmt.Sprintf("User is not in group %s", info.OIDCGroup))
+					return
+				}
+			}
+
+			// Add the user to the context
+			ctx = context.WithValue(ctx, "user", userInfo)
+		}
 
 		h.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -290,8 +296,8 @@ func FrontendServer(info *FrontendInfo, embedfs *embed.FS) error {
 	if info.Title == "" {
 		info.Title = "Peridot"
 	}
-	newTemplate = strings.ReplaceAll(newTemplate, "{{.Title}}", info.Title)
-	newUnauthenticatedTemplate = strings.ReplaceAll(newUnauthenticatedTemplate, "{{.Title}}", info.Title)
+	newTemplate = strings.ReplaceAll(newTemplate, "{{-Title-}}", info.Title)
+	newUnauthenticatedTemplate = strings.ReplaceAll(newUnauthenticatedTemplate, "{{-Title-}}", info.Title)
 
 	info.unauthenticatedTemplate = newUnauthenticatedTemplate
 
@@ -354,7 +360,15 @@ func FrontendServer(info *FrontendInfo, embedfs *embed.FS) error {
 	http.HandleFunc(prefix+"/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 
-		tmpl, err := template.New("index.html").Parse(newTemplate)
+		// Set beta script (if beta basically set window.__beta__ = true)
+		srvTemplate := newTemplate
+		betaScript := ""
+		if r.Header.Get("x-peridot-beta") == "true" {
+			betaScript = "<script>window.__beta__ = true;</script>"
+		}
+		srvTemplate = strings.ReplaceAll(srvTemplate, "{{-Beta-}}", betaScript)
+
+		tmpl, err := template.New("index.html").Parse(srvTemplate)
 		if err != nil {
 			info.renderUnauthorized(w, fmt.Sprintf("Failed to parse template: %v", err))
 			return
@@ -523,8 +537,8 @@ func FrontendServer(info *FrontendInfo, embedfs *embed.FS) error {
 	}
 
 	var handler http.Handler = nil
-	// if auth is enabled as well as AllowUnauthenticated is false, then wrap the handler with the auth handler
-	if !info.NoAuth && !info.AllowUnauthenticated {
+	// if auth is enabled as well, then wrap the handler with the auth handler
+	if !info.NoAuth {
 		handler = info.frontendAuthHandler(provider, http.DefaultServeMux)
 	} else {
 		handler = http.DefaultServeMux

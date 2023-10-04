@@ -32,6 +32,7 @@ go_library(
     embedsrcs = [
         ":bundle",  # keep
         "mship_gopher.png",  # keep
+        "mship_gopher_beta.png",  # keep
         "favicon.png",  # keep
     ],
     importpath = "go.resf.org/peridot/tools/mothership/ui",

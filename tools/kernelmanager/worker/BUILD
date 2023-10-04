@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "worker",
+    srcs = [
+        "kernel.go",
+        "worker.go",
+        "workflows.go",
+    ],
+    importpath = "go.resf.org/peridot/tools/kernelmanager/worker",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base/go",
+        "//base/go/forge",
+        "//base/go/kv",
+        "//base/go/storage",
+        "//tools/kernelmanager/kernel_repack",
+        "//tools/kernelmanager/kernel_repack/kernelorg",
+        "//tools/kernelmanager/kernel_repack/v1:kernel_repack",
+        "//tools/kernelmanager/proto/v1:pb",
+        "//vendor/github.com/go-git/go-billy/v5/memfs",
+        "//vendor/github.com/go-git/go-git/v5:go-git",
+        "//vendor/github.com/go-git/go-git/v5/config",
+        "//vendor/github.com/go-git/go-git/v5/plumbing",
+        "//vendor/github.com/go-git/go-git/v5/plumbing/object",
+        "//vendor/github.com/go-git/go-git/v5/storage/memory",
+        "//vendor/github.com/pkg/errors",
+        "//vendor/go.temporal.io/sdk/workflow",
+        "//vendor/golang.org/x/crypto/openpgp",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)

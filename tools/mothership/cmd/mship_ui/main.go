@@ -32,7 +32,7 @@ func main() {
 	app := &cli.App{
 		Name:   "mship_ui",
 		Action: run,
-		Flags:  base.WithDefaultFrontendNoAuthCliFlags(),
+		Flags:  base.WithFrontendFlags(9111),
 	}
 
 	if err := app.Run(os.Args); err != nil {

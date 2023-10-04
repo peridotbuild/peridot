@@ -25,6 +25,9 @@ var assets embed.FS
 //go:embed mship_gopher.png
 var gopher []byte
 
+//go:embed mship_gopher_beta.png
+var gopherBeta []byte
+
 //go:embed favicon.png
 var favicon []byte
 
@@ -35,8 +38,9 @@ func InitFrontendInfo(info *base.FrontendInfo) *embed.FS {
 	info.Title = "Mship"
 	info.NoAuth = true
 	info.AdditionalContent = map[string][]byte{
-		"/_ga/mship_gopher.png": gopher,
-		"/_ga/favicon.png":      favicon,
+		"/_ga/mship_gopher.png":      gopher,
+		"/_ga/mship_gopher_beta.png": gopherBeta,
+		"/_ga/favicon.png":           favicon,
 	}
 
 	return &assets

@@ -23,5 +23,6 @@ declare global {
   interface Window {
     __peridot_prefix__: string;
     __peridot_user__: PeridotUser;
+    __beta__: boolean;
   }
 }

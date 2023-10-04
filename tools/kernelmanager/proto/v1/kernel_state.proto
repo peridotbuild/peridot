@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package peridot.tools.kernelmanager.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "tools/kernelmanager/proto/v1/update.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "KernelStateProto";
+option java_package = "org.resf.peridot.tools.kernelmanager.v1";
+option go_package = "go.resf.org/peridot/tools/kernelmanager/pb;kernelmanagerpb";
+
+// KernelState represents the state of a kernel.
+message KernelState {
+  // The last time the kernel was updated.
+  google.protobuf.Timestamp last_update_time = 1;
+
+  // Kernel state
+  enum State {
+    // Unspecified state
+    STATE_UNSPECIFIED = 0;
+
+    // Kernel has no active updates
+    IDLE = 1;
+
+    // Kernel is being updated
+    UPDATING = 2;
+
+    // Kernel is pending Secure Boot artifacts
+    PENDING_SECURE_BOOT = 3;
+
+    // Kernel is uploading Secure Boot artifacts to Peridot
+    UPLOADING_SECURE_BOOT = 4;
+  }
+  // Kernel current active state
+  State state = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Kernel current active update
+  Update update = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

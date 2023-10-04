@@ -1,0 +1,173 @@
+syntax = "proto3";
+
+package peridot.tools.kernelmanager.v1;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "google/longrunning/operations.proto";
+import "tools/kernelmanager/proto/v1/kernel.proto";
+import "tools/kernelmanager/proto/v1/update.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "KernelManagerProto";
+option java_package = "org.resf.peridot.tools.kernelmanager.v1";
+option go_package = "go.resf.org/peridot/tools/kernelmanager/pb;kernelmanagerpb";
+
+// KernelManager is the service that manages kernels.
+// It helps with the repackaging of upstream kernels, as well as facilitating
+// the SB signing process for both Core and SIG kernels.
+service KernelManager {
+  // ListKernels returns a list of all kernels.
+  rpc ListKernels(ListKernelsRequest) returns (ListKernelsResponse) {
+    option (google.api.http) = {
+      get: "/v1/kernels"
+    };
+  }
+
+  // GetKernel returns a kernel by name.
+  rpc GetKernel(GetKernelRequest) returns (Kernel) {
+    option (google.api.http) = {
+      get: "/v1/{name=kernels/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+
+  // CreateKernel creates a new kernel.
+  rpc CreateKernel(CreateKernelRequest) returns (Kernel) {
+    option (google.api.http) = {
+      post: "/v1/kernels"
+      body: "kernel"
+    };
+  }
+
+  // UpdateKernel updates an existing kernel.
+  rpc UpdateKernel(UpdateKernelRequest) returns (Kernel) {
+    option (google.api.http) = {
+      patch: "/v1/{kernel.name=kernels/*}"
+      body: "kernel"
+    };
+    option (google.api.method_signature) = "kernel,update_mask";
+  }
+
+  // TriggerKernelUpdate triggers an update of a kernel.
+  // For any repack kernels that are on a schedule, this will trigger an immediate
+  // update of the kernel. And the update window will be reset.
+  rpc TriggerKernelUpdate(TriggerKernelUpdateRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = {
+      post: "/v1/{name=kernels/*}:triggerUpdate"
+    };
+    option (google.longrunning.operation_info) = {
+      response_type: "TriggerKernelUpdateResponse"
+      metadata_type: "KernelManagerMetadata"
+    };
+  }
+
+  // ListUpdates returns a list of all kernel updates.
+  rpc ListUpdates(ListUpdatesRequest) returns (ListUpdatesResponse) {
+    option (google.api.http) = {
+      get: "/v1/updates"
+    };
+  }
+
+  // GetUpdate returns a kernel update by name.
+  rpc GetUpdate(GetUpdateRequest) returns (Update) {
+    option (google.api.http) = {
+      get: "/v1/{name=updates/*}"
+    };
+    option (google.api.method_signature) = "name";
+  }
+}
+
+// ListKernelsRequest is the request message for ListKernels.
+message ListKernelsRequest {
+  // The maximum number of kernels to return.
+  // If not specified, the server will pick an appropriate default.
+  int32 page_size = 1;
+
+  // A page token, received from a previous `ListKernels` call.
+  // Provide this to retrieve the subsequent page.
+  // When paginating, all other parameters provided to `ListKernels` must match
+  // the call that provided the page token.
+  string page_token = 2;
+}
+
+// ListKernelsResponse is the response message for ListKernels.
+message ListKernelsResponse {
+  // The list of kernels.
+  repeated Kernel kernels = 1;
+
+  // A token that can be sent as `page_token` to retrieve the next page.
+  // If this field is omitted, there are no subsequent pages.
+  string next_page_token = 2;
+}
+
+// GetKernelRequest is the request message for GetKernel.
+message GetKernelRequest {
+  // The name of the kernel to retrieve.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// CreateKernelRequest is the request message for CreateKernel.
+message CreateKernelRequest {
+  // The kernel to create.
+  Kernel kernel = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// UpdateKernelRequest is the request message for UpdateKernel.
+message UpdateKernelRequest {
+  // The kernel to update.
+  Kernel kernel = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// TriggerKernelUpdateRequest is the request message for TriggerKernelUpdate.
+message TriggerKernelUpdateRequest {
+  // The name of the kernel to update.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// TriggerKernelUpdateResponse is the response message for TriggerKernelUpdate.
+message TriggerKernelUpdateResponse {
+  // Updated kernel.
+  Update update = 1;
+}
+
+// KernelManagerMetadata is the metadata message for TriggerKernelUpdate.
+message KernelManagerMetadata {
+  // The time at which the workflow started
+  google.protobuf.Timestamp start_time = 1;
+
+  // The time at which the workflow finished
+  google.protobuf.Timestamp end_time = 2;
+}
+
+// ListUpdatesRequest is the request message for ListUpdates.
+message ListUpdatesRequest {
+  // The maximum number of updates to return.
+  // If not specified, the server will pick an appropriate default.
+  int32 page_size = 1;
+
+  // A page token, received from a previous `ListUpdates` call.
+  // Provide this to retrieve the subsequent page.
+  // When paginating, all other parameters provided to `ListUpdates` must match
+  // the call that provided the page token.
+  string page_token = 2;
+}
+
+// ListUpdatesResponse is the response message for ListUpdates.
+message ListUpdatesResponse {
+  // The list of updates.
+  repeated Update updates = 1;
+
+  // A token that can be sent as `page_token` to retrieve the next page.
+  // If this field is omitted, there are no subsequent pages.
+  string next_page_token = 2;
+}
+
+// GetUpdateRequest is the request message for GetUpdate.
+message GetUpdateRequest {
+  // The name of the update to retrieve.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+}

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+bazel build $(bazel query 'kind(go_proto_library, //...)')
+bazel run //devtools/nfv2

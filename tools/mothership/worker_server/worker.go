@@ -16,8 +16,8 @@ package mothership_worker_server
 
 import (
 	base "go.resf.org/peridot/base/go"
+	"go.resf.org/peridot/base/go/forge"
 	"go.resf.org/peridot/base/go/storage"
-	"go.resf.org/peridot/tools/mothership/worker_server/forge"
 	"golang.org/x/crypto/openpgp"
 )
 

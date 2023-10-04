@@ -44,216 +44,202 @@ const (
 	EnvVarStoragePathStyle             EnvVar = "STORAGE_PATH_STYLE"
 )
 
-var defaultCliFlagsDatabaseOnly = []cli.Flag{
-	&cli.StringFlag{
-		Name:    "database-url",
-		Aliases: []string{"d"},
-		Usage:   "database url",
-		EnvVars: []string{string(EnvVarDatabaseURL)},
-		Value:   "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
-	},
+func WithDatabaseFlags(appName string) []cli.Flag {
+	if appName == "" {
+		appName = "postgres"
+	}
+
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    "database-url",
+			Aliases: []string{"d"},
+			Usage:   "database url",
+			EnvVars: []string{string(EnvVarDatabaseURL)},
+			Value:   "postgres://postgres:postgres@localhost:5432/" + appName + "?sslmode=disable",
+		},
+	}
 }
 
-var defaultCliFlagsTemporal = append(defaultCliFlagsDatabaseOnly, []cli.Flag{
-	&cli.StringFlag{
-		Name:    "temporal-namespace",
-		Aliases: []string{"n"},
-		Usage:   "temporal namespace",
-		EnvVars: []string{string(EnvVarTemporalNamespace)},
-		Value:   "default",
-	},
-	&cli.StringFlag{
-		Name:    "temporal-address",
-		Aliases: []string{"a"},
-		Usage:   "temporal address",
-		EnvVars: []string{string(EnvVarTemporalAddress)},
-		Value:   "localhost:7233",
-	},
-	&cli.StringFlag{
-		Name:    "temporal-task-queue",
-		Aliases: []string{"q"},
-		Usage:   "temporal task queue",
-		EnvVars: []string{string(EnvVarTemporalTaskQueue)},
-	},
-}...)
+func WithTemporalFlags(defaultNamespace string, defaultTaskQueue string) []cli.Flag {
+	if defaultNamespace == "" {
+		defaultNamespace = "default"
+	}
 
-var defaultCliFlagsNoAuth = append(defaultCliFlagsDatabaseOnly, []cli.Flag{
-	&cli.IntFlag{
-		Name:    "grpc-port",
-		Usage:   "gRPC port",
-		EnvVars: []string{string(EnvVarGRPCPort)},
-		Value:   8080,
-	},
-	&cli.IntFlag{
-		Name:    "gateway-port",
-		Usage:   "gRPC gateway port",
-		EnvVars: []string{string(EnvVarGatewayPort)},
-		Value:   8081,
-	},
-}...)
-
-var defaultCliFlagsNoAuthTemporal = append(defaultCliFlagsTemporal, []cli.Flag{
-	&cli.IntFlag{
-		Name:    "grpc-port",
-		Usage:   "gRPC port",
-		EnvVars: []string{string(EnvVarGRPCPort)},
-		Value:   8080,
-	},
-	&cli.IntFlag{
-		Name:    "gateway-port",
-		Usage:   "gRPC gateway port",
-		EnvVars: []string{string(EnvVarGatewayPort)},
-		Value:   8081,
-	},
-}...)
-
-var defaultCliFlags = append(defaultCliFlagsNoAuth, []cli.Flag{
-	&cli.StringFlag{
-		Name:    "oidc-issuer",
-		Usage:   "OIDC issuer",
-		EnvVars: []string{string(EnvVarFrontendOIDCIssuer)},
-		Value:   "https://accounts.rockylinux.org/auth/realms/rocky",
-	},
-	&cli.StringFlag{
-		Name:    "required-oidc-group",
-		Usage:   "OIDC group that is required to access the frontend",
-		EnvVars: []string{string(EnvVarFrontendRequiredOIDCGroup)},
-	},
-}...)
-
-var defaultCliFlagsTemporalClient = append(defaultCliFlagsNoAuthTemporal, []cli.Flag{
-	&cli.StringFlag{
-		Name:    "oidc-issuer",
-		Usage:   "OIDC issuer",
-		EnvVars: []string{string(EnvVarFrontendOIDCIssuer)},
-		Value:   "https://accounts.rockylinux.org/auth/realms/rocky",
-	},
-	&cli.StringFlag{
-		Name:    "required-oidc-group",
-		Usage:   "OIDC group that is required to access the frontend",
-		EnvVars: []string{string(EnvVarFrontendRequiredOIDCGroup)},
-	},
-}...)
-
-var defaultFrontendNoAuthCliFlags = []cli.Flag{
-	&cli.IntFlag{
-		Name:    "port",
-		Usage:   "frontend port",
-		EnvVars: []string{string(EnvVarFrontendPort)},
-		Value:   9111,
-	},
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    "temporal-namespace",
+			Aliases: []string{"n"},
+			Usage:   "temporal namespace",
+			EnvVars: []string{string(EnvVarTemporalNamespace)},
+			Value:   defaultNamespace,
+		},
+		&cli.StringFlag{
+			Name:    "temporal-address",
+			Aliases: []string{"a"},
+			Usage:   "temporal address",
+			EnvVars: []string{string(EnvVarTemporalAddress)},
+			Value:   "localhost:7233",
+		},
+		&cli.StringFlag{
+			Name:    "temporal-task-queue",
+			Aliases: []string{"q"},
+			Usage:   "temporal task queue",
+			EnvVars: []string{string(EnvVarTemporalTaskQueue)},
+			Value:   defaultTaskQueue,
+		},
+	}
 }
 
-var defaultFrontendCliFlags = append(defaultFrontendNoAuthCliFlags, []cli.Flag{
-	&cli.StringFlag{
-		Name:    "oidc-issuer",
-		Usage:   "OIDC issuer",
-		EnvVars: []string{string(EnvVarFrontendOIDCIssuer)},
-		Value:   "https://accounts.rockylinux.org/auth/realms/rocky",
-	},
-	&cli.StringFlag{
-		Name:    "oidc-client-id",
-		Usage:   "OIDC client ID",
-		EnvVars: []string{string(EnvVarFrontendOIDCClientID)},
-	},
-	&cli.StringFlag{
-		Name:    "oidc-client-secret",
-		Usage:   "OIDC client secret",
-		EnvVars: []string{string(EnvVarFrontendOIDCClientSecret)},
-	},
-	&cli.StringFlag{
-		Name:    "oidc-userinfo-override",
-		Usage:   "OIDC userinfo override",
-		EnvVars: []string{string(EnvVarFrontendOIDCUserInfoOverride)},
-	},
-	&cli.StringFlag{
-		Name:    "required-oidc-group",
-		Usage:   "OIDC group that is required to access the frontend",
-		EnvVars: []string{string(EnvVarFrontendRequiredOIDCGroup)},
-	},
-	&cli.StringFlag{
-		Name:    "self",
-		Usage:   "Endpoint pointing to the frontend",
-		EnvVars: []string{string(EnvVarFrontendSelf)},
-	},
-}...)
+func WithGrpcFlags(defaultPort int) []cli.Flag {
+	if defaultPort == 0 {
+		defaultPort = 8080
+	}
 
-var storageFlags = []cli.Flag{
-	&cli.StringFlag{
-		Name:    "storage-endpoint",
-		Usage:   "storage endpoint",
-		EnvVars: []string{string(EnvVarStorageEndpoint)},
-		Value:   "",
-	},
-	&cli.StringFlag{
-		Name:    "storage-connection-string",
-		Usage:   "storage connection string",
-		EnvVars: []string{string(EnvVarStorageConnectionString)},
-	},
-	&cli.StringFlag{
-		Name:    "storage-region",
-		Usage:   "storage region",
-		EnvVars: []string{string(EnvVarStorageRegion)},
-		// RESF default region
-		Value: "us-east-2",
-	},
-	&cli.BoolFlag{
-		Name:    "storage-secure",
-		Usage:   "storage secure",
-		EnvVars: []string{string(EnvVarStorageSecure)},
-		Value:   true,
-	},
-	&cli.BoolFlag{
-		Name:    "storage-path-style",
-		Usage:   "storage path style",
-		EnvVars: []string{string(EnvVarStoragePathStyle)},
-		Value:   false,
-	},
+	return []cli.Flag{
+		&cli.IntFlag{
+			Name:    "grpc-port",
+			Usage:   "gRPC port",
+			EnvVars: []string{string(EnvVarGRPCPort)},
+			Value:   defaultPort,
+		},
+	}
 }
 
-// WithDefaultCliFlags adds the default cli flags to the app.
-func WithDefaultCliFlags(flags ...cli.Flag) []cli.Flag {
-	return append(defaultCliFlags, flags...)
+func WithGatewayFlags(defaultPort int) []cli.Flag {
+	if defaultPort == 0 {
+		defaultPort = 8081
+	}
+
+	return []cli.Flag{
+		&cli.IntFlag{
+			Name:    "gateway-port",
+			Usage:   "gRPC gateway port",
+			EnvVars: []string{string(EnvVarGatewayPort)},
+			Value:   defaultPort,
+		},
+	}
 }
 
-// WithDefaultCliFlagsTemporalClient adds the default cli flags to the app.
-func WithDefaultCliFlagsTemporalClient(flags ...cli.Flag) []cli.Flag {
-	return append(defaultCliFlagsTemporalClient, flags...)
+func WithOidcFlags(defaultOidcIssuer string, defaultGroup string) []cli.Flag {
+	if defaultOidcIssuer == "" {
+		defaultOidcIssuer = "https://accounts.rockylinux.org/auth/realms/rocky"
+	}
+
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    "oidc-issuer",
+			Usage:   "OIDC issuer",
+			EnvVars: []string{string(EnvVarFrontendOIDCIssuer)},
+			Value:   defaultOidcIssuer,
+		},
+		&cli.StringFlag{
+			Name:    "required-oidc-group",
+			Usage:   "OIDC group that is required to access the frontend",
+			EnvVars: []string{string(EnvVarFrontendRequiredOIDCGroup)},
+			Value:   defaultGroup,
+		},
+	}
 }
 
-// WithDefaultCliFlagsNoAuth adds the default cli flags to the app.
-func WithDefaultCliFlagsNoAuth(flags ...cli.Flag) []cli.Flag {
-	return append(defaultCliFlagsNoAuth, flags...)
+func WithFrontendFlags(defaultPort int) []cli.Flag {
+	if defaultPort == 0 {
+		defaultPort = 9111
+	}
+
+	return []cli.Flag{
+		&cli.IntFlag{
+			Name:    "port",
+			Usage:   "frontend port",
+			EnvVars: []string{string(EnvVarFrontendPort)},
+			Value:   defaultPort,
+		},
+	}
 }
 
-// WithDefaultCliFlagsNoAuthTemporal adds the default cli flags to the app.
-func WithDefaultCliFlagsNoAuthTemporal(flags ...cli.Flag) []cli.Flag {
-	return append(defaultCliFlagsNoAuthTemporal, flags...)
-}
+func WithFrontendAuthFlags(defaultOidcIssuer string) []cli.Flag {
+	if defaultOidcIssuer == "" {
+		defaultOidcIssuer = "https://accounts.rockylinux.org/auth/realms/rocky"
+	}
 
-// WithDefaultCliFlagsTemporal adds the default cli flags to the app.
-func WithDefaultCliFlagsTemporal(flags ...cli.Flag) []cli.Flag {
-	return append(defaultCliFlagsTemporal, flags...)
-}
-
-// WithDefaultCliFlagsDatabaseOnly adds the default cli flags to the app.
-func WithDefaultCliFlagsDatabaseOnly(flags ...cli.Flag) []cli.Flag {
-	return append(defaultCliFlagsDatabaseOnly, flags...)
-}
-
-// WithDefaultFrontendNoAuthCliFlags adds the default frontend cli flags to the app.
-func WithDefaultFrontendNoAuthCliFlags(flags ...cli.Flag) []cli.Flag {
-	return append(defaultFrontendNoAuthCliFlags, flags...)
-}
-
-// WithDefaultFrontendCliFlags adds the default frontend cli flags to the app.
-func WithDefaultFrontendCliFlags(flags ...cli.Flag) []cli.Flag {
-	return append(defaultFrontendCliFlags, flags...)
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    "oidc-issuer",
+			Usage:   "OIDC issuer",
+			EnvVars: []string{string(EnvVarFrontendOIDCIssuer)},
+			Value:   defaultOidcIssuer,
+		},
+		&cli.StringFlag{
+			Name:    "oidc-client-id",
+			Usage:   "OIDC client ID",
+			EnvVars: []string{string(EnvVarFrontendOIDCClientID)},
+		},
+		&cli.StringFlag{
+			Name:    "oidc-client-secret",
+			Usage:   "OIDC client secret",
+			EnvVars: []string{string(EnvVarFrontendOIDCClientSecret)},
+		},
+		&cli.StringFlag{
+			Name:    "oidc-userinfo-override",
+			Usage:   "OIDC userinfo override",
+			EnvVars: []string{string(EnvVarFrontendOIDCUserInfoOverride)},
+		},
+		&cli.StringFlag{
+			Name:    "required-oidc-group",
+			Usage:   "OIDC group that is required to access the frontend",
+			EnvVars: []string{string(EnvVarFrontendRequiredOIDCGroup)},
+		},
+		&cli.StringFlag{
+			Name:    "self",
+			Usage:   "Endpoint pointing to the frontend",
+			EnvVars: []string{string(EnvVarFrontendSelf)},
+		},
+	}
 }
 
 // WithStorageFlags adds the storage flags to the app.
-func WithStorageFlags(flags ...cli.Flag) []cli.Flag {
-	return append(storageFlags, flags...)
+func WithStorageFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    "storage-endpoint",
+			Usage:   "storage endpoint",
+			EnvVars: []string{string(EnvVarStorageEndpoint)},
+			Value:   "",
+		},
+		&cli.StringFlag{
+			Name:    "storage-connection-string",
+			Usage:   "storage connection string",
+			EnvVars: []string{string(EnvVarStorageConnectionString)},
+		},
+		&cli.StringFlag{
+			Name:    "storage-region",
+			Usage:   "storage region",
+			EnvVars: []string{string(EnvVarStorageRegion)},
+			// RESF default region
+			Value: "us-east-2",
+		},
+		&cli.BoolFlag{
+			Name:    "storage-secure",
+			Usage:   "storage secure",
+			EnvVars: []string{string(EnvVarStorageSecure)},
+			Value:   true,
+		},
+		&cli.BoolFlag{
+			Name:    "storage-path-style",
+			Usage:   "storage path style",
+			EnvVars: []string{string(EnvVarStoragePathStyle)},
+			Value:   false,
+		},
+	}
+}
+
+func WithFlags(flags ...[]cli.Flag) []cli.Flag {
+	var result []cli.Flag
+
+	for _, f := range flags {
+		result = append(result, f...)
+	}
+
+	return result
 }
 
 // FlagsToGRPCServerOptions converts the cli flags to gRPC server options.
@@ -311,19 +297,6 @@ func GetTemporalClientFromFlags(ctx *cli.Context, opts client.Options) (client.C
 	)
 }
 
-// ChangeDefaultForEnvVar changes the default value of a flag based on an environment variable.
-func ChangeDefaultForEnvVar(envVar EnvVar, newDefault string) {
-	// Check if the environment variable is set.
-	if _, ok := os.LookupEnv(string(envVar)); ok {
-		return
-	}
-
-	// Change the default value.
-	if err := os.Setenv(string(envVar), newDefault); err != nil {
-		LogFatalf("failed to set environment variable %s: %v", envVar, err)
-	}
-}
-
 // RareUseChangeDefault changes the default value of an arbitrary environment variable.
 func RareUseChangeDefault(envVar string, newDefault string) {
 	// Check if the environment variable is set.
@@ -335,9 +308,4 @@ func RareUseChangeDefault(envVar string, newDefault string) {
 	if err := os.Setenv(envVar, newDefault); err != nil {
 		LogFatalf("failed to set environment variable %s: %v", envVar, err)
 	}
-}
-
-// ChangeDefaultDatabaseURL changes the default value of the database url based on an environment variable.
-func ChangeDefaultDatabaseURL(appName string) {
-	ChangeDefaultForEnvVar(EnvVarDatabaseURL, "postgres://postgres:postgres@localhost:5432/"+appName+"?sslmode=disable")
 }

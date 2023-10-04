@@ -60,6 +60,7 @@ go_test(
         "//vendor/github.com/go-git/go-git/v5/plumbing/object",
         "//vendor/github.com/go-git/go-git/v5/storage/filesystem",
         "//vendor/github.com/go-git/go-git/v5/storage/memory",
+        "//vendor/github.com/rocky-linux/srpmproc/pkg/data",
         "//vendor/github.com/stretchr/testify/require",
         "//vendor/golang.org/x/crypto/openpgp",
     ],

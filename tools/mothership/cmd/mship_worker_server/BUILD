@@ -22,10 +22,10 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//base/go",
+        "//base/go/forge",
+        "//base/go/forge/github",
         "//base/go/storage/detector",
         "//tools/mothership/worker_server",
-        "//tools/mothership/worker_server/forge",
-        "//tools/mothership/worker_server/forge/github",
         "//vendor/github.com/urfave/cli/v2:cli",
         "//vendor/go.temporal.io/sdk/client",
         "//vendor/go.temporal.io/sdk/worker",

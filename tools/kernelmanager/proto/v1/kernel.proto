@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package peridot.tools.kernelmanager.v1;
+
+import "google/api/annotations.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "KernelProto";
+option java_package = "org.resf.peridot.tools.kernelmanager.v1";
+option go_package = "go.resf.org/peridot/tools/kernelmanager/pb;kernelmanagerpb";
+
+// RepackOptions contains options for repackaging the kernel.
+// This is only repackaging from Kernel.org.
+message RepackOptions {
+  // The variant of the kernel to be repackaged.
+  enum KernelOrgVariant {
+    // Unknown variant.
+    KERNEL_ORG_VARIANT_UNSPECIFIED = 0;
+
+    // Mainline variant.
+    MAINLINE = 1;
+
+    // Longterm variant.
+    LONGTERM = 2;
+  }
+  // The variant of the kernel to be repackaged.
+  KernelOrgVariant kernel_org_variant = 1;
+
+  // The version of the kernel to be repackaged.
+  // Only valid for LONGTERM variant.
+  string kernel_org_version = 2;
+
+  // How often to repack the kernel.
+  enum Frequency {
+    // Unknown frequency.
+    FREQUENCY_UNSPECIFIED = 0;
+
+    // Repack every 24 hours.
+    DAILY = 1;
+
+    // Repack every 7 days.
+    WEEKLY = 2;
+
+    // Repack every 30 days.
+    MONTHLY = 3;
+  }
+  // How often to repack the kernel.
+  Frequency frequency = 3;
+
+  // Repack version
+  enum Version {
+    // Unknown version.
+    VERSION_UNSPECIFIED = 0;
+
+    // V1 version.
+    V1 = 1;
+  }
+  // Repack version
+  Version version = 4;
+}
+
+// PeridotProject contains information about the Peridot project
+// This is where the builds are sent to (or watched for).
+message PeridotProject {
+  // ID of the project.
+  // Package name MUST match the Kernel package name.
+  string id = 1;
+}
+
+// Config contains the configuration on how to facilitate an update
+// for a kernel.
+message Config {
+  // Whether the kernel should be repackaged from Kernel.org
+  RepackOptions repack_options = 1;
+
+  // Peridot project this kernel is being built for.
+  PeridotProject peridot_project = 2;
+
+  // Whether the kernel needs Secure Boot signing.
+  bool secure_boot = 3;
+
+  // Namespace in SCM where the kernel is stored.
+  string scm_namespace = 4;
+
+  // SCM branches to push the kernel to.
+  repeated string scm_branches = 5;
+}
+
+// Kernel is the representation of a kernel.
+message Kernel {
+  // The name of the kernel.
+  string name = 1;
+
+  // The kernel config.
+  Config config = 2;
+
+  // The package name in Peridot
+  string pkg = 3;
+}

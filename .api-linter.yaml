@@ -24,6 +24,11 @@
     # We want to allow certain POST methods to set body to something other than "*".
     # Useful for non-JSON payloads.
     - "core::0136::http-body"
+    # I don't really understand this requirement but looks like Google has a special
+    # use case when it comes to user provided IDs.
+    - "core::0133::request-id-field"
+    # We don't require update mask support
+    - "core::0134::request-mask-required"
 - included_paths:
     - "third_party/**/*.proto"
     - "vendor/**/*.proto"

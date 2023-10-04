@@ -6,3 +6,4 @@ bazel-out
 bazel-testlogs
 bazel-peridot
 node_modules
+vendor/go.resf.org

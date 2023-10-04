@@ -2,9 +2,8 @@
 
 set -euo pipefail
 
-go mod tidy -e
-rm -rf vendor
-go mod vendor -e
+go mod tidy
+go mod vendor
 find vendor -name "BUILD.bazel" -delete
 find vendor -name "BUILD" -delete
 

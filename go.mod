@@ -36,6 +36,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	go.ciq.dev/pika v0.0.0-20230819201750-737c3e8f413d
 	go.resf.org/peridot/third_party/bazel/src/main/protobuf v0.0.0-00010101000000-000000000000
+	go.resf.org/peridot/tools/kernelmanager/pb v0.0.0-00010101000000-000000000000
 	go.resf.org/peridot/tools/mothership/admin/pb v0.0.0-00010101000000-000000000000
 	go.resf.org/peridot/tools/mothership/pb v0.0.0-00010101000000-000000000000
 	go.starlark.net v0.0.0-20230814145427-12f4cb8177e4
@@ -293,3 +294,5 @@ replace go.resf.org/peridot/third_party/bazel/src/main/protobuf => ./bazel-bin/t
 replace go.resf.org/peridot/tools/mothership/admin/pb => ./bazel-bin/tools/mothership/proto/admin/v1/mshipadminpb_go_proto_/go.resf.org/peridot/tools/mothership/admin/pb
 
 replace google.golang.org/genproto/googleapis/longrunning => ./bazel-bin/third_party/googleapis/google/longrunning/longrunning_go_proto_/google.golang.org/genproto/googleapis/longrunning
+
+replace go.resf.org/peridot/tools/kernelmanager/pb => ./bazel-bin/tools/kernelmanager/proto/v1/kernelmanagerpb_go_proto_/go.resf.org/peridot/tools/kernelmanager/pb
