@@ -164,6 +164,15 @@ func OidcGrpcInterceptor(details *OidcInterceptorDetails) (grpc.UnaryServerInter
 	return interceptor, nil
 }
 
+func UserFromContext(ctx context.Context) (UserInfo, error) {
+	user, ok := ctx.Value(UserContextKey).(UserInfo)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "missing user info")
+	}
+
+	return user, nil
+}
+
 // TestOidcProvider is a test implementation of OidcProvider
 type TestOidcProvider struct {
 	// This interface is a pointer on purpose, so we can point it to

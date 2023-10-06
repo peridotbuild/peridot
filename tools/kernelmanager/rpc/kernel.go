@@ -13,21 +13,6 @@ import (
 	"strings"
 )
 
-func getPrefixEnd(key []byte) []byte {
-	end := make([]byte, len(key))
-	copy(end, key)
-	for i := len(end) - 1; i >= 0; i-- {
-		if end[i] < 0xff {
-			end[i] = end[i] + 1
-			end = end[:i+1]
-			return end
-		}
-	}
-	// next prefix does not exist (e.g., 0xffff);
-	// default to WithFromKey policy
-	return []byte{0}
-}
-
 func (s *Server) ListKernels(ctx context.Context, req *kernelmanagerpb.ListKernelsRequest) (*kernelmanagerpb.ListKernelsResponse, error) {
 	// Min page size is 1, max page size is 100.
 	if req.PageSize < 1 {
@@ -86,6 +71,11 @@ func (s *Server) GetKernel(ctx context.Context, req *kernelmanagerpb.GetKernelRe
 }
 
 func (s *Server) CreateKernel(ctx context.Context, req *kernelmanagerpb.CreateKernelRequest) (*kernelmanagerpb.Kernel, error) {
+	// Authenticate the request
+	if _, err := base.UserFromContext(ctx); err != nil {
+		return nil, err
+	}
+
 	if req.Kernel == nil {
 		return nil, status.Error(codes.InvalidArgument, "kernel must be provided")
 	}
@@ -120,6 +110,11 @@ func (s *Server) CreateKernel(ctx context.Context, req *kernelmanagerpb.CreateKe
 }
 
 func (s *Server) UpdateKernel(ctx context.Context, req *kernelmanagerpb.UpdateKernelRequest) (*kernelmanagerpb.Kernel, error) {
+	// Authenticate the request
+	if _, err := base.UserFromContext(ctx); err != nil {
+		return nil, err
+	}
+
 	if req.Kernel == nil {
 		return nil, status.Error(codes.InvalidArgument, "kernel must be provided")
 	}
