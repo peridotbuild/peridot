@@ -24,11 +24,12 @@ type ChangelogEntry struct {
 }
 
 type Input struct {
-	Version       string
-	BuildID       string
-	KernelPackage string
-	Changelog     []*ChangelogEntry
-	Tarball       []byte
+	Version                string
+	BuildID                string
+	KernelPackage          string
+	Changelog              []*ChangelogEntry
+	AdditionalKernelConfig []string
+	Tarball                []byte
 }
 
 func kernel(kernelType string, in *Input) (*kernel_repack.Output, error) {
@@ -78,9 +79,31 @@ func kernel(kernelType string, in *Input) (*kernel_repack.Output, error) {
 			return nil, err
 		}
 
+		// If the file starts with "config-", then it's a kernel config file.
+		// Append additional kernel config to the end of the file.
+		if strings.HasPrefix(file.Name(), "config-") {
+			data = append(data, []byte("\n")...)
+			for _, config := range in.AdditionalKernelConfig {
+				data = append(data, []byte(config)...)
+				data = append(data, []byte("\n")...)
+			}
+		}
+
+		stat, err := f.Stat()
+		if err != nil {
+			return nil, err
+		}
+		mode := stat.Mode()
+
+		// If file name ends with ".sh", set executable bit
+		if strings.HasSuffix(file.Name(), ".sh") {
+			mode |= 0111
+		}
+
 		files = append(files, &kernel_repack.File{
-			Name: file.Name(),
-			Data: data,
+			Name:        file.Name(),
+			Data:        data,
+			Permissions: mode,
 		})
 	}
 

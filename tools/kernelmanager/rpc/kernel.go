@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"strings"
 )
 
 func getPrefixEnd(key []byte) []byte {
@@ -65,8 +66,11 @@ func (s *Server) GetKernel(ctx context.Context, req *kernelmanagerpb.GetKernelRe
 		return nil, status.Error(codes.InvalidArgument, "name must be provided")
 	}
 
-	kernelBytes, err := s.kv.Get(ctx, fmt.Sprintf("/kernels/entries/%s", req.Name))
+	kernelBytes, err := s.kv.Get(ctx, fmt.Sprintf("/kernels/entries/%s", strings.TrimPrefix(req.Name, "kernels/")))
 	if err != nil {
+		if errors.Is(err, kv.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "kernel not found")
+		}
 		base.LogErrorf("failed to get kernel: %v", err)
 		return nil, status.Error(codes.Internal, "failed to get kernel")
 	}

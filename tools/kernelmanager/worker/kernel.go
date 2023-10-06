@@ -135,11 +135,12 @@ func (w *Worker) KernelRepack(ctx context.Context, kernel *kernelmanagerpb.Kerne
 		version = mlVersion
 
 		out, err := repack_v1.ML(&repack_v1.Input{
-			Version:       mlVersion,
-			BuildID:       buildID,
-			KernelPackage: kernel.Pkg,
-			Tarball:       mlTarball,
-			Changelog:     changelog(mlVersion),
+			Version:                mlVersion,
+			BuildID:                buildID,
+			KernelPackage:          kernel.Pkg,
+			Tarball:                mlTarball,
+			Changelog:              changelog(mlVersion),
+			AdditionalKernelConfig: kernel.Config.RepackOptions.AdditionalKernelConfig,
 		})
 		if err != nil {
 			return nil, err
@@ -158,11 +159,12 @@ func (w *Worker) KernelRepack(ctx context.Context, kernel *kernelmanagerpb.Kerne
 		version = ltVersion
 
 		out, err := repack_v1.LT(&repack_v1.Input{
-			Version:       ltVersion,
-			BuildID:       buildID,
-			KernelPackage: kernel.Pkg,
-			Tarball:       ltTarball,
-			Changelog:     changelog(ltVersion),
+			Version:                ltVersion,
+			BuildID:                buildID,
+			KernelPackage:          kernel.Pkg,
+			Tarball:                ltTarball,
+			Changelog:              changelog(ltVersion),
+			AdditionalKernelConfig: kernel.Config.RepackOptions.AdditionalKernelConfig,
 		})
 		if err != nil {
 			return nil, err

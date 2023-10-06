@@ -30,7 +30,7 @@ service KernelManager {
   // GetKernel returns a kernel by name.
   rpc GetKernel(GetKernelRequest) returns (Kernel) {
     option (google.api.http) = {
-      get: "/v1/{name=kernels/*}"
+      get: "/v1/{name=kernels/*/kernels/*}"
     };
     option (google.api.method_signature) = "name";
   }
@@ -46,7 +46,7 @@ service KernelManager {
   // UpdateKernel updates an existing kernel.
   rpc UpdateKernel(UpdateKernelRequest) returns (Kernel) {
     option (google.api.http) = {
-      patch: "/v1/{kernel.name=kernels/*}"
+      patch: "/v1/{kernel.name=kernels/*/kernels/*}"
       body: "kernel"
     };
     option (google.api.method_signature) = "kernel,update_mask";
@@ -57,7 +57,7 @@ service KernelManager {
   // update of the kernel. And the update window will be reset.
   rpc TriggerKernelUpdate(TriggerKernelUpdateRequest) returns (google.longrunning.Operation) {
     option (google.api.http) = {
-      post: "/v1/{name=kernels/*}:triggerUpdate"
+      post: "/v1/{name=kernels/*/kernels/*}:triggerUpdate"
     };
     option (google.longrunning.operation_info) = {
       response_type: "TriggerKernelUpdateResponse"

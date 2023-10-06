@@ -23,6 +23,8 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import { Theme } from '@mui/material/styles';
 import { Kernels } from './Kernels';
+import { GetKernel } from 'tools/kernelmanager/ui/GetKernel';
+import Link from '@mui/material/Link';
 
 export const App = () => {
   return (
@@ -34,7 +36,9 @@ export const App = () => {
       >
         <Toolbar variant="dense">
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            RESF KernelManager{window.__beta__ ? ' (beta)' : ''}
+            <Link to="/">
+              RESF KernelManager{window.__beta__ ? ' (beta)' : ''}
+            </Link>
           </Typography>
           <Box sx={{ flexGrow: 1, textAlign: 'right' }}>
             {window.__peridot_user__ ? (
@@ -68,6 +72,7 @@ export const App = () => {
           <Route index element={<Navigate to="/kernels" replace />} />
           <Route path="/kernels">
             <Route index element={<Kernels />} />
+            <Route path="*" element={<GetKernel />} />
           </Route>
         </Routes>
       </Box>

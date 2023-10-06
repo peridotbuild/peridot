@@ -6,8 +6,9 @@ import (
 )
 
 type File struct {
-	Name string
-	Data []byte
+	Name        string
+	Data        []byte
+	Permissions os.FileMode
 }
 
 type Output struct {
@@ -30,7 +31,7 @@ func (o *Output) ToFS(fs billy.Filesystem) error {
 
 	// Create SOURCES files
 	for _, file := range o.OtherFiles {
-		f, err := fs.OpenFile("SOURCES/"+file.Name, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+		f, err := fs.OpenFile("SOURCES/"+file.Name, os.O_CREATE|os.O_RDWR|os.O_TRUNC, file.Permissions)
 		if err != nil {
 			return err
 		}

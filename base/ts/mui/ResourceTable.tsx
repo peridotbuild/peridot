@@ -105,7 +105,9 @@ export function ResourceTable<T extends StandardResource>(
   const [rows, setRows] = React.useState<T[] | undefined>(undefined);
   const [loading, setLoading] = React.useState<boolean>(false);
   const [filter, setFilter] = React.useState<string | undefined>(initFilter);
-  const [filterValue, setFilterValue] = React.useState<string | undefined>(initFilter);
+  const [filterValue, setFilterValue] = React.useState<string | undefined>(
+    initFilter,
+  );
 
   const updateSearch = (replace = false) => {
     const search = new URLSearchParams(location.search);
@@ -170,7 +172,8 @@ export function ResourceTable<T extends StandardResource>(
         setRowsPerPage(initRowsPerPage);
       }
       if (
-        JSON.stringify(pageTokenHistory) !== JSON.stringify(initPageTokenHistory)
+        JSON.stringify(pageTokenHistory) !==
+        JSON.stringify(initPageTokenHistory)
       ) {
         setPageTokenHistory(initPageTokenHistory);
       }
@@ -251,10 +254,19 @@ export function ResourceTable<T extends StandardResource>(
       sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
     >
       {props.fields.map((field) => {
+        // If row has prefix of location.pathname, then we should remove it
+        // from the name.
+        // Then we can use a relative link.
+        const doesStartWithPathname = row.name?.startsWith(location.pathname);
+        if (doesStartWithPathname) {
+          // Only replace the first occurrence
+          row.name = row.name?.replace(location.pathname, '');
+        }
+
         return (
           <TableCell key={field.key}>
             {field.key === 'name' ? (
-              <Link to={`/${row.name}`}>{row.name}</Link>
+              <Link to={row.name}>{row.name}</Link>
             ) : (
               <>{row[field.key] ? row[field.key].toString() : '--'}</>
             )}
@@ -274,7 +286,9 @@ export function ResourceTable<T extends StandardResource>(
         variant="outlined"
         size="small"
         value={filterValue}
-        onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFilterValue(event.target.value)}
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+          setFilterValue(event.target.value)
+        }
       />
       <Button
         variant="contained"

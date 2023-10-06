@@ -569,21 +569,21 @@ sed -i "s@^EXTRAVERSION.*@EXTRAVERSION = -%{release}.%{_target_cpu}@" Makefile
 
 %ifarch x86_64 || aarch64
 cp config-%{_target_cpu} .config
-%{__make} -s ARCH=%{bldarch} listnewconfig | grep -E '^CONFIG_' > newoptions-el9-%{_target_cpu}.txt || true
-if [ -s newoptions-el9-%{_target_cpu}.txt ]; then
-	cat newoptions-el9-%{_target_cpu}.txt
+%{__make} -s ARCH=%{bldarch} listnewconfig | grep -E '^CONFIG_' > newoptions%{_target_cpu}.txt || true
+if [ -s newoptions%{_target_cpu}.txt ]; then
+	cat newoptions%{_target_cpu}.txt
 	exit 1
 fi
-rm -f newoptions-el9-%{_target_cpu}.txt
+rm -f newoptions%{_target_cpu}.txt
 %endif
 
-# Add DUP and kpatch certificates to system trusted keys for RHEL.
+# Add DUP and kpatch certificates to system trusted keys for Rocky.
 %if %{signkernel} || %{signmodules}
-openssl x509 -inform der -in %{SOURCE100} -out rheldup3.pem
-openssl x509 -inform der -in %{SOURCE101} -out rhelkpatch1.pem
-cat rheldup3.pem rhelkpatch1.pem > certs/rhel.pem
+openssl x509 -inform der -in %{SOURCE100} -out rockydup3.pem
+openssl x509 -inform der -in %{SOURCE101} -out rockykpatch1.pem
+cat rockydup3.pem rockykpatch1.pem > certs/rocky.pem
 for i in config-*; do
-	sed -i 's@CONFIG_SYSTEM_TRUSTED_KEYS="*"@CONFIG_SYSTEM_TRUSTED_KEYS="certs/rhel.pem"@' $i
+	sed -i 's@CONFIG_SYSTEM_TRUSTED_KEYS="*"@CONFIG_SYSTEM_TRUSTED_KEYS="certs/rocky.pem"@' $i
 done
 %else
 for i in config-*; do
@@ -591,9 +591,9 @@ for i in config-*; do
 done
 %endif
 
-# Adjust the FIPS module name for RHEL9.
+# Adjust the FIPS module name for Rocky9.
 for i in config-*; do
-	sed -i 's@CONFIG_CRYPTO_FIPS_NAME=.*@CONFIG_CRYPTO_FIPS_NAME="Red Hat Enterprise Linux 9 - Kernel Cryptographic API"@' $i
+	sed -i 's@CONFIG_CRYPTO_FIPS_NAME=.*@CONFIG_CRYPTO_FIPS_NAME="Rocky Linux 9 - Kernel Cryptographic API"@' $i
 done
 
 %{__make} -s distclean

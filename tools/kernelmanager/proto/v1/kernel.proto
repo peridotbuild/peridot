@@ -57,6 +57,9 @@ message RepackOptions {
   }
   // Repack version
   Version version = 4;
+
+  // Additional kernel config entries.
+  repeated string additional_kernel_config = 5;
 }
 
 // PeridotProject contains information about the Peridot project
