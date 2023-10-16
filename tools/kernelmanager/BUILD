@@ -17,10 +17,6 @@ load("//devtools/taskrunner2:defs.bzl", "taskrunner2")
 taskrunner2(
     name = "kernelmanager",
     dev_frontend_flags = True,
-    targets = [
-        "//devtools/devtemporal",
-        "//devtools/devdex",
-    ],
     watch_targets = [
         "//tools/kernelmanager/cmd/kernelmanager_dev",
     ],

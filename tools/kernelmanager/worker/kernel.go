@@ -128,7 +128,7 @@ func (w *Worker) KernelRepack(ctx context.Context, kernel *kernelmanagerpb.Kerne
 
 	switch kernel.Config.RepackOptions.KernelOrgVariant {
 	case kernelmanagerpb.RepackOptions_MAINLINE:
-		mlVersion, mlTarball, _, err := kernelorg.GetLatestML()
+		mlVersion, mlTarball, _, err := kernelorg.GetLatestStable()
 		if err != nil {
 			return nil, err
 		}

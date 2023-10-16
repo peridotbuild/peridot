@@ -80,27 +80,36 @@ func download(url string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+func downloadKernel(version string) ([]byte, *openpgp.Entity, error) {
+	firstDigit := version[0:1]
+
+	downloadURL := fmt.Sprintf("https://cdn.kernel.org/pub/linux/kernel/v%s.x/linux-%s.tar.xz", firstDigit, version)
+	tarball, err := download(downloadURL)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	signatureURL := fmt.Sprintf("https://cdn.kernel.org/pub/linux/kernel/v%s.x/linux-%s.tar.sign", firstDigit, version)
+	signature, err := download(signatureURL)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	entity, err := verifyTarball(tarball, false, signature)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return tarball, entity, nil
+}
+
 func downloadLT(majorVersion string) (string, []byte, *openpgp.Entity, error) {
 	latestVersion, err := GetLTVersion(majorVersion)
 	if err != nil {
 		return "", nil, nil, err
 	}
 
-	firstDigit := latestVersion[0:1]
-
-	downloadURL := fmt.Sprintf("https://cdn.kernel.org/pub/linux/kernel/v%s.x/linux-%s.tar.xz", firstDigit, latestVersion)
-	tarball, err := download(downloadURL)
-	if err != nil {
-		return "", nil, nil, err
-	}
-
-	signatureURL := fmt.Sprintf("https://cdn.kernel.org/pub/linux/kernel/v%s.x/linux-%s.tar.sign", firstDigit, latestVersion)
-	signature, err := download(signatureURL)
-	if err != nil {
-		return "", nil, nil, err
-	}
-
-	entity, err := verifyTarball(tarball, false, signature)
+	tarball, entity, err := downloadKernel(latestVersion)
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -127,4 +136,18 @@ func GetLatestML() (string, []byte, *openpgp.Entity, error) {
 
 func GetLatestLT(prefix string) (string, []byte, *openpgp.Entity, error) {
 	return downloadLT(prefix)
+}
+
+func GetLatestStable() (string, []byte, *openpgp.Entity, error) {
+	latestVersion, err := GetLatestStableVersion()
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	tarball, entity, err := downloadKernel(latestVersion)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	return latestVersion, tarball, entity, nil
 }

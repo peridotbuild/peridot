@@ -59,6 +59,36 @@ func GetLatestMLVersion() (string, error) {
 	return "", ErrNotFound
 }
 
+func GetLatestStableVersion() (string, error) {
+	f, err := http.Get(atomURL)
+	if err != nil {
+		return "", err
+	}
+	defer f.Body.Close()
+
+	var atom releaseAtom
+	err = xml.NewDecoder(f.Body).Decode(&atom)
+	if err != nil {
+		return "", err
+	}
+
+	if atom.Channel == nil {
+		return "", ErrNoRelease
+	}
+
+	if len(atom.Channel.Items) == 0 {
+		return "", ErrNoRelease
+	}
+
+	for _, item := range atom.Channel.Items {
+		if strings.HasSuffix(item.Title, ": stable") {
+			return strings.TrimSuffix(item.Title, ": stable"), nil
+		}
+	}
+
+	return "", ErrNotFound
+}
+
 func GetLTVersion(majorVersion string) (string, error) {
 	f, err := http.Get(atomURL)
 	if err != nil {

@@ -24,10 +24,10 @@
 %global _binary_payload w3T.xzdio
 
 # Define the version of the Linux Kernel Archive tarball.
-%global LKAver [[Version]]
+%global LKAver {{.Version}}
 
 # Define the buildid, if required.
-%global buildid [[BuildID]]
+%global buildid {{.BuildID}}
 
 # Determine the sublevel number and set pkg_version.
 %define sublevel %(echo %{LKAver} | %{__awk} -F\. '{ print $3 }')
@@ -79,13 +79,13 @@
 # by later architecture-specific checks. These can also be disabled by using
 # --without <opt> in the rpmbuild command, or by forcing these values to 0.
 #
-# [[KernelPackage]]
+# {{.KernelPackage}}
 %define with_std          %{?_without_std:          0} %{?!_without_std:          1}
 #
-# [[KernelPackage]]-headers
+# {{.KernelPackage}}-headers
 %define with_headers      %{?_without_headers:      0} %{?!_without_headers:      1}
 #
-# [[KernelPackage]]-doc
+# {{.KernelPackage}}-doc
 %define with_doc          %{?_without_doc:          0} %{?!_without_doc:          1}
 #
 # perf
@@ -100,13 +100,13 @@
 # control whether to install the vdso directories
 %define with_vdso_install %{?_without_vdso_install: 0} %{?!_without_vdso_install: 1}
 #
-# Additional option for toracat-friendly, one-off, [[KernelPackage]] building.
-# Only build the base [[KernelPackage]] (--with baseonly):
+# Additional option for toracat-friendly, one-off, {{.KernelPackage}} building.
+# Only build the base {{.KernelPackage}} (--with baseonly):
 %define with_baseonly     %{?_with_baseonly:        1} %{?!_with_baseonly:        0}
 
 %global KVERREL %{pkg_version}-%{pkg_release}.%{_target_cpu}
 
-# If requested, only build base [[KernelPackage]] package.
+# If requested, only build base {{.KernelPackage}} package.
 %if %{with_baseonly}
 %define with_doc 0
 %define with_perf 0
@@ -126,7 +126,7 @@
 
 %ifarch x86_64 || aarch64
 %define with_doc 0
-### as of [[KernelPackage]]-6.5.4, no more perf and bpftool -ay
+### as of {{.KernelPackage}}-6.5.4, no more perf and bpftool -ay
 %define with_perf 0
 %define with_bpftool 0
 %endif
@@ -161,7 +161,7 @@
 %define kernel_ml_prereq  coreutils, systemd >= 203-2, /usr/bin/kernel-install
 %define initrd_prereq  dracut >= 027
 
-Name: [[KernelPackage]]
+Name: {{.KernelPackage}}
 Summary: The Linux kernel. (The core of any Linux kernel based operating system.)
 License: GPLv2 and Redistributable, no modification permitted.
 URL: https://www.kernel.org/
@@ -175,7 +175,7 @@ Requires: %{name}-core-uname-r = %{KVERREL}
 Requires: %{name}-modules-uname-r = %{KVERREL}
 
 #
-# List the packages required for the [[KernelPackage]] build.
+# List the packages required for the {{.KernelPackage}} build.
 #
 BuildRequires: bash, bc, binutils, bison, bzip2, coreutils, diffutils, dwarves, elfutils-devel
 BuildRequires: findutils, flex, gawk, gcc, gcc-c++, gcc-plugin-devel, git-core, glibc-static
@@ -258,7 +258,7 @@ Source2002: kvm_stat.logrotate
 The %{name} meta package.
 
 #
-# This macro does requires, provides, conflicts, obsoletes for a [[KernelPackage]] package.
+# This macro does requires, provides, conflicts, obsoletes for a {{.KernelPackage}} package.
 #	%%kernel_ml_reqprovconf <subpackage>
 # It uses any kernel_ml_<subpackage>_conflicts and kernel_ml_<subpackage>_obsoletes
 # macros defined above.
@@ -377,7 +377,7 @@ and simple manipulation of eBPF programs and maps.
 %endif
 
 #
-# This macro creates a [[KernelPackage]]-<subpackage>-devel package.
+# This macro creates a {{.KernelPackage}}-<subpackage>-devel package.
 #	%%kernel_ml_devel_package [-m] <subpackage> <pretty-name>
 #
 %define kernel_ml_devel_package(m) \
@@ -387,7 +387,7 @@ Provides: %{name}%{?1:-%{1}}-devel-%{_target_cpu} = %{version}-%{release}\
 Provides: %{name}-devel-%{_target_cpu} = %{version}-%{release}%{?1:+%{1}}\
 Provides: %{name}-devel-uname-r = %{KVERREL}%{?1:+%{1}}\
 Provides: installonlypkg(kernel)\
-Provides: installonlypkg([[KernelPackage]])\
+Provides: installonlypkg({{.KernelPackage}})\
 AutoReqProv: no\
 Requires(pre): findutils\
 Requires: findutils\
@@ -407,7 +407,7 @@ against the %{?2:%{2} }%{name} package.\
 %{nil}
 
 #
-# This macro creates an empty [[KernelPackage]]-<subpackage>-devel-matched package that
+# This macro creates an empty {{.KernelPackage}}-<subpackage>-devel-matched package that
 # requires both the core and devel packages locked on the same version.
 #	%%kernel_ml_devel_matched_package [-m] <subpackage> <pretty-name>
 #
@@ -421,7 +421,7 @@ This meta package is used to install matching core and devel packages for a give
 %{nil}
 
 #
-# This macro creates a [[KernelPackage]]-<subpackage>-modules-extra package.
+# This macro creates a {{.KernelPackage}}-<subpackage>-modules-extra package.
 #	%%kernel_ml_modules_extra_package [-m] <subpackage> <pretty-name>
 #
 %define kernel_ml_modules_extra_package(m) \
@@ -431,7 +431,7 @@ Provides: %{name}%{?1:-%{1}}-modules-extra-%{_target_cpu} = %{version}-%{release
 Provides: %{name}%{?1:-%{1}}-modules-extra-%{_target_cpu} = %{version}-%{release}%{?1:+%{1}}\
 Provides: %{name}%{?1:-%{1}}-modules-extra = %{version}-%{release}%{?1:+%{1}}\
 Provides: installonlypkg(kernel-module)\
-Provides: installonlypkg([[KernelPackage]]-module)\
+Provides: installonlypkg({{.KernelPackage}}-module)\
 Provides: %{name}%{?1:-%{1}}-modules-extra-uname-r = %{KVERREL}%{?1:+%{1}}\
 Requires: %{name}-uname-r = %{KVERREL}%{?1:+%{1}}\
 Requires: %{name}%{?1:-%{1}}-modules-uname-r = %{KVERREL}%{?1:+%{1}}\
@@ -445,7 +445,7 @@ This package provides less commonly used %{name} modules for the %{?2:%{2} }%{na
 %{nil}
 
 #
-# This macro creates a [[KernelPackage]]-<subpackage>-modules package.
+# This macro creates a {{.KernelPackage}}-<subpackage>-modules package.
 #	%%kernel_ml_modules_package [-m] <subpackage> <pretty-name>
 #
 %define kernel_ml_modules_package(m) \
@@ -455,7 +455,7 @@ Provides: %{name}%{?1:-%{1}}-modules-%{_target_cpu} = %{version}-%{release}\
 Provides: %{name}-modules-%{_target_cpu} = %{version}-%{release}%{?1:+%{1}}\
 Provides: %{name}-modules = %{version}-%{release}%{?1:+%{1}}\
 Provides: installonlypkg(kernel-module)\
-Provides: installonlypkg([[KernelPackage]]-module)\
+Provides: installonlypkg({{.KernelPackage}}-module)\
 Provides: %{name}%{?1:-%{1}}-modules-uname-r = %{KVERREL}%{?1:+%{1}}\
 Requires: %{name}-uname-r = %{KVERREL}%{?1:+%{1}}\
 %if %{-m:1}%{!-m:0}\
@@ -468,7 +468,7 @@ This package provides commonly used %{name} modules for the %{?2:%{2}-}core %{na
 %{nil}
 
 #
-# this macro creates a [[KernelPackage]]-<subpackage> meta package.
+# this macro creates a {{.KernelPackage}}-<subpackage> meta package.
 #	%%kernel_ml_meta_package <subpackage>
 #
 %define kernel_ml_meta_package() \
@@ -477,14 +477,14 @@ Summary: %{name} meta-package for the %{1} ${name}.\
 Requires: %{name}-%{1}-core-uname-r = %{KVERREL}+%{1}\
 Requires: %{name}-%{1}-modules-uname-r = %{KVERREL}+%{1}\
 Provides: installonlypkg(kernel)\
-Provides: installonlypkg([[KernelPackage]])\
+Provides: installonlypkg({{.KernelPackage}})\
 %description %{1}\
 The meta-package for the %{1} %{name}.\
 %{nil}
 
 #
-# This macro creates a [[KernelPackage]]-<subpackage> and its -devel.
-#	%%define variant_summary The Linux [[KernelPackage]] compiled for <configuration>
+# This macro creates a {{.KernelPackage}}-<subpackage> and its -devel.
+#	%%define variant_summary The Linux {{.KernelPackage}} compiled for <configuration>
 #	%%kernel_ml_variant_package [-n <pretty-name>] [-m] <subpackage>
 #
 %define kernel_ml_variant_package(n:m) \
@@ -492,7 +492,7 @@ The meta-package for the %{1} %{name}.\
 Summary: %{variant_summary}.\
 Provides: %{name}-%{?1:%{1}-}core-uname-r = %{KVERREL}%{?1:+%{1}}\
 Provides: installonlypkg(kernel)\
-Provides: installonlypkg([[KernelPackage]])\
+Provides: installonlypkg({{.KernelPackage}})\
 %if %{-m:1}%{!-m:0}\
 Requires: %{name}-core-uname-r = %{KVERREL}\
 %endif\
@@ -849,7 +849,7 @@ cp -a scripts $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build
 rm -fr $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build/scripts/tracing
 rm -f $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build/scripts/spdxcheck.py
 
-# Files for 'make scripts' to succeed with [[KernelPackage]]-devel.
+# Files for 'make scripts' to succeed with {{.KernelPackage}}-devel.
 mkdir -p $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build/security/selinux/include
 cp -a --parents security/selinux/include/classmap.h $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build
 cp -a --parents security/selinux/include/initial_sid_to_string.h $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build
@@ -857,7 +857,7 @@ mkdir -p $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build/tools/include/tools
 cp -a --parents tools/include/tools/be_byteshift.h $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build
 cp -a --parents tools/include/tools/le_byteshift.h $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build
 
-# Files for 'make prepare' to succeed with [[KernelPackage]]-devel.
+# Files for 'make prepare' to succeed with {{.KernelPackage}}-devel.
 cp -a --parents tools/include/linux/compiler* $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build
 cp -a --parents tools/include/linux/types.h $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build
 cp -a --parents tools/build/Build.include $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build
@@ -916,7 +916,7 @@ cp -a --parents arch/arm/include/asm/opcodes.h $RPM_BUILD_ROOT/lib/modules/%{KVE
 cp -a include $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build/include
 
 %ifarch x86_64
-# Files required for 'make prepare' to succeed with [[KernelPackage]]-devel.
+# Files required for 'make prepare' to succeed with {{.KernelPackage}}-devel.
 cp -a --parents arch/x86/entry/syscalls/syscall_32.tbl $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build/
 cp -a --parents arch/x86/entry/syscalls/syscall_64.tbl $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build/
 cp -a --parents arch/x86/tools/relocs_32.c $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build/
@@ -997,11 +997,11 @@ remove_depmod_files()
 
 remove_depmod_files
 
-# Identify modules in the [[KernelPackage]]-modules-extras package
+# Identify modules in the {{.KernelPackage}}-modules-extras package
 %{SOURCE20} $RPM_BUILD_ROOT lib/modules/%{KVERREL} %{SOURCE26}
 
 #
-# Generate the [[KernelPackage]]-core and [[KernelPackage]]-modules file lists.
+# Generate the {{.KernelPackage}}-core and {{.KernelPackage}}-modules file lists.
 #
 
 # Make a copy of the System.map file for depmod to use.
@@ -1014,11 +1014,11 @@ pushd $RPM_BUILD_ROOT > /dev/null
 mkdir restore
 cp -r lib/modules/%{KVERREL}/* restore/
 
-# Don't include anything going into [[KernelPackage]]-modules-extra in the file lists.
+# Don't include anything going into {{.KernelPackage}}-modules-extra in the file lists.
 xargs rm -fr < mod-extra.list
 
 # Find all the module files and filter them out into the core and modules lists.
-# This actually removes anything going into [[KernelPackage]]-modules from the directory.
+# This actually removes anything going into {{.KernelPackage}}-modules from the directory.
 find lib/modules/%{KVERREL}/kernel -name *.ko -type f | sort -n > modules.list
 cp $RPM_SOURCE_DIR/filter-*.sh .
 ./filter-modules.sh modules.list %{_target_cpu}
@@ -1041,7 +1041,7 @@ remove_depmod_files
 ### BCAT
 
 # Go back and find all of the various directories in the tree.
-# We use this for the directory lists in [[KernelPackage]]-core.
+# We use this for the directory lists in {{.KernelPackage}}-core.
 find lib/modules/%{KVERREL}/kernel -mindepth 1 -type d | sort -n > module-dirs.list
 
 # Cleanup.
@@ -1070,15 +1070,15 @@ mv $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build $RPM_BUILD_ROOT/usr/src/kernels/
 
 # This is going to create a broken link during the build but we don't use
 # it after this point. We need the link to actually point to something
-# for when the [[KernelPackage]]-devel package is installed.
+# for when the {{.KernelPackage}}-devel package is installed.
 ln -sf /usr/src/kernels/%{KVERREL} $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/build
 
-# Move the generated vmlinux.h file into the [[KernelPackage]]-devel directory structure.
+# Move the generated vmlinux.h file into the {{.KernelPackage}}-devel directory structure.
 if [ -f tools/bpf/bpftool/vmlinux.h ]; then
 	mv tools/bpf/bpftool/vmlinux.h $RPM_BUILD_ROOT/usr/src/kernels/%{KVERREL}/
 fi
 
-# Purge the [[KernelPackage]]-devel tree of leftover junk.
+# Purge the {{.KernelPackage}}-devel tree of leftover junk.
 find $RPM_BUILD_ROOT/usr/src/kernels -name ".*.cmd" -type f -delete
 
 # Red Hat UEFI Secure Boot CA certificate, which can be used to authenticate the kernel.
@@ -1095,11 +1095,11 @@ cp certs/signing_key.x509 certs/signing_key.x509.sign
 %endif
 
 # We have to do the headers install before the tools install because the
-# [[KernelPackage]] headers_install will remove any header files in /usr/include that
+# {{.KernelPackage}} headers_install will remove any header files in /usr/include that
 # it doesn't install itself.
 
 %if %{with_headers}
-# Install [[KernelPackage]] headers
+# Install {{.KernelPackage}} headers
 %{__make} -s ARCH=%{hdrarch} INSTALL_HDR_PATH=$RPM_BUILD_ROOT/usr headers_install
 
 find $RPM_BUILD_ROOT/usr/include \
@@ -1235,7 +1235,7 @@ popd > /dev/null
 %endif
 
 #
-# This macro defines a %%post script for a [[KernelPackage]]*-devel package.
+# This macro defines a %%post script for a {{.KernelPackage}}*-devel package.
 #	%%kernel_ml_devel_post [<subpackage>]
 # Note we don't run hardlink if ostree is in use, as ostree is
 # a far more sophisticated hardlink implementation.
@@ -1257,7 +1257,7 @@ fi\
 %{nil}
 
 #
-# This macro defines a %%post script for a [[KernelPackage]]*-modules-extra package.
+# This macro defines a %%post script for a {{.KernelPackage}}*-modules-extra package.
 # It also defines a %%postun script that does the same thing.
 #	%%kernel_ml_modules_extra_post [<subpackage>]
 #
@@ -1270,7 +1270,7 @@ fi\
 %{nil}
 
 #
-# This macro defines a %%post script for a [[KernelPackage]]*-modules package.
+# This macro defines a %%post script for a {{.KernelPackage}}*-modules package.
 # It also defines a %%postun script that does the same thing.
 #	%%kernel_ml_modules_post [<subpackage>]
 #
@@ -1282,7 +1282,7 @@ fi\
 /sbin/depmod -a %{KVERREL}%{?1:+%{1}}\
 %{nil}
 
-# This macro defines a %%posttrans script for a [[KernelPackage]] package.
+# This macro defines a %%posttrans script for a {{.KernelPackage}} package.
 #	%%kernel_ml_variant_posttrans [<subpackage>]
 # More text can follow to go at the end of this variant's %%post.
 #
@@ -1296,7 +1296,7 @@ fi\
 %{nil}
 
 #
-# This macro defines a %%post script for a [[KernelPackage]] package and its devel package.
+# This macro defines a %%post script for a {{.KernelPackage}} package and its devel package.
 #	%%kernel_ml_variant_post [-v <subpackage>] [-r <replace>]
 # More text can follow to go at the end of this variant's %%post.
 #
@@ -1314,7 +1314,7 @@ fi}\
 %{nil}
 
 #
-# This macro defines a %%preun script for a [[KernelPackage]] package.
+# This macro defines a %%preun script for a {{.KernelPackage}} package.
 #	%%kernel_ml_variant_preun <subpackage>
 #
 %define kernel_ml_variant_preun() \
@@ -1435,7 +1435,7 @@ fi
 %endif
 
 #
-# This macro defines the %%files sections for a [[KernelPackage]] package
+# This macro defines the %%files sections for a {{.KernelPackage}} package
 # and its devel package.
 #	%%kernel_ml_variant_files [-k vmlinux] <use_vdso> <condition> <subpackage>
 #
