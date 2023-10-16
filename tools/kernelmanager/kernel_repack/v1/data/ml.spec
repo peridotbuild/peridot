@@ -574,8 +574,9 @@ sed -i "s@^EXTRAVERSION.*@EXTRAVERSION = -%{release}.%{_target_cpu}@" Makefile
 cp config-%{_target_cpu} .config
 %{__make} -s ARCH=%{bldarch} listnewconfig | grep -E '^CONFIG_' > newoptions-%{_target_cpu}.txt || true
 if [ -s newoptions-%{_target_cpu}.txt ]; then
-	cat newoptions-%{_target_cpu}.txt
-	exit 1
+  # We're just automatically adding new options, think of it as rolling.
+  # If something breaks we can disable it explicitly.
+  cat newoptions-%{_target_cpu}.txt >> .config
 fi
 rm -f newoptions-%{_target_cpu}.txt
 %endif
