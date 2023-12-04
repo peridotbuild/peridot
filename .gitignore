@@ -6,3 +6,5 @@ node_modules
 
 # ignore nfv2 generated content
 vendor/go.resf.org/peridot
+
+.envrc.local
