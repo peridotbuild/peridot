@@ -55,13 +55,6 @@
 %global signmodules 0
 %endif
 
-### BCAT
-# Further investigation is required before these features
-# are enabled for the ELRepo Project kernels.
-%global signkernel 0
-%global signmodules 0
-### BCAT
-
 # Compress modules on all architectures that build modules.
 %ifarch x86_64 || aarch64
 %global zipmodules 1
@@ -247,11 +240,13 @@ Source2000: cpupower.service
 Source2001: cpupower.config
 Source2002: kvm_stat.logrotate
 
+Source3000: rocky-sigkernel.cer
+
 %if %{signkernel}
 %define secureboot_ca_0 %{_datadir}/pki/sb-certs/secureboot-ca-%{_arch}.cer
-%define secureboot_key_0 %{_datadir}/pki/sb-certs/secureboot-kernel-%{_arch}.cer
+%define secureboot_key_0 %{SOURCE3000}
 
-%define pesign_name_0 redhatsecureboot501
+%define pesign_name_0 rockybootsigningsigkernelcert
 %endif
 
 %description
@@ -707,6 +702,7 @@ popd > /dev/null
 
 %install
 %define __modsign_install_post \
+pushd linux-%{KVERREL} > /dev/null \
 if [ "%{signmodules}" -eq "1" ]; then \
 	if [ "%{with_std}" -ne "0" ]; then \
 		%{SOURCE21} certs/signing_key.pem.sign certs/signing_key.x509.sign $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/ \
@@ -1404,7 +1400,7 @@ fi
 ### BCAT
 
 %files -n %{name}-tools-libs
-%{_libdir}/libcpupower.so.0
+%{_libdir}/libcpupower.so.1
 %{_libdir}/libcpupower.so.0.0.1
 
 %files -n %{name}-tools-libs-devel
@@ -1488,3 +1484,7 @@ fi
 %kernel_ml_variant_files %{_use_vdso} %{with_std}
 
 %changelog
+{{range $val := .Changelog}}
+* {{$val.Date}} {{$val.Name}} - {{$val.Version}}-{{$val.BuildID}}
+- {{$val.Text}}
+{{end}}

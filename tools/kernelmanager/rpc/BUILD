@@ -14,7 +14,6 @@ go_library(
         "//base/go/kv",
         "//third_party/googleapis/google/longrunning:longrunning_go_proto",
         "//tools/kernelmanager/proto/v1:pb",
-        "//tools/mothership/proto/v1:pb",
         "//vendor/go.temporal.io/api/enums/v1:enums",
         "//vendor/go.temporal.io/api/serviceerror",
         "//vendor/go.temporal.io/api/workflowservice/v1:workflowservice",

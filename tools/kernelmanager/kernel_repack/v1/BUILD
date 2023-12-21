@@ -17,6 +17,7 @@ go_library(
         "data/kvm_stat.logrotate",
         "data/mod-denylist.sh",
         "data/mod-sign.sh",
+        "data/rocky-sigkernel.cer",
         "data/rockykpatch1.x509",
         "data/x509.genkey",
         "data/rockydup1.x509",

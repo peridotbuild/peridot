@@ -15,20 +15,19 @@
 package kernelmanager_rpc
 
 import (
-	"context"
-	base "go.resf.org/peridot/base/go"
-	kernelmanagerpb "go.resf.org/peridot/tools/kernelmanager/pb"
-	mothershippb "go.resf.org/peridot/tools/mothership/pb"
-	v11 "go.temporal.io/api/enums/v1"
-	"go.temporal.io/api/serviceerror"
-	"go.temporal.io/api/workflowservice/v1"
-	"google.golang.org/genproto/googleapis/longrunning"
-	rpccode "google.golang.org/genproto/googleapis/rpc/code"
-	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
+    "context"
+    base "go.resf.org/peridot/base/go"
+    kernelmanagerpb "go.resf.org/peridot/tools/kernelmanager/pb"
+    v11 "go.temporal.io/api/enums/v1"
+    "go.temporal.io/api/serviceerror"
+    "go.temporal.io/api/workflowservice/v1"
+    "google.golang.org/genproto/googleapis/longrunning"
+    rpccode "google.golang.org/genproto/googleapis/rpc/code"
+    rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
+    "google.golang.org/protobuf/types/known/anypb"
+    "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (s *Server) describeWorkflowToOperation(ctx context.Context, res *workflowservice.DescribeWorkflowExecutionResponse) (*longrunning.Operation, error) {
@@ -75,7 +74,7 @@ func (s *Server) describeWorkflowToOperation(ctx context.Context, res *workflows
 		// Complete, we need to get the result using GetWorkflow
 		run := s.temporal.GetWorkflow(ctx, op.Name, "")
 
-		var res mothershippb.ProcessRPMResponse
+		var res kernelmanagerpb.TriggerKernelUpdateResponse
 		if err := run.Get(ctx, &res); err != nil {
 			return nil, err
 		}
