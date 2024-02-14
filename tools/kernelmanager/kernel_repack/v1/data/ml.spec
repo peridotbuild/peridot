@@ -240,11 +240,18 @@ Source2000: cpupower.service
 Source2001: cpupower.config
 Source2002: kvm_stat.logrotate
 
-Source3000: rocky-sigkernel.cer
+Source3000: secureboot-sig-kernel-x86_64.cer
+Source3001: secureboot-sig-kernel-aarch64.cer
 
 %if %{signkernel}
 %define secureboot_ca_0 %{_datadir}/pki/sb-certs/secureboot-ca-%{_arch}.cer
+
+%ifarch x86_64
 %define secureboot_key_0 %{SOURCE3000}
+%endif
+%ifarch aarch64
+%define secureboot_key_0 %{SOURCE3001}
+%endif
 
 %define pesign_name_0 rockybootsigningsigkernelcert
 %endif
