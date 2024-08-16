@@ -10,7 +10,7 @@ go_library(
         "gregkh.asc",
         "torvalds.asc",
     ],
-    importpath = "go.resf.org/peridot/tools/kernelmanager/kernel_repack/kernelorg",
+    importpath = "go.resf.org/peridot/tools/kernelmanager/packager/kernelorg",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/xi2/xz",
