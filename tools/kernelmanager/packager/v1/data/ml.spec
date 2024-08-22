@@ -1407,7 +1407,11 @@ fi
 ### BCAT
 
 %files -n %{name}-tools-libs
+{{if (eq (compareVersion .Version "6.2") 1)}}
 %{_libdir}/libcpupower.so.1
+{{else}}
+%{_libdir}/libcpupower.so.0
+{{end}}
 %{_libdir}/libcpupower.so.0.0.1
 
 %files -n %{name}-tools-libs-devel
@@ -1491,7 +1495,7 @@ fi
 %kernel_ml_variant_files %{_use_vdso} %{with_std}
 
 %changelog
-{{range $val := .Changelog}}
-* {{$val.Date}} {{$val.Name}} - {{$val.Version}}-{{$val.BuildID}}
-- {{$val.Text}}
+{{range $val := .Changelog}}* {{if $val.Subject}}{{$val.Subject}}{{else}}{{$val.Date}} {{$val.Name}} - {{$val.Version}}-{{$val.BuildID}}{{end}}
+{{range $text := $val.Messages}}- {{$text}}
+{{end}}
 {{end}}

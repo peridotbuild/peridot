@@ -1,7 +1,7 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
-    name = "kernel_repack",
+    name = "packager",
     srcs = ["v1.go"],
     embedsrcs = [
         "data/config-x86_64",
@@ -23,7 +23,7 @@ go_library(
         "data/x509.genkey",
         "data/rockydup1.x509",
     ],
-    importpath = "go.resf.org/peridot/tools/kernelmanager/kernel_repack/v1",
+    importpath = "go.resf.org/peridot/tools/kernelmanager/packager/v1",
     visibility = ["//visibility:public"],
-    deps = ["//tools/kernelmanager/kernel_repack"],
+    deps = ["//tools/kernelmanager/packager"],
 )
